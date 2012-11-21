@@ -316,6 +316,8 @@ int main(int argc, char **argv)
 		net_ptr->epoll_waiter(1000);
 #endif
 		net_ptr->epoll_dispatcher();
+
+		Sleep(1);
 	
 	}
 
