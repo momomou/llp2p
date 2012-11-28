@@ -64,17 +64,6 @@ void pk_mgr::peer_mgr_set(peer_mgr *peer_mgr_ptr)
 
 }
 
-void pk_mgr::rtsp_viewer_set(rtsp_viewer *rtsp_viewer_ptr)
-{
-	_rtsp_viewer_ptr = rtsp_viewer_ptr;
-
-}
-
-void pk_mgr::rtmp_sock_set(int sock)
-{
-	_rtmp_sock = sock;
-
-}
 
 void pk_mgr::init()
 {
@@ -1285,7 +1274,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 			
 		}else if((*(_chunk_rtp + (seq_ready_to_send % _bucket_size))).header.stream == STRM_TYPE_MEDIA){
 			for (_map_stream_iter = _map_stream_media.begin(); _map_stream_iter != _map_stream_media.end(); _map_stream_iter++) {
-//per fd mean a player
+//per fd mean a player   
 				strm_ptr = _map_stream_iter->second;
 				    strm_ptr->add_chunk((struct chunk_t *)(_chunk_rtp + (seq_ready_to_send % _bucket_size)));
 				    _net_ptr->epoll_control(_map_stream_iter->first, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);

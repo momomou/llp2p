@@ -55,8 +55,6 @@ public:
 	int build_connection(string ip, string port); 
 	int handle_register(string svc_tcp_port, string svc_udp_port);
 	void peer_mgr_set(peer_mgr *peer_mgr_ptr);
-	void rtsp_viewer_set(rtsp_viewer *rtsp_viewer_ptr);
-	void rtmp_sock_set(int sock);
 	
 	void add_stream(int strm_addr, stream *strm, unsigned strm_type);
 	void del_stream(int strm_addr, stream *strm, unsigned strm_type);

@@ -11,10 +11,10 @@ bit_stream_httpout::bit_stream_httpout(int stream_id,network *net_ptr, logger *l
 		char httpHeader[]=	"HTTP/1.1 200 OK\r\n" 
 							"Date: Mon, 22 Oct 2012 18:46:42 GMT"
 							"Server: Apache/2.2.8 (Win32) PHP/5.2.6"
-							"Connection: Keep-Alive\r\n"
-	//						"Connection: close\r\n"
-//							"Content-Type: application/octet-stream\r\n"
-							"Content-Type: text/plain\r\n"
+//							"Connection: Keep-Alive\r\n"
+							"Connection: close\r\n"
+							"Content-Type: application/octet-stream\r\n"
+//							"Content-Type: text/plain\r\n"
 //							"Content-Length: 324924230\r\n"
 							"\r\n";
 
@@ -56,13 +56,14 @@ bit_stream_httpout::bit_stream_httpout(int stream_id,network *net_ptr, logger *l
 		sendHeaderBytes = _net_ptr->send(acceptfd,FLV_Header,sizeof(FLV_Header),0);
 		cout << "send_FLVHeaderBytes=" << sendHeaderBytes<<endl;
 
-		//for debug
-
+//for debug
 //		file_ptr = fopen("./here.flv" , "wb");
 //		file_ptr_test = fopen("./metadata" , "rb");
-
 //		fwrite(FLV_Header,1,sizeof(FLV_Header),file_ptr);
-
+//		char buff[512]={0};
+//		recv(acceptfd,buff,512,0);
+//		for(int i=0 ; i<512;i++)
+//		printf("%c",buff[i]);
 
 
 	}
@@ -90,7 +91,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 
 
-//	while(true){
+	while(true){
 
 	if (_send_ctl_info.ctl_state == READY) {
 		size_t send_size;
@@ -202,12 +203,11 @@ _log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt sequence_
 				//it not a error
 				_send_ctl_info.ctl_state = READY;
 				_queue_out_data_ptr->pop();
-				}else{
-						printf("delete map and bit_stream_out_ptr");
-						_pk_mgr_ptr ->del_stream(sock,(stream*)this, STRM_TYPE_MEDIA);
-						_pk_mgr_ptr ->data_close(sock,"here sock error");
-						_bit_stream_server_ptr -> delBitStreamOut((stream*)this);
-
+			}else{
+					printf("delete map and bit_stream_httpout_ptr\n");
+					_pk_mgr_ptr ->del_stream(sock,(stream*)this, STRM_TYPE_MEDIA);
+					_pk_mgr_ptr ->data_close(sock," bit_stream_httpout ");
+					_bit_stream_server_ptr -> delBitStreamOut((stream*)this);
 					}
 
 			}
@@ -239,7 +239,7 @@ _log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt sequence_
 				return RET_OK;
 			}
 		}
-//	}//end while (1)
+	}//end while (1)
 	}
 void bit_stream_httpout::handle_pkt_error(int sock){
 	}
@@ -296,10 +296,10 @@ unsigned int bit_stream_httpout::getFlvTimeStamp(struct chunk_bitstream_t *chunk
 	timeStampIntExtend =  *(char*)(chunk_ptr->buf +7);
 	timeStampInt=(timeStampIntExtend  << 24) +timeStampInt ;
 	printf("%d\n",timeStampInt);
-	if(*(char*)(chunk_ptr->buf) == 0x09 )  //video
-	_log_ptr->write_log_format("s => s u \n", __FUNCTION__, "video timeStamp=", timeStampInt);
-	else //audio
-	 _log_ptr->write_log_format("s => s d \n", __FUNCTION__, "audio timeStamp=", timeStampInt);
+//	if(*(char*)(chunk_ptr->buf) == 0x09 )  //video
+//	_log_ptr->write_log_format("s => s u \n", __FUNCTION__, "video timeStamp=", timeStampInt);
+//	else //audio
+//	 _log_ptr->write_log_format("s => s d \n", __FUNCTION__, "audio timeStamp=", timeStampInt);
 	return timeStampInt;
 
 }

@@ -164,7 +164,7 @@ void network::epoll_dispatcher(void)
 			
 			if(events[i].events & EPOLLIN)
 				if (bc_ptr->handle_pkt_in(cfd) == RET_SOCK_ERROR) {		// readable
-                    printf("%s,handle sock error\n",__FUNCTION__);
+                    printf("%s,handle in sock error\n",__FUNCTION__);
 					if(_map_fd_del_hdl_tbl.find(cfd) != _map_fd_del_hdl_tbl.end()){
 						_map_fd_del_hdl_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
 					}
@@ -173,7 +173,7 @@ void network::epoll_dispatcher(void)
 
 			if(events[i].events & EPOLLOUT)
 				if (bc_ptr->handle_pkt_out(cfd) == RET_SOCK_ERROR) {		// writable
-					printf("%s,handle sock error\n",__FUNCTION__);
+					printf("%s,handle out sock error\n",__FUNCTION__);
 					if(_map_fd_del_hdl_tbl.find(cfd) != _map_fd_del_hdl_tbl.end()){
 						_map_fd_del_hdl_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
 					}
@@ -207,10 +207,6 @@ void network::epoll_control(int sock, int op, unsigned int event)
 	}
 }
 
-void network::handle_rtmp_error(int sock) 
-{
-	_error_cfd->push(sock);
-}
 
 void network::set_nonblocking(int sock) 
 {
@@ -312,6 +308,9 @@ void network::peer_set(peer *peer_ptr)
 	_peer_ptr = peer_ptr;		
 }
 
+//close "sock" in _map_fd_bc_tbl and erase the key-value
+//delete sock in epoll_control
+//shutdown socket and close socket
 int network::close(int sock) 
 {
 	DBG_PRINTF("here\n");
@@ -475,9 +474,10 @@ network::~network()
 
 }
 
+//================below not important=====================
 
 
-
-
-
-
+void network::handle_rtmp_error(int sock) 
+{
+	_error_cfd->push(sock);
+}
