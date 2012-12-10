@@ -64,6 +64,19 @@ void pk_mgr::peer_mgr_set(peer_mgr *peer_mgr_ptr)
 
 }
 
+void pk_mgr::rtsp_viewer_set(rtsp_viewer *rtsp_viewer_ptr)
+{
+	_rtsp_viewer_ptr = rtsp_viewer_ptr;
+
+}
+
+void pk_mgr::rtmp_sock_set(int sock)
+{
+	_rtmp_sock = sock;
+
+}
+
+
 
 void pk_mgr::init()
 {

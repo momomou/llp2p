@@ -79,6 +79,9 @@ public:
 	void data_close(int cfd, const char *reason); 
 	int get_sock(void);
 
+	void rtsp_viewer_set(rtsp_viewer *rtsp_viewer_ptr);
+	void rtmp_sock_set(int sock);
+
 private:
 
 	int _sock;
