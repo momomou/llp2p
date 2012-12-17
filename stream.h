@@ -8,7 +8,7 @@ class stream:public basic_class {
 public:
 	stream();
 	~stream();
-
+	int _reqStreamID;
 	virtual int handle_pkt_in(int sock);
 	virtual int handle_pkt_out(int sock);
 	virtual void handle_pkt_error(int sock);

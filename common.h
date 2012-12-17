@@ -114,6 +114,7 @@ using std::bitset;
 #define CHNK_CMD_PEER_DEP				0x10	// departure
 #define CHNK_CMD_PEER_NOTIFY        	0x11
 #define CHNK_CMD_PEER_LATENCY           0x12
+#define CHNK_CMD_CHN_UPDATA_DATA        0x13	// update steam id to peer
 #define CHNK_CMD_PEER_UNKNOWN			0xFF	// 1 B cmd => 0xFF is reserved for unknown cmd
 
 

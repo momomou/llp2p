@@ -5,21 +5,15 @@
 #include "pk_mgr.h"
 #include <sstream>
 
-
-bit_stream_httpout::bit_stream_httpout(int stream_id,network *net_ptr, logger *log_ptr,bit_stream_server *bit_stream_server_ptr ,pk_mgr *pk_mgr_ptr, list<int> *fd_list,int acceptfd){
-		
-		char httpHeader[]=	"HTTP/1.1 200 OK\r\n" 
+const	char httpHeader[]=	"HTTP/1.1 200 OK\r\n" 
 							"Date: Mon, 22 Oct 2012 18:46:42 GMT"
 							"Server: Apache/2.2.8 (Win32) PHP/5.2.6"
-//							"Connection: Keep-Alive\r\n"
 							"Connection: close\r\n"
 							"Content-Type: application/octet-stream\r\n"
-//							"Content-Type: text/plain\r\n"
-//							"Content-Length: 324924230\r\n"
 							"\r\n";
 
 
-		 char FLV_Header[] = { 0x46,0x4c,0x56,0x01,0x05,0x00,0x00,0x00,0x09,0x00,0x00,0x00,0x00,0x12,0x00,0x00
+const	 char FLV_Header[] = { 0x46,0x4c,0x56,0x01,0x05,0x00,0x00,0x00,0x09,0x00,0x00,0x00,0x00,0x12,0x00,0x00
 							,0xb6,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02,0x00,0x0a,0x6f,0x6e,0x4d,0x65,0x74
 							,0x61,0x44,0x61,0x74,0x61,0x08,0x00,0x00,0x00,0x07,0x00,0x08,0x64,0x75,0x72,0x61
 							,0x74,0x69,0x6f,0x6e,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x05,0x77
@@ -36,38 +30,31 @@ bit_stream_httpout::bit_stream_httpout(int stream_id,network *net_ptr, logger *l
 
 
 
-		int first_pkt=1;
+bit_stream_httpout::bit_stream_httpout(int stream_id,network *net_ptr, logger *log_ptr,bit_stream_server *bit_stream_server_ptr ,pk_mgr *pk_mgr_ptr, list<int> *fd_list,int acceptfd){
+
+		_reqStreamID=-1;
+		first_pkt=true;
+		first_HTTP_Header=true;
+		
 		_stream_id = stream_id;
 		_net_ptr = net_ptr;
 		_log_ptr = log_ptr;
 		_pk_mgr_ptr = pk_mgr_ptr;
 		fd_list_ptr = fd_list;
 		_bit_stream_server_ptr = bit_stream_server_ptr;
-		
+
 		_queue_out_data_ptr = new std::queue<struct chunk_t *>;	
 		memset(&_send_ctl_info, 0x00, sizeof(_send_ctl_info));
-
-		
-		//here is http header and flv header
-		
-		cout << "============= Acceppt New Player ============"<<endl;
-		int sendHeaderBytes = _net_ptr->send(acceptfd,httpHeader,sizeof(httpHeader) -1 ,0);  //-1 to subtract '\0'
-		cout << "send_HttpHeaderBytes=" << sendHeaderBytes<<endl;
-		sendHeaderBytes = _net_ptr->send(acceptfd,FLV_Header,sizeof(FLV_Header),0);
-		cout << "send_FLVHeaderBytes=" << sendHeaderBytes<<endl;
 
 //for debug
 //		file_ptr = fopen("./here.flv" , "wb");
 //		file_ptr_test = fopen("./metadata" , "rb");
 //		fwrite(FLV_Header,1,sizeof(FLV_Header),file_ptr);
-//		char buff[512]={0};
-//		recv(acceptfd,buff,512,0);
-//		for(int i=0 ; i<512;i++)
-//		printf("%c",buff[i]);
 
 
 	}
 bit_stream_httpout::~bit_stream_httpout(){
+	printf("==============deldet bit_stream_httpout success==========\n");
 	if(_queue_out_data_ptr)
 	delete _queue_out_data_ptr;
 	}
@@ -75,20 +62,53 @@ bit_stream_httpout::~bit_stream_httpout(){
 void bit_stream_httpout::init(){
 	}
 	
+
+
+//只有一開始第一次接收player的http request 接收後即關閉監聽
 int bit_stream_httpout::handle_pkt_in(int sock){
-		return -1;
+		
+		int recv_byte;
+		char HTTPrequestBuffer[512]={0x0};
+		_net_ptr->set_nonblocking(sock);
+
+		recv_byte = _net_ptr ->recv(sock, HTTPrequestBuffer,  sizeof(HTTPrequestBuffer), 0);
+
+		_reqStreamID= getStreamID_FromHTTP_Request(HTTPrequestBuffer,sizeof(HTTPrequestBuffer));
+		printf("\n HTTP  _reqStreamID =%d\n",_reqStreamID);
+
+		if(isStreamID_inChannel(_reqStreamID)){						//得到streamID 並關掉監聽
+			_net_ptr->epoll_control(sock, EPOLL_CTL_DEL,EPOLLIN);	
+		}else{														//stream ID 錯誤 或player 多次連線
+			printf("delete map and bit_stream_httpout_ptr\n");
+			_net_ptr->epoll_control(sock, EPOLL_CTL_DEL, EPOLLIN | EPOLLOUT);	
+			_pk_mgr_ptr ->del_stream(sock,(stream*)this, STRM_TYPE_MEDIA);
+			_pk_mgr_ptr ->data_close(sock," bit_stream_httpout ");
+			delete this;
+			}
+
+		return RET_OK;
 	}
 	
+
+//第一次傳送http header 和flv headerd,然後等到第一個keyframe後才開始丟給player 
+//判斷delay是否發生並適當的做取樣,接著就把queue 的資料傳出去
 int bit_stream_httpout::handle_pkt_out(int sock){
 
-	int send_rt_val; //send return value
+	int send_rt_val=0; //send return value
 	int channel_num;
 	int basic_header_type;
 	int ms_type_id = 0;
 	int mss_id = 0;
-	send_rt_val=0;
 
-
+	//here is http header and flv header
+	if(first_HTTP_Header){
+		cout << "============= Acceppt New Player ============"<<endl;
+		int sendHeaderBytes = _net_ptr->send(sock,httpHeader,sizeof(httpHeader) -1 ,0);  //-1 to subtract '\0'
+		cout << "send_HttpHeaderBytes=" << sendHeaderBytes<<endl;
+		sendHeaderBytes = _net_ptr->send(sock,FLV_Header,sizeof(FLV_Header),0);
+		cout << "send_FLVHeaderBytes=" << sendHeaderBytes<<endl;
+		first_HTTP_Header =false;
+	}
 
 
 	while(true){
@@ -98,7 +118,6 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 		struct chunk_bitstream_t *chunk_ptr;
 
-		
 		if (!_queue_out_data_ptr->size()) {
 			_log_ptr->write_log_format("s => s \n", __FUNCTION__, "_queue_out_data_ptr->size =0");
 			_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN);	
@@ -107,8 +126,8 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 		chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();
 
-
 //pop until get the first keyframe
+
 		while(first_pkt){
 			if(_queue_out_data_ptr ->size() >=10){
 				for(int i=0;i<5;i++){
@@ -117,7 +136,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 					chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();
 					}else{
 						_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "First Key Frame is ", chunk_ptr ->header.sequence_number);
-						first_pkt=0;
+						first_pkt=false;
 						break;
 					}
 				return RET_OK;
@@ -125,8 +144,6 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 			}else
 				return RET_OK;
 		}
-
-
 
 
 //here is to down-sampling
@@ -149,7 +166,6 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 		else if(differenceValue <=100 && differenceValue >40){  
 			  	if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 3 == 0) ){   //not key frame &&  sampling by 1/3
 					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard ", chunk_ptr ->header.sequence_number);
-//					printf("pkt discard %d\n",sentSequenceNumber);
 					_queue_out_data_ptr->pop();
 					chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();			 //ignore and not send
 					}
@@ -189,11 +205,10 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 		_send_ctl_info.rtmp_chunk = (chunk_rtmp_t *)chunk_ptr;
 		_send_ctl_info.serial_num = chunk_ptr->header.sequence_number;
 
-
 		send_rt_val = _net_ptr->nonblock_send(sock, &_send_ctl_info);
-//		send_rt_val = _net_ptr->send(sock, (const char*)chunk_ptr->buf,chunk_ptr->header.length,0);
 
-
+	
+		
 _log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt sequence_number", chunk_ptr ->header.sequence_number, send_rt_val);
 
 
@@ -203,15 +218,17 @@ _log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt sequence_
 				//it not a error
 				_send_ctl_info.ctl_state = READY;
 				_queue_out_data_ptr->pop();
+				continue;
 			}else{
 					printf("delete map and bit_stream_httpout_ptr\n");
+					_net_ptr->epoll_control(sock, EPOLL_CTL_DEL, EPOLLIN | EPOLLOUT);	
 					_pk_mgr_ptr ->del_stream(sock,(stream*)this, STRM_TYPE_MEDIA);
 					_pk_mgr_ptr ->data_close(sock," bit_stream_httpout ");
-					_bit_stream_server_ptr -> delBitStreamOut((stream*)this);
+					delete this;
 					}
 
 			}
-		//Log(LOGDEBUG, "%s: send_rt = %d, expect_len = %d", __FUNCTION__, send_rt_val,_send_ctl_info.expect_len);
+
 		switch (send_rt_val) {
 			case RET_SOCK_ERROR:
 				printf("%s, socket error\n", __FUNCTION__);
@@ -279,6 +296,36 @@ bool bit_stream_httpout::isKeyFrame(struct chunk_bitstream_t *chunk_ptr){
 	
 	return false;
 	}
+
+}
+
+//return  StreamID  ,streamID >0 ,bufferSize 暫時保留沒用到(習慣上會將陣列的大小一起傳進function)
+//example http://127.0.0.1:3000/8877.flv  streamID= 8877
+int  bit_stream_httpout::getStreamID_FromHTTP_Request(char *httpBuffer,unsigned long bufferSize ){
+	char *ptr=NULL;
+	int streamID;
+	ptr = strstr(httpBuffer ,"GET /");
+	if(!ptr)
+	return -1;//return undefine ID
+	else{
+	ptr+=5;
+	char temp[5]={'0x0','0x0','0x0','0x0','\0'};
+	memcpy(temp,ptr,4);
+	streamID=atoi(temp);
+	return streamID;
+	}
+}
+
+// T=1/F=0
+bool bit_stream_httpout::isStreamID_inChannel(int streamid){
+	list<int>::iterator IDiter;
+	if(streamid < 0)
+	return false;
+	for(IDiter = _pk_mgr_ptr ->streamID_list.begin() ; IDiter !=_pk_mgr_ptr ->streamID_list.end() ;IDiter++){
+	if(streamid== *IDiter)
+	return true;
+	}
+	return false;
 
 }
 

@@ -171,7 +171,6 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 
 int peer::handle_pkt_in(int sock)
 {
-	//DBG_PRINTF("here\n");
 	ftime(&interval_time);	//--!!0215
 	unsigned long buf_len;
 	unsigned long i;

@@ -34,28 +34,6 @@ static volatile sig_atomic_t srv_shutdown = 0;
 list<int> fd_list;
 
 
-/*
-char* const short_options = "c:i:l:p:";  
-struct option long_options[] = {  
-	{ "config",     1,   NULL,    'c'     },
-	{ "ip",  1,   NULL,    'i'     },  
-	{ "local",     1,   NULL,    'l'     },
-	{ "port",     1,   NULL,    'p'     },	
-	{      0,     0,     0,     0},  
-}; 
-
-void print_usage (FILE* stream, int exit_code)
-{
-    fprintf (stream, "Usage: ray options [ inputfile ... ]\n");
-    fprintf (stream, " -c --config file.\n"
-                     " -i --pk ip.\n"
-                     " -l --local port.\n"
-                     " -p --pk port.\n");
-    exit (exit_code);
-}
-
-*/
-
 void signal_handler(int sig)
 {
 	fprintf(stdout, "\n\nrecv Signal %d\n\n", sig);
@@ -119,37 +97,12 @@ int main(int argc, char **argv)
 	rtmp_supplement *rtmp_supplement_ptr = NULL;
 	bit_stream_server *bit_stream_server_ptr =NULL;
 	
-
     config_file = "config.ini";
 	
 	prep = new configuration(config_file);
 	net_ptr = new network();
 	log_ptr = new logger();
 	peer_mgr_ptr = new peer_mgr(&fd_list);
-
-
-	/*
-    while((opt = getopt_long(argc, argv, short_options, long_options, NULL)) != -1)  { 
-        switch (opt)  {  
-            case 'c':  
-                config_file = optarg;
-                break;  
-            case 'i':  
-                prep->add_key("pk_ip",optarg);
-                break;  
-            case 'l':  
-                prep->add_key("stream_local_port",optarg);
-                break;  
-            case 'p':  
-                prep->add_key("pk_port",optarg);
-                break;  
-            default: 
-                print_usage(stderr, 1);
-                break;
-         }  
-    }  
-
-	*/
 
 	prep->read_key("html_size", html_size);
 	prep->read_key("svc_tcp_port", svc_tcp_port);

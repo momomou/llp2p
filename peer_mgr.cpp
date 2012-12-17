@@ -170,12 +170,7 @@ int peer_mgr::handle_pkt_in(int sock)
 	if(new_fd < 0) {
 		return RET_SOCK_ERROR;
 	} else {
-/*		
-#ifdef _WIN32
-		u_long iMode = 0;
-		ioctlsocket(_sock, FIONBIO, &iMode);
-#endif
-*/
+
 		_net_ptr->set_nonblocking(new_fd);
 		cout << "new_fd = " << new_fd << endl;   
 		//PAUSE

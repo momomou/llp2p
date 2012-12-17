@@ -145,3 +145,4 @@ unsigned char bit_stream_out::get_stream_pk_id()
 {
     return -1;
 }
+

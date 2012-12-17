@@ -20,6 +20,7 @@ public:
 	list<struct level_info_t *> rescue_list ;
 	list<int> outside_rescue_list;
 	list<unsigned int> sequence_number_list;
+	list <int> streamID_list;
 
 	map<unsigned long, unsigned long> map_pid_manifest;
     map<unsigned char, int> map_rtmp_chunk_size;
@@ -42,6 +43,7 @@ public:
 	unsigned long current_child_pid;
 	unsigned long current_child_manifest;
 	unsigned int _least_sequence_number;
+	unsigned long stream_number;
 	
 	map<unsigned long, struct peer_info_t *> map_pid_peer_info;		// <pid, struct peer_info_t *>
 	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		// <pid, struct peer_info_t *>

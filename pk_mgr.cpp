@@ -35,6 +35,7 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 	 current_child_pid = 0;
 	 current_child_manifest = 0;
 	 _least_sequence_number = 0;
+	 stream_number=0;
 	 _current_send_sequence_number = -1;
 	 
 	_prep->read_key("bucket_size", _bucket_size);
@@ -108,19 +109,12 @@ void pk_mgr::init()
 		exit(0);
 	}
 
-	//_net_ptr->set_nonblocking(_sock);	// set to non-blocking
-	//_net_ptr->epoll_control(_sock, EPOLL_CTL_ADD, EPOLLIN);
-	//_net_ptr->set_fd_bcptr_map(_sock, dynamic_cast<basic_class *> (this));
-	//fd_list_ptr->push_back(_sock);
-
-	
 	if (handle_register(svc_tcp_port, svc_udp_port)) {
 		cout << "pk_mgr handle_register() success" << endl;
 		_net_ptr->set_nonblocking(_sock);	// set to non-blocking
 		_net_ptr->epoll_control(_sock, EPOLL_CTL_ADD, EPOLLIN);
 		_net_ptr->set_fd_bcptr_map(_sock, dynamic_cast<basic_class *> (this));
 		fd_list_ptr->push_back(_sock);
-		//printf("%s, new_fd=> %d\n", __FUNCTION__, _sock);
 
 	} else {
 		cout << "pk_mgr handle_register() fail" << endl;
@@ -130,7 +124,7 @@ void pk_mgr::init()
 	
 }
 
-
+// build_connection to (string ip , string port) ,if failure return 0,else return 1
 int pk_mgr::build_connection(string ip, string port)
 {
 
@@ -165,16 +159,17 @@ int pk_mgr::build_connection(string ip, string port)
 
 }
 
-
+//Follow light protocol spec send register message to pk,  HTTP | light | content(request_info_t)
+//This function include send function ,send  register packet to PK Server
 int pk_mgr::handle_register(string svc_tcp_port, string svc_udp_port)
 {
 	struct chunk_t *chunk_ptr = NULL;
 	struct chunk_request_msg_t *chunk_request_ptr = NULL;
 	int send_byte;
-	char *crlf_ptr = NULL;
+	char *crlf_ptr = NULL;		 // it need to point to   -> \r\n\r\n
 	char html_buf[8192];
-	unsigned long html_hdr_size;
-	unsigned long buf_len;
+	unsigned long html_hdr_size; // HTTP protocol  len
+	unsigned long buf_len;		 // HTTP protocol  len + HTTP content len
 	
 	chunk_request_ptr = (struct chunk_request_msg_t *)new unsigned char[sizeof(struct chunk_request_msg_t)];
 	
@@ -206,13 +201,14 @@ int pk_mgr::handle_register(string svc_tcp_port, string svc_udp_port)
 
 	send_byte = _net_ptr->send(_sock, html_buf, buf_len, 0);
 
+	if(chunk_request_ptr)
+	delete chunk_request_ptr;
+
 	if( send_byte <= 0 ) {
 		data_close(_sock, "send html_buf error");
 		_log_ptr->exit(0, "send html_buf error");
 		return 0;
-	} else {
-		if(chunk_request_ptr)
-			delete chunk_request_ptr;
+	} else {		//success
 		return 1;
 	}
 	
@@ -222,7 +218,6 @@ int pk_mgr::handle_register(string svc_tcp_port, string svc_udp_port)
 int pk_mgr::handle_pkt_in(int sock)
 {
 	ftime(&interval_time);	//--!! 0215
-	//DBG_PRINTF("here\n");
 	unsigned long i;
 	unsigned long buf_len;
 	unsigned long level_msg_size;
@@ -248,8 +243,8 @@ int pk_mgr::handle_pkt_in(int sock)
 	memset(chunk_header_ptr, 0x0, sizeof(struct chunk_header_t));
 	
 	expect_len = sizeof(struct chunk_header_t) ;
-	//printf("%s\n", __FUNCTION__);
 
+//expect recv light header
 	while (1) {
 		recv_byte = recv(sock, (char *)chunk_header_ptr + offset, expect_len, 0);
 		if (recv_byte < 0) {
@@ -262,7 +257,6 @@ int pk_mgr::handle_pkt_in(int sock)
 			} else {
 				data_close(sock, "recv error in pk_mgr::handle_pkt_in");
 				printf("recv error in pk_mgr::handle_pkt_in\n");
-				DBG_PRINTF("here\n");
 				PAUSE
 				_log_ptr->exit(0, "recv error in pk_mgr::handle_pkt_in");\
 			}
@@ -274,13 +268,9 @@ int pk_mgr::handle_pkt_in(int sock)
 			break;
 	}
 
-	//cout << "offset = " << offset << endl;
+
 	expect_len = chunk_header_ptr->length;
-	
-	//cout << "sequence_number = " << chunk_header_ptr->sequence_number << endl;
-	//cout << "expect_len = " << expect_len<< endl;
 	buf_len = sizeof(struct chunk_header_t) + expect_len;
-	//cout << "buf_len = " << buf_len << endl;
 
 	chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
 
@@ -320,11 +310,11 @@ int pk_mgr::handle_pkt_in(int sock)
 		if (expect_len == 0)
 			break;
 	}
-		
-	
+//recv whole packet to chunk_ptr done (size is buf_len),packet include (light header + content ) 
+
 	offset = 0;
-	
-	//printf("header.cmd = %d\n", chunk_ptr->header.cmd);
+
+//handle CHNK_CMD_PEER_REG,expect
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_REG) {
 		lane_member = (buf_len - sizeof(struct chunk_header_t) - 6 * sizeof(unsigned long)) / sizeof(struct level_info_t);
 		level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + lane_member * sizeof(struct level_info_t *);
@@ -614,6 +604,8 @@ int pk_mgr::handle_pkt_in(int sock)
 
         if(chunk_ptr) 
 			delete chunk_ptr;
+
+
     } else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_LATENCY){
         unsigned long sec, usec, peer_id;
         unsigned long peer_num;
@@ -633,6 +625,7 @@ int pk_mgr::handle_pkt_in(int sock)
 
         if(chunk_ptr) 
 			delete chunk_ptr;
+
     } else if(chunk_ptr->header.cmd == CHNK_CMD_RT_NLM) {	//--!! 0128 rcv from lightning
 		map<unsigned long, int>::iterator pid_fd_iter;
 		map<int, queue<struct chunk_t *> *>::iterator fd_queue_iter;
@@ -739,8 +732,19 @@ int pk_mgr::handle_pkt_in(int sock)
 	    ftime(&interval_time);
 	    tmp = interval_time.time * 1000ull + interval_time.millitm - tmp;
 	    cout<<"interval delay = "<<tmp<<endl;
-	}
 
+//  CHNK_CMD_CHN_UPDATA_DATA store new streamID in streamID_list
+	}else if(chunk_ptr->header.cmd == CHNK_CMD_CHN_UPDATA_DATA){
+	printf("cmd =CHNK_CMD_CHN_UPDATA_DATA\n");
+	stream_number=(chunk_ptr->header.length)/sizeof(int);
+	int *intptr=(int *)((char*)chunk_ptr +sizeof(chunk_header_t));
+	streamID_list.clear();
+	for(int i=0 ; i< stream_number ;i++){
+	streamID_list.push_back(*(intptr+i));
+	}
+	if (chunk_ptr)
+	delete chunk_ptr;
+	}
 	return RET_OK;		
 }
 
@@ -1289,8 +1293,11 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 			for (_map_stream_iter = _map_stream_media.begin(); _map_stream_iter != _map_stream_media.end(); _map_stream_iter++) {
 //per fd mean a player   
 				strm_ptr = _map_stream_iter->second;
+				if((strm_ptr -> _reqStreamID) == (*(_chunk_rtp + (seq_ready_to_send % _bucket_size))).header.stream_id ){  //stream_id 和request 一樣才add chunk
 				    strm_ptr->add_chunk((struct chunk_t *)(_chunk_rtp + (seq_ready_to_send % _bucket_size)));
-				    _net_ptr->epoll_control(_map_stream_iter->first, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
+//				    _net_ptr->epoll_control(_map_stream_iter->first, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
+					_net_ptr->epoll_control(_map_stream_iter->first, EPOLL_CTL_MOD, EPOLLOUT);
+				}
 			}
 		}
 	} //end for

@@ -5,16 +5,6 @@
 #include "rtmp_viewer.h"
 #include <sstream>
 
-/*
-	char httpHeader[]=	"HTTP/1.1 200 OK\r\n"
-	//					"Server: Microsoft-IIS/5.0\r\n"
-	//					"Connection: Keep-Alive\r\n"
-						"Content-Type: application/octet-stream\r\n"
-	//					"Content-Length: 32492423\r\n"
-						"\r\n";
-
-	char FLV_Header[9]={'F','L','V',(char)0x01,(char)0x05,(char)0x0,(char)0x0,(char)0x0,(char)0x09};
-*/
 
 rtmp_server::rtmp_server(network *net_ptr, logger *log_ptr, amf *amf_ptr, rtmp *rtmp_ptr, rtmp_supplement *rtmp_supplement_ptr, pk_mgr *pk_mgr_ptr, list<int> *fd_list)
 {
@@ -80,8 +70,7 @@ void rtmp_server::init(int stream_id, string tcp_svc_port)
 	_net_ptr->epoll_control(_sock_tcp, EPOLL_CTL_ADD, EPOLLIN);
 	_net_ptr->fd_bcptr_map_set(_sock_tcp, dynamic_cast<basic_class *> (this));
 	fd_list_ptr->push_back(_sock_tcp);
-	//printf("%s, new_fd=> %d\n", __FUNCTION__, _sock_tcp);
-	//	TODO: add server delete handler
+
 }
 
 int rtmp_server::handle_pkt_in(int sock)
@@ -89,10 +78,6 @@ int rtmp_server::handle_pkt_in(int sock)
 	int new_fd;
 	socklen_t sock_len;
 
-	//if (_rtmp_viewer) {
-		//cout << "can only accept one viewer!!!" << endl;		//unknown reason of remark, left for future reference
-		//return;
-	//}
 
 	if (sock != _sock_tcp)
 		return RET_ERROR;
@@ -104,14 +89,7 @@ int rtmp_server::handle_pkt_in(int sock)
 		return RET_ERROR;
 	}
 	
-/*
-	//here is http header and flv header
-	cout << "============= Acceppt New Player ============"<<endl;
-	int sendHeaderBytes = send(new_fd,httpHeader,sizeof(httpHeader)-1,1);  //-1 to subtract '\0'
-	cout << "send_HttpHeaderBytes=" << sendHeaderBytes<<endl;
-	sendHeaderBytes = send(new_fd,FLV_Header,sizeof(FLV_Header),1);
-	cout << "send_FLVHeaderBytes=" << sendHeaderBytes<<endl;
-*/
+
 
 	_rtmp_viewer = new rtmp_viewer(_stream_id, _net_ptr, _log_ptr, this, _amf_ptr, _rtmp_ptr, _rtmp_supplement_ptr, _pk_mgr_ptr, fd_list_ptr);
 	if (!_rtmp_viewer) {
@@ -121,8 +99,6 @@ int rtmp_server::handle_pkt_in(int sock)
 	}
 
 
-	//here for testing rflv
-//	_pk_mgr_ptr->add_stream(new_fd, (stream *)_rtmp_viewer, STRM_TYPE_MEDIA);
 	
 	printf("new rtmp_viewer successfully\n");
 

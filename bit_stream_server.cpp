@@ -122,20 +122,21 @@ int bit_stream_server::handle_pkt_in(int sock)
 
 		_bit_stream_httpout_ptr = new bit_stream_httpout(_stream_id , _net_ptr, _log_ptr, this, _pk_mgr_ptr, fd_list_ptr ,new_fd);
 	
-	if (!_bit_stream_httpout_ptr) {
+	if (!_bit_stream_httpout_ptr) {				//obj create fail
 		cout << "can not allocate _bit_stream_out!!!" << endl;
 		_net_ptr -> close (new_fd);
 		return RET_ERROR;
-	}
+
+	}else{				
 	printf("\nnew bit_stream_httpout successfully\n");
 	_pk_mgr_ptr ->add_stream( new_fd,(stream*)_bit_stream_httpout_ptr, STRM_TYPE_MEDIA);
-
 
 	_bit_stream_httpout_ptr->set_client_sockaddr(&_cin);
 	_net_ptr->set_nonblocking(new_fd);
 	_net_ptr->epoll_control(new_fd, EPOLL_CTL_ADD, EPOLLIN);
 	_net_ptr->fd_bcptr_map_set(new_fd, dynamic_cast<basic_class *> (_bit_stream_httpout_ptr));
 	fd_list_ptr->push_back(new_fd);
+	}
 
 	return RET_OK;
 	}else if (mode==mode_RTMP){

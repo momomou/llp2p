@@ -15,7 +15,7 @@ class bit_stream_httpout:public stream {
 public:
 
 	list<int> *fd_list_ptr;
-	
+
 	bit_stream_httpout(int stream_id , network *net_ptr, logger *log_ptr,bit_stream_server *bit_stream_server_ptr,pk_mgr *pk_mgr_ptr, list<int> *fd_list ,int acceptfd);
 	~bit_stream_httpout();
 	
@@ -28,8 +28,7 @@ public:
 	void set_client_sockaddr(struct sockaddr_in *cin);
 	virtual void add_chunk(struct chunk_t *chunk);
     virtual unsigned char get_stream_pk_id();
-	bool isKeyFrame(struct chunk_bitstream_t *chunk_ptr);
-	unsigned int bit_stream_httpout::getFlvTimeStamp(struct chunk_bitstream_t *chunk_ptr);
+//	int _reqStreamID;
 
 
 private:
@@ -46,7 +45,8 @@ private:
 	FILE *file_ptr;
 	FILE *file_ptr_test;
 
-	int first_pkt;
+	bool first_pkt;
+	bool first_HTTP_Header;
 
 	Network_nonblocking_ctl _send_ctl_info;
 	queue<struct chunk_t *> _queue_output_ctrl;
@@ -55,6 +55,10 @@ private:
 	unsigned long _html_size;
 
 	void data_close(int cfd, const char *reason);
+	bool isStreamID_inChannel(int streamid);
+	int getStreamID_FromHTTP_Request(char *httpBuffer,unsigned long BufferSize );
+	bool isKeyFrame(struct chunk_bitstream_t *chunk_ptr);
+	unsigned int getFlvTimeStamp(struct chunk_bitstream_t *chunk_ptr);
 };
 
 #endif
