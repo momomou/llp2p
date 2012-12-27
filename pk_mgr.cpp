@@ -1,3 +1,10 @@
+/*
+
+
+
+*/
+
+
 #include "pk_mgr.h"
 #include "network.h"
 #include "logger.h"
@@ -45,7 +52,8 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 		bandwidth_bucket[i] = 0;
 	}
 */
-	
+
+//主要的大buffer
 	_chunk_rtp = (struct chunk_rtp_t *)malloc(RTP_PKT_BUF_MAX * _bucket_size);
 	memset( _chunk_rtp, 0x0, _bucket_size * RTP_PKT_BUF_MAX );
 	 
@@ -459,18 +467,7 @@ int pk_mgr::handle_pkt_in(int sock)
 		_peer_mgr_ptr->del_rescue_downstream();
 
 		cout << "map_pid_peer_info_size = " << map_pid_peer_info.size() << endl;
-/*
-		for (i = 0; i < lane_member; i++) {
-			cout << "pid = " << level_msg_ptr->pid << endl;
-			cout << "level = " << level_msg_ptr->level << endl;
-			cout << "level_info.pid = " << level_msg_ptr->level_info[i]->pid << endl;
-			cout << "level_info.level = " << level_msg_ptr->level_info[i]->level << endl;
-			cout << "level_info.public_ip = " << level_msg_ptr->level_info[i]->public_ip << endl;
-			cout << "level_info.private_ip = " << level_msg_ptr->level_info[i]->private_ip << endl;
-			cout << "level_info.tcp_port = " << level_msg_ptr->level_info[i]->tcp_port << endl;
-			cout << "level_info.udp_port = " << level_msg_ptr->level_info[i]->udp_port << endl;
-		}
-*/	
+
 		
 		//PAUSE
 		if(chunk_ptr)
@@ -735,11 +732,12 @@ int pk_mgr::handle_pkt_in(int sock)
 
 //  CHNK_CMD_CHN_UPDATA_DATA store new streamID in streamID_list
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_CHN_UPDATA_DATA){
-	printf("cmd =CHNK_CMD_CHN_UPDATA_DATA\n");
+printf("cmd =recv CHNK_CMD_CHN_UPDATA_DATA\n");
 	stream_number=(chunk_ptr->header.length)/sizeof(int);
 	int *intptr=(int *)((char*)chunk_ptr +sizeof(chunk_header_t));
 	streamID_list.clear();
 	for(int i=0 ; i< stream_number ;i++){
+printf("streamID = %d\n",*(intptr+i));
 	streamID_list.push_back(*(intptr+i));
 	}
 	if (chunk_ptr)
@@ -1113,20 +1111,6 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	queue<struct chunk_t *> *queue_out_data_ptr;
 	list<unsigned int>::iterator sequence_number_list_iter;
 
-	//chunk_ptr->header.sequence_number % _bucket_size
-	//memset((char *)(_chunk_rtp + _current_pos), 0x0, RTP_PKT_BUF_MAX);
-	//memcpy((char *)(_chunk_rtp + _current_pos), chunk_ptr, (sizeof(struct chunk_header_t) + chunk_ptr->header.length));
-
-	//for(sequence_number_list_iter = sequence_number_list.begin(); sequence_number_list_iter != sequence_number_list.end(); sequence_number_list_iter++) {
-		//if(*sequence_number_list_iter == chunk_ptr->header.sequence_number) {
-			//chunk_ptr->header.length = 0;
-			//return;
-		//}
-	//}
-
-	//sequence_number_list.push_back(chunk_ptr->header.sequence_number);
-
-	//printf("%s \n", __FUNCTION__);
 
 	if(chunk_ptr->header.sequence_number > _least_sequence_number){
 		_least_sequence_number = chunk_ptr->header.sequence_number;
@@ -1213,33 +1197,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		
 	}
 
-    /*if ((*(_chunk_rtp + (chunk_ptr->header.sequence_number % _bucket_size))).header.stream == STRM_TYPE_AUDIO) {
-		for (_map_stream_iter = _map_stream_audio.begin(); _map_stream_iter != _map_stream_audio.end(); _map_stream_iter++) {
-			//DBG_PRINTF("here here\n");
-			strm_ptr = _map_stream_iter->second;
-			strm_ptr->add_chunk((struct chunk_t *)(_chunk_rtp + (chunk_ptr->header.sequence_number % _bucket_size)));
-			_net_ptr->epoll_control(_rtsp_viewer_ptr->_sock_udp_audio, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
-		}
-	} else if ((*(_chunk_rtp + (chunk_ptr->header.sequence_number % _bucket_size))).header.stream == STRM_TYPE_VIDEO) {
-		for (_map_stream_iter = _map_stream_video.begin(); _map_stream_iter != _map_stream_video.end(); _map_stream_iter++) {
-			//DBG_PRINTF("here here\n");
-			strm_ptr = _map_stream_iter->second;
-			strm_ptr->add_chunk((struct chunk_t *)(_chunk_rtp + (chunk_ptr->header.sequence_number % _bucket_size)));
-			_net_ptr->epoll_control(_rtsp_viewer_ptr->_sock_udp_video, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
-		}
-	} else if ((*(_chunk_rtp + (chunk_ptr->header.sequence_number % _bucket_size))).header.stream == STRM_TYPE_MEDIA) {
-		//cout << "sent seq " << chunk_ptr->header.sequence_number << endl;
-		for (_map_stream_iter = _map_stream_media.begin(); _map_stream_iter != _map_stream_media.end(); _map_stream_iter++) {
-			strm_ptr = _map_stream_iter->second;
-            if(strm_ptr->get_stream_pk_id() == chunk_ptr->header.stream_id){
-                //printf("push pkt %d to %d\n",chunk_ptr->header.stream_id,_map_stream_iter->first);
-                strm_ptr->add_chunk((struct chunk_t *)(_chunk_rtp + (chunk_ptr->header.sequence_number % _bucket_size)));
-                _net_ptr->epoll_control(_map_stream_iter->first, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
-            }
-        }
-	}*/
 
-    //printf("recieve pkt %d (%d) from parent\n", chunk_ptr->header.sequence_number, chunk_ptr->header.sequence_number % sub_stream_num);
 
 //why??
 	for(seq_ready_to_send = _current_send_sequence_number;seq_ready_to_send <= _least_sequence_number;seq_ready_to_send ++){
@@ -1274,7 +1232,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
                 continue;
             }*/
 
-		//normal handle stream
+//normal handle stream
 		}else if((*(_chunk_rtp + (seq_ready_to_send % _bucket_size))).header.stream == STRM_TYPE_AUDIO) {
 			for (_map_stream_iter = _map_stream_audio.begin(); _map_stream_iter != _map_stream_audio.end(); _map_stream_iter++) {
 				strm_ptr = _map_stream_iter->second;
@@ -1288,19 +1246,19 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 				strm_ptr->add_chunk((struct chunk_t *)(_chunk_rtp + (chunk_ptr->header.sequence_number % _bucket_size)));
 				_net_ptr->epoll_control(_rtsp_viewer_ptr->_sock_udp_video, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
 			}
-			
+
+// STRM_TYPE_MEDIA, main type
 		}else if((*(_chunk_rtp + (seq_ready_to_send % _bucket_size))).header.stream == STRM_TYPE_MEDIA){
 			for (_map_stream_iter = _map_stream_media.begin(); _map_stream_iter != _map_stream_media.end(); _map_stream_iter++) {
 //per fd mean a player   
 				strm_ptr = _map_stream_iter->second;
 				if((strm_ptr -> _reqStreamID) == (*(_chunk_rtp + (seq_ready_to_send % _bucket_size))).header.stream_id ){  //stream_id 和request 一樣才add chunk
 				    strm_ptr->add_chunk((struct chunk_t *)(_chunk_rtp + (seq_ready_to_send % _bucket_size)));
-//				    _net_ptr->epoll_control(_map_stream_iter->first, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
 					_net_ptr->epoll_control(_map_stream_iter->first, EPOLL_CTL_MOD, EPOLLOUT);
 				}
 			}
 		}
-	} //end for
+	} //end for(seq_ready_to_send = _current_send_sequence_number; ....
 	
 	_current_send_sequence_number = seq_ready_to_send;
 

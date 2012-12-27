@@ -1,3 +1,7 @@
+/*
+
+*/
+
 #include "peer_mgr.h"
 #include "peer.h"
 #include "network.h"
@@ -23,18 +27,19 @@ peer_mgr::~peer_mgr()
 
 }
 
-
+//初始化基本參數
 void peer_mgr::peer_mgr_set(network *net_ptr , logger *log_ptr , configuration *prep, pk_mgr * pk_mgr_ptr)
 {
 	_net_ptr = net_ptr;
 	_log_ptr = log_ptr;
 	_prep = prep;
 	_pk_mgr_ptr = pk_mgr_ptr;
+
 	peer_ptr = new peer(fd_list_ptr);
 	peer_ptr->peer_set(_net_ptr, _log_ptr, _prep, _pk_mgr_ptr, this);		
 }
 
-
+//和所有在同個lane 下的member做連線要求 呼叫build_connection連線
 void peer_mgr::connect_peer(struct chunk_level_msg_t *level_msg_ptr, unsigned long pid)
 {
     set_up_public_ip(level_msg_ptr);
@@ -54,6 +59,7 @@ void peer_mgr::connect_peer(struct chunk_level_msg_t *level_msg_ptr, unsigned lo
 
 }
 
+//給定一個rescue 的list 然後隨機從list 挑一個peer
 int peer_mgr::connect_other_lane_peer(struct chunk_rescue_list_reply_t *rescue_list_reply_ptr, unsigned long peer_list_member, unsigned long pid, unsigned long outside_lane_rescue_num)
 {
 	int i;
@@ -87,12 +93,13 @@ int peer_mgr::connect_other_lane_peer(struct chunk_rescue_list_reply_t *rescue_l
 
 }
 
+//利用level_info_ptr 連線到connect的狀態後 呼叫handle_connect_request(傳送request 到sock (其他peer) )
+//最後把sock設成 nonblock 然後加入select 的監聽 EPOLLIN | EPOLLOUT ( 由peer 的obj做後續的傳送處理)
 int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned long pid)
 {
 	struct sockaddr_in peer_saddr;
 	int ret;
 	struct in_addr ip;
-	//struct in_addr peer;
 
 	if((_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
 		cout << "init create socket failure" << endl;
@@ -103,18 +110,16 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 	}
 
 	memset((struct sockaddr_in*)&peer_saddr, 0x0, sizeof(struct sockaddr_in));
-	//memset((struct in_addr*)&peer, 0x0, sizeof(in_addr));
 	
-
+//在同個NAT 底下
     if(self_public_ip == level_info_ptr->public_ip)
 	    peer_saddr.sin_addr.s_addr = level_info_ptr->private_ip;
     else
         peer_saddr.sin_addr.s_addr = level_info_ptr->public_ip;
+	
 	peer_saddr.sin_port = htons(level_info_ptr->tcp_port);
 	peer_saddr.sin_family = AF_INET;
 
-	//ip.s_addr = level_info_ptr->private_ip;
-	//printf("connect to %s\n", inet_ntoa(ip));	
 	ip.s_addr = level_info_ptr->public_ip;
 	printf("connect to %s\n", inet_ntoa(ip));	
 	
@@ -134,8 +139,9 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 		u_long iMode = 0;
 		ioctlsocket(_sock, FIONBIO, &iMode);
 #endif
-		cout << "connect sock = " << _sock << endl;
+
 		ret = peer_ptr->handle_connect_request(_sock, level_info_ptr, pid);
+
 		if(ret < 0) {
 			cout << "handle_connect_request error!!!" << endl;
 			return 0;
@@ -441,7 +447,6 @@ void peer_mgr::handle_cut_peer(unsigned long pid, int sock)
 
 void peer_mgr::send_cut_peer(unsigned long pid, int sock)
 {
-	DBG_PRINTF("here\n");
 
 	map<int, queue<struct chunk_t *> *>::iterator fd_queue_iter;
 	queue<struct chunk_t *> *queue_out_ctrl_ptr = NULL;
