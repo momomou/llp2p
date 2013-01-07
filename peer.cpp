@@ -1,9 +1,3 @@
-/*
-2012/12/05打算整理一下code ,清除一些無用或年代久遠的 cdoe 
-
-
-*/
-
 #include "peer.h"
 #include "network.h"
 #include "logger.h"
@@ -44,8 +38,6 @@ peer::~peer()
 
 }
 
-//map_fd_out_ctrl,map_fd_out_data 兩個queue 裡面資料的清除(memory free) 並且把兩個queue刪除
-//這兩個實體在handle_connect() 裡面被 new 出來
 void peer::clear_map()
 {
 
@@ -79,7 +71,6 @@ void peer::clear_map()
 
 }
 
-//做一些基本參數設定,設定到這個obj 通常在new這個obg之後呼叫 。把本身的obj設定到 network裡。
 void peer::peer_set(network *net_ptr , logger *log_ptr , configuration *prep, pk_mgr *pk_mgr_ptr, peer_mgr *peer_mgr_ptr)
 {
 	_net_ptr = net_ptr;
@@ -123,29 +114,22 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 	
 }
 
-//new queue_out_ctrl_ptr,queue_out_data_ptr 的實體  ,尋找map_pid_fd,map_fd_pid 有無資料沒有則新增
-//send chunk_request_ptr 到sock (other peer)
+
 int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, unsigned long pid)
 {
 	map<unsigned long, int>::iterator map_pid_fd_iter;
-	map<int, unsigned long>::iterator map_fd_pid_iter;
 	
 	queue_out_ctrl_ptr = new std::queue<struct chunk_t *>;
 	queue_out_data_ptr = new std::queue<struct chunk_t *>;
 
 	map_pid_fd_iter = map_pid_fd.find(level_info_ptr->pid);
-	map_fd_pid_iter = map_fd_pid.find(sock);
 
 	if(map_pid_fd_iter == map_pid_fd.end())
 		map_pid_fd[level_info_ptr->pid] = sock;
 	
-	if(map_fd_pid_iter == map_fd_pid.end())
-		map_fd_pid[sock] = level_info_ptr->pid;
-
-	
+	map_fd_pid[sock] = level_info_ptr->pid;
 	map_fd_out_ctrl[sock] = queue_out_ctrl_ptr;
 	map_fd_out_data[sock] = queue_out_data_ptr;
-
 	
 	struct chunk_t *chunk_ptr = NULL;
 	struct chunk_request_msg_t *chunk_request_ptr = NULL;
@@ -176,10 +160,7 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 	if( send_byte <= 0 ) {
 		data_close(sock, "send html_buf error");		
 		_log_ptr->exit(0, "send html_buf error");
-		if(chunk_request_ptr)
-			delete chunk_request_ptr;
 		return -1;
-		
 	} else {
 		if(chunk_request_ptr)
 			delete chunk_request_ptr;
@@ -289,7 +270,6 @@ int peer::handle_pkt_in(int sock)
 	
 //CHNK_CMD_PEER_DATA
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_DATA) {
-//		printf("DATA IN  StreamID =%d\n", chunk_ptr->header.stream_id);
 		_pk_mgr_ptr->handle_stream(chunk_ptr, sock);
 		_recv_byte_count += chunk_ptr->header.length;
         if(~parent_manifest & (1 << (chunk_ptr->header.sequence_number % _pk_mgr_ptr->sub_stream_num))){

@@ -93,7 +93,7 @@ using std::bitset;
 #define SYS_FREQ		1
 
 //#define RTMP_PKT_BUF_MAX	1536	// This value defines the max rtmp packet size
-#define RTMP_PKT_BUF_MAX	1024*20	// This value defines the max rtmp packet size
+#define RTMP_PKT_BUF_MAX	1024*30	// This value defines the max rtmp packet size
 #define RTMP_PKT_BUF_PAY_SIZE	(RTMP_PKT_BUF_MAX - sizeof(struct chunk_header_t))	// This value defines the max rtp packet size
 
 #define CHNK_CMD_PEER_REG				0x01	// register
@@ -121,7 +121,7 @@ using std::bitset;
 #define OK				0x01
 #define REJECT			0x02
 
-#define RTP_PKT_BUF_MAX	1024*20	// This value defines the max rtp packet size
+#define RTP_PKT_BUF_MAX	1024*30	// This value defines the max rtp packet size
 #define RTP_PKT_BUF_PAY_SIZE	(RTP_PKT_BUF_MAX - sizeof(struct chunk_header_t) - sizeof(struct rtp_hdr_t))	// This value defines the max rtp packet size
 #define MAXFDS 			2048
 #define EVENTSIZE 		2048
