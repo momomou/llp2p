@@ -11,8 +11,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{50502A93-A7CC-460A-8886-446CE712EFA5}</ProjectGuid>
-    <RootNamespace>P2P_Client</RootNamespace>
+    <ProjectGuid>{ACA38406-2BC7-4A2A-AC8D-A17CEBD5BEBD}</ProjectGuid>
+    <RootNamespace>P2P_Client_VS2010_proj</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -60,66 +60,65 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\amf.cpp" />
-    <ClCompile Include="..\..\basic_class.cpp" />
-    <ClCompile Include="..\..\bit_stream_httpout.cpp" />
-    <ClCompile Include="..\..\bit_stream_out.cpp" />
-    <ClCompile Include="..\..\bit_stream_server.cpp" />
-    <ClCompile Include="..\..\configuration.cpp" />
-    <ClCompile Include="..\..\EpollFake.cpp" />
-    <ClCompile Include="..\..\logger.cpp" />
-    <ClCompile Include="..\..\main.cpp" />
-    <ClCompile Include="..\..\network.cpp" />
-    <ClCompile Include="..\..\parseurl.cpp" />
-    <ClCompile Include="..\..\peer.cpp" />
-    <ClCompile Include="..\..\peer_mgr.cpp" />
-    <ClCompile Include="..\..\pk_mgr.cpp" />
-    <ClCompile Include="..\..\rtmp.cpp" />
-    <ClCompile Include="..\..\rtmp_server.cpp" />
-    <ClCompile Include="..\..\rtmp_supplement.cpp" />
-    <ClCompile Include="..\..\rtmp_viewer.cpp" />
-    <ClCompile Include="..\..\rtsp_server.cpp" />
-    <ClCompile Include="..\..\rtsp_viewer.cpp" />
-    <ClCompile Include="..\..\ss_rtsp.cpp" />
-    <ClCompile Include="..\..\stream.cpp" />
-    <ClCompile Include="..\..\stream_handler.cpp" />
-    <ClCompile Include="..\..\stream_handler_udp.cpp" />
-    <ClCompile Include="..\..\stream_server.cpp" />
-    <ClCompile Include="..\..\stream_udp.cpp" />
+    <ClInclude Include="..\basic_class.h" />
+    <ClInclude Include="..\bit_stream_server.h" />
+    <ClInclude Include="..\common.h" />
+    <ClInclude Include="..\configuration.h" />
+    <ClInclude Include="..\EpollFake.h" />
+    <ClInclude Include="..\libBitStreamHTTP\bit_stream_httpout.h" />
+    <ClInclude Include="..\libBitStream\bit_stream_out.h" />
+    <ClInclude Include="..\librtmp\amf.h" />
+    <ClInclude Include="..\librtmp\bytes.h" />
+    <ClInclude Include="..\librtmp\parseurl.h" />
+    <ClInclude Include="..\librtmp\rtmp.h" />
+    <ClInclude Include="..\librtmp\rtmp_server.h" />
+    <ClInclude Include="..\librtmp\rtmp_supplement.h" />
+    <ClInclude Include="..\librtmp\rtmp_viewer.h" />
+    <ClInclude Include="..\librtmp\stdint.h" />
+    <ClInclude Include="..\librtsp\rtsp_server.h" />
+    <ClInclude Include="..\librtsp\rtsp_viewer.h" />
+    <ClInclude Include="..\librtsp\ss_rtsp.h" />
+    <ClInclude Include="..\logger.h" />
+    <ClInclude Include="..\network.h" />
+    <ClInclude Include="..\peer.h" />
+    <ClInclude Include="..\peer_mgr.h" />
+    <ClInclude Include="..\pk_mgr.h" />
+    <ClInclude Include="..\stream.h" />
+    <ClInclude Include="..\stream_handler.h" />
+    <ClInclude Include="..\stream_handler_udp.h" />
+    <ClInclude Include="..\stream_udp.h" />
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\amf.h" />
-    <ClInclude Include="..\..\basic_class.h" />
-    <ClInclude Include="..\..\bit_stream_httpout.h" />
-    <ClInclude Include="..\..\bit_stream_out.h" />
-    <ClInclude Include="..\..\bit_stream_server.h" />
-    <ClInclude Include="..\..\bytes.h" />
-    <ClInclude Include="..\..\common.h" />
-    <ClInclude Include="..\..\configuration.h" />
-    <ClInclude Include="..\..\EpollFake.h" />
-    <ClInclude Include="..\..\logger.h" />
-    <ClInclude Include="..\..\network.h" />
-    <ClInclude Include="..\..\parseurl.h" />
-    <ClInclude Include="..\..\peer.h" />
-    <ClInclude Include="..\..\peer_mgr.h" />
-    <ClInclude Include="..\..\pk_mgr.h" />
-    <ClInclude Include="..\..\rtmp.h" />
-    <ClInclude Include="..\..\rtmp_server.h" />
-    <ClInclude Include="..\..\rtmp_supplement.h" />
-    <ClInclude Include="..\..\rtmp_viewer.h" />
-    <ClInclude Include="..\..\rtsp_server.h" />
-    <ClInclude Include="..\..\rtsp_viewer.h" />
-    <ClInclude Include="..\..\ss_rtsp.h" />
-    <ClInclude Include="..\..\stdint.h" />
-    <ClInclude Include="..\..\stream.h" />
-    <ClInclude Include="..\..\stream_handler.h" />
-    <ClInclude Include="..\..\stream_handler_udp.h" />
-    <ClInclude Include="..\..\stream_server.h" />
-    <ClInclude Include="..\..\stream_udp.h" />
+    <None Include="..\config.ini" />
+    <None Include="..\Makefile" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\config.ini" />
-    <None Include="..\..\Makefile" />
+    <ClCompile Include="..\basic_class.cpp" />
+    <ClCompile Include="..\bit_stream_server.cpp" />
+    <ClCompile Include="..\configuration.cpp" />
+    <ClCompile Include="..\EpollFake.cpp" />
+    <ClCompile Include="..\libBitStreamHTTP\bit_stream_httpout.cpp" />
+    <ClCompile Include="..\libBitStream\bit_stream_out.cpp" />
+    <ClCompile Include="..\librtmp\amf.cpp" />
+    <ClCompile Include="..\librtmp\parseurl.cpp" />
+    <ClCompile Include="..\librtmp\rtmp.cpp" />
+    <ClCompile Include="..\librtmp\rtmp_server.cpp" />
+    <ClCompile Include="..\librtmp\rtmp_supplement.cpp" />
+    <ClCompile Include="..\librtmp\rtmp_viewer.cpp" />
+    <ClCompile Include="..\librtsp\rtsp_server.cpp" />
+    <ClCompile Include="..\librtsp\rtsp_viewer.cpp" />
+    <ClCompile Include="..\librtsp\ss_rtsp.cpp" />
+    <ClCompile Include="..\logger.cpp" />
+    <ClCompile Include="..\main.cpp" />
+    <ClCompile Include="..\network.cpp" />
+    <ClCompile Include="..\peer.cpp" />
+    <ClCompile Include="..\peer_mgr.cpp" />
+    <ClCompile Include="..\pk_mgr.cpp" />
+    <ClCompile Include="..\stream.cpp" />
+    <ClCompile Include="..\stream_handler.cpp" />
+    <ClCompile Include="..\stream_handler_udp.cpp" />
+    <ClCompile Include="..\stream_udp.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

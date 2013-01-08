@@ -23,7 +23,7 @@
  *
  */
 
-#include "common.h"
+#include "../common.h"
 #include "amf.h"
 #include <errno.h>
 #ifdef _WIN32

@@ -1,7 +1,7 @@
 #include "web_ctrl_sever.h"
 #include "web_ctrl_unit.h"
-#include "network.h"
-#include "logger.h"
+#include "../network.h"
+#include "../logger.h"
 
 web_ctrl_sever::web_ctrl_sever(network *net_ptr, logger *log_ptr, list<int> *fd_list, map<string, unsigned char> *map_stream_name_id)
 {

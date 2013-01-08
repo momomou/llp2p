@@ -1,11 +1,11 @@
 #ifndef _RTMP_VIEWER_H_
 #define _RTMP_VIEWER_H_
 
-#include "common.h"
-#include "basic_class.h"
+#include "../common.h"
+#include "../basic_class.h"
 #include "rtmp_supplement.h"
-#include "stream_udp.h"
-#include "stream_handler_udp.h"
+#include "../stream_udp.h"
+#include "../stream_handler_udp.h"
 
 class network;
 class logger;

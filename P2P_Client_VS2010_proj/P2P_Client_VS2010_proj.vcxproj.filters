@@ -1,0 +1,203 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="原始程式檔">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="標頭檔">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="資源檔">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="原始程式檔\librtmp">
+      <UniqueIdentifier>{6125c6d1-033c-4b09-81b1-04e30281a8cf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="原始程式檔\librtsp">
+      <UniqueIdentifier>{82512209-6ef0-4953-9e83-42b1723e32bf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="原始程式檔\webctrl">
+      <UniqueIdentifier>{3e28de7d-a60e-4aab-a7de-78154f5a29b9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="原始程式檔\libBitStream">
+      <UniqueIdentifier>{fbdc8552-5e30-4b63-a9fd-d99d87ad3272}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="原始程式檔\libBitStreamHTTP">
+      <UniqueIdentifier>{688c163e-4f93-4f64-8300-1177970bbfe7}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\peer_mgr.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\pk_mgr.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stream.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stream_handler.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stream_handler_udp.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stream_udp.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\basic_class.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bit_stream_server.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\configuration.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\EpollFake.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\network.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\peer.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\librtmp\rtmp_server.h">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\librtmp\rtmp_supplement.h">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\librtmp\rtmp_viewer.h">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\librtmp\amf.h">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\librtmp\bytes.h">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\librtmp\parseurl.h">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\librtmp\rtmp.h">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\librtsp\rtsp_server.h">
+      <Filter>原始程式檔\librtsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\librtsp\rtsp_viewer.h">
+      <Filter>原始程式檔\librtsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libBitStream\bit_stream_out.h">
+      <Filter>原始程式檔\libBitStream</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libBitStreamHTTP\bit_stream_httpout.h">
+      <Filter>原始程式檔\libBitStreamHTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\librtmp\stdint.h">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\librtsp\ss_rtsp.h">
+      <Filter>原始程式檔\librtsp</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\config.ini">
+      <Filter>資源檔</Filter>
+    </None>
+    <None Include="..\Makefile">
+      <Filter>資源檔</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\peer.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\peer_mgr.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pk_mgr.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stream.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stream_handler.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stream_handler_udp.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stream_udp.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\basic_class.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bit_stream_server.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\configuration.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\EpollFake.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\main.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\network.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\librtmp\rtmp_supplement.cpp">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\librtmp\rtmp_viewer.cpp">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\librtmp\amf.cpp">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\librtmp\parseurl.cpp">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\librtmp\rtmp.cpp">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\librtmp\rtmp_server.cpp">
+      <Filter>原始程式檔\librtmp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\librtsp\rtsp_viewer.cpp">
+      <Filter>原始程式檔\librtsp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\librtsp\rtsp_server.cpp">
+      <Filter>原始程式檔\librtsp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libBitStream\bit_stream_out.cpp">
+      <Filter>原始程式檔\libBitStream</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libBitStreamHTTP\bit_stream_httpout.cpp">
+      <Filter>原始程式檔\libBitStreamHTTP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\librtsp\ss_rtsp.cpp">
+      <Filter>原始程式檔\librtsp</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

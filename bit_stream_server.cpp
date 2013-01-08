@@ -2,8 +2,8 @@
 #include "network.h"
 #include "logger.h"
 #include "pk_mgr.h"
-#include "bit_stream_out.h"
-#include "bit_stream_httpout.h"
+#include "libBitStream/bit_stream_out.h"
+#include "libBitStreamHTTP/bit_stream_httpout.h"
 #include <sstream>
 
 #define mode 5 // mod_HTTP

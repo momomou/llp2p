@@ -703,7 +703,7 @@ void peer_mgr::del_rescue_downstream()
 
 void peer_mgr::cut_rescue_downstream(unsigned long pid)
 {
-	DBG_PRINTF("here\n");
+
 	
 	int sock;
 	list<int>::iterator fd_iter;

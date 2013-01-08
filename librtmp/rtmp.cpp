@@ -31,8 +31,8 @@
 #include <assert.h>
 
 #include "rtmp.h"
-#include "logger.h"
-#include "network.h"
+#include "../logger.h"
+#include "../network.h"
 #include "amf.h"
 
 

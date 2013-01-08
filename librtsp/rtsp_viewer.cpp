@@ -1,9 +1,9 @@
 #include "rtsp_viewer.h"
-#include "pk_mgr.h"
-#include "network.h"
-#include "logger.h"
-#include "stream_udp.h"
-#include "stream_handler_udp.h"
+#include "../pk_mgr.h"
+#include "../network.h"
+#include "../logger.h"
+#include "../stream_udp.h"
+#include "../stream_handler_udp.h"
 #include <sstream>
 
 rtsp_viewer::rtsp_viewer(network *net_ptr, logger *log_ptr, pk_mgr *pk_mgr_ptr, list<int> *fd_list)

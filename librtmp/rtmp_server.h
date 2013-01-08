@@ -1,7 +1,7 @@
 #ifndef _RTMP_SERVER_H_
 #define _RTMP_SERVER_H_
 
-#include "common.h"
+#include "../common.h"
 
 #define MAX_POLL_EVENT 100
 

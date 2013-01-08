@@ -10,7 +10,7 @@
 #include "logger.h"
 #include "peer_mgr.h"
 #include "peer.h"
-#include "rtsp_viewer.h"
+#include "librtsp/rtsp_viewer.h"
 
 using namespace std;
 

@@ -30,9 +30,9 @@
 //#include <assert.h>
 //#include <stdlib.h>
 
-#include "common.h"
+#include "../common.h"
 #include "amf.h"
-#include "logger.h"
+#include "../logger.h"
 #include "bytes.h"
 
 static const AMFObjectProperty AMFProp_Invalid = { {0, 0}, AMF_INVALID };

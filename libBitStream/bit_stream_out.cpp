@@ -1,8 +1,8 @@
 #include "bit_stream_out.h"
-#include "bit_stream_server.h"
-#include "network.h"
-#include "logger.h"
-#include "pk_mgr.h"
+#include "../bit_stream_server.h"
+#include "../network.h"
+#include "../logger.h"
+#include "../pk_mgr.h"
 #include <sstream>
 
 //this is a implement sample 

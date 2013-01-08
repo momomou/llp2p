@@ -1,8 +1,8 @@
 #include "bit_stream_httpout.h"
-#include "bit_stream_server.h"
-#include "network.h"
-#include "logger.h"
-#include "pk_mgr.h"
+#include "../bit_stream_server.h"
+#include "../network.h"
+#include "../logger.h"
+#include "../pk_mgr.h"
 #include <sstream>
 
 const	char httpHeader[]=	"HTTP/1.1 200 OK\r\n" 

@@ -1,6 +1,6 @@
 #include "rtsp_server.h"
-#include "network.h"
-#include "logger.h"
+#include "../network.h"
+#include "../logger.h"
 #include "rtsp_viewer.h"
 #include <sstream>
 

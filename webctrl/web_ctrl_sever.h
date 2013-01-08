@@ -3,8 +3,8 @@
 
 #define BIND_PORT  2000
 
-#include "common.h"
-#include "basic_class.h"
+#include "../common.h"
+#include "../basic_class.h"
 
 class network;
 class logger;

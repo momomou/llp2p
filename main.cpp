@@ -15,10 +15,10 @@ in main should init sock to listen to listen other peer connected
 #include "pk_mgr.h"
 #include "peer_mgr.h"
 #include "peer.h"
-#include "stream_server.h"
-#include "rtmp_server.h"
-#include "rtmp.h"
-#include "rtmp_supplement.h"
+//#include "stream_server.h"
+#include "librtmp/rtmp_server.h"
+#include "librtmp/rtmp.h"
+#include "librtmp/rtmp_supplement.h"
 #include "bit_stream_server.h"
 
 
@@ -120,7 +120,6 @@ int main(int argc, char **argv)
 	net_ptr->epoll_creater();
 	log_ptr->start_log_record(SYS_FREQ);
 
-	
 	peer_mgr_ptr->peer_mgr_set(net_ptr, log_ptr, prep, pk_mgr_ptr);
 	//peer_mgr_ptr->pk_mgr_set(pk_mgr_ptr);
 	pk_mgr_ptr->peer_mgr_set(peer_mgr_ptr);

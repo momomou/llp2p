@@ -1,6 +1,6 @@
 #include "web_ctrl_unit.h"
-#include "network.h"
-#include "logger.h"
+#include "../network.h"
+#include "../logger.h"
 
 using namespace std;
 

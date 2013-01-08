@@ -1,8 +1,8 @@
 #ifndef _RTSP_SERVER_H_
 #define _RTSP_SERVER_H_
 
-#include "common.h"
-#include "basic_class.h"
+#include "../common.h"
+#include "../basic_class.h"
 
 class network;
 class logger;

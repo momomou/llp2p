@@ -1,3 +1,7 @@
+/*
+
+*/
+
 #include "peer.h"
 #include "network.h"
 #include "logger.h"
@@ -252,10 +256,9 @@ int peer::handle_pkt_in(int sock)
 #endif
 				continue;
 			} else {
-				//continue;
+
 				data_close(sock, "recv error in peer::handle_pkt_in");
-				//cout << "haha7" << endl;
-				//PAUSE
+
 				return RET_SOCK_ERROR;
 			}
 		}

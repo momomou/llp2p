@@ -313,7 +313,7 @@ void logger::LogHexString(int level, const char *data, unsigned long len)
 	LogPrintf( "%s", line );
 }
 
-
+//沒有時計準確到us的實做 其tv_usec 只準確到msec,不如使用 clock來的直覺
 #ifdef WIN32
 int logger::gettimeofday(struct timeval *tv, void *tzp)
 {
@@ -344,17 +344,11 @@ double logger::set_diff_timmer()
     if(is_diff_timmer_set) {
         start_time = detail_time;
         detail_time = clock();
-        return (double)(detail_time - start_time) / CLOCKS_PER_SEC;
+        return (double)(detail_time - start_time) / CLOCKS_PER_SEC;  //CLOCKS_PER_SEC by define =1000
     } else {
         is_diff_timmer_set = 1;
         detail_time = clock();
         return 0;
     }
 }
-
-
-
-
-
-
 
