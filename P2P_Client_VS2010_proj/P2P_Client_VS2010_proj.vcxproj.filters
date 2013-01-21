@@ -93,9 +93,6 @@
     <ClInclude Include="..\librtmp\rtmp.h">
       <Filter>原始程式檔\librtmp</Filter>
     </ClInclude>
-    <ClInclude Include="resource.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
     <ClInclude Include="..\librtsp\rtsp_server.h">
       <Filter>原始程式檔\librtsp</Filter>
     </ClInclude>

@@ -23,6 +23,7 @@ public:
 	list <int> streamID_list;
 
 	map<unsigned long, unsigned long> map_pid_manifest;
+	
     map<unsigned char, int> map_rtmp_chunk_size;
     map<string, unsigned char> map_stream_name_id;
 		
@@ -30,7 +31,12 @@ public:
 	struct chunk_rescue_list_reply_t *rescue_list_reply_ptr;
 	unsigned long lane_member;
 	unsigned long peer_list_member;
-	struct chunk_rtp_t *_chunk_rtp;
+	struct chunk_bitstream_t *_chunk_bitstream;
+
+	//rescue
+	struct detectionInfo *ssDetect_ptr;
+	int *statsArryCount_ptr ;
+
 	int _current_pos, _bucket_size;
 	unsigned long _channel_id;
 	unsigned long bit_rate;
@@ -48,7 +54,6 @@ public:
 	map<unsigned long, struct peer_info_t *> map_pid_peer_info;		// <pid, struct peer_info_t *>
 	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		// <pid, struct peer_info_t *>
 	
-	//unsigned long long bandwidth_bucket[BANDWIDTH_BUCKET];
 	
 	pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , logger *log_ptr , configuration *prep);
 	~pk_mgr();
@@ -68,18 +73,25 @@ public:
 	virtual void handle_job_realtime();
 	virtual void handle_job_timer();
 
-	void handle_bandwidth(unsigned long avg_bit_rate);
+//	void handle_bandwidth(unsigned long avg_bit_rate);
 	void send_rescue(unsigned long manifest);
 	void send_rescue_to_pk();
-	void send_rescue_to_upstream(unsigned long manifest);
+//	void send_rescue_to_upstream(unsigned long manifest);
 	void send_request_sequence_number_to_pk(unsigned int req_from, unsigned int req_to);
     void send_pkt_to_pk(struct chunk_t *chunk_ptr);
 	void handle_rescue(unsigned long pid, unsigned long manifest);
-    void handle_latency(struct chunk_t *chunk_ptr, int sockfd);
+//    void handle_latency(struct chunk_t *chunk_ptr, int sockfd);
 	void handle_stream(struct chunk_t *chunk_ptr, int sockfd);
     void store_stream_id_map(char user_name[], unsigned char stream_id);
 	void data_close(int cfd, const char *reason); 
 	int get_sock(void);
+
+///new rescue function
+	int rescue_detecion(struct chunk_t *chunk_ptr);
+	void init_rescue_detection();
+	void measure();
+//	unsigned int threshold(int peer_ss_num ,double sourceBitrate);
+//	void isSameMeasureN(int rescue_ss_num);
 
 	void rtsp_viewer_set(rtsp_viewer *rtsp_viewer_ptr);
 	void rtmp_sock_set(int sock);

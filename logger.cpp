@@ -145,7 +145,8 @@ bool logger::check_arch_compatible()
 		return false;
 	}
 
-	if(sizeof(struct peer_info_t) != 24) {
+
+	if(sizeof(struct peer_info_t) != (24+PARAMETER_M*4) ) {
 		return false;
 	}
 	
@@ -313,7 +314,7 @@ void logger::LogHexString(int level, const char *data, unsigned long len)
 	LogPrintf( "%s", line );
 }
 
-//沒有時計準確到us的實做 其tv_usec 只準確到msec,不如使用 clock來的直覺
+//沒有時計準確到us的實做 其tv_usec 只準確到msec
 #ifdef WIN32
 int logger::gettimeofday(struct timeval *tv, void *tzp)
 {
@@ -328,6 +329,38 @@ int logger::gettimeofday(struct timeval *tv, void *tzp)
     return (0);
 }
 #endif
+
+#ifdef WIN32
+void logger::getTickTime(LARGE_INTEGER *tickTime)
+{
+	QueryPerformanceCounter(tickTime);
+}
+#endif
+
+
+#ifdef WIN32
+LONGLONG logger::diffTime_us(LARGE_INTEGER startTime,LARGE_INTEGER endTime)
+{
+    LARGE_INTEGER CUPfreq;
+    LONGLONG llLastTime;
+    QueryPerformanceFrequency(&CUPfreq);
+    llLastTime = 1000000 * (endTime.QuadPart - startTime.QuadPart) / CUPfreq.QuadPart;
+    return llLastTime;
+}
+#endif
+
+#ifdef WIN32
+unsigned int logger::diffTime_ms(LARGE_INTEGER startTime,LARGE_INTEGER endTime)
+{
+    LARGE_INTEGER CUPfreq;
+    LONGLONG llLastTime;
+    QueryPerformanceFrequency(&CUPfreq);
+    llLastTime = (unsigned int)  (1000 * (endTime.QuadPart - startTime.QuadPart) / CUPfreq.QuadPart);
+
+    return llLastTime;
+}
+#endif
+
 
 unsigned long logger::timevaldiff(struct timeval *starttime, struct timeval *finishtime)
 {

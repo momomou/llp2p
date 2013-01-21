@@ -87,7 +87,6 @@
     <ClInclude Include="..\stream_handler.h" />
     <ClInclude Include="..\stream_handler_udp.h" />
     <ClInclude Include="..\stream_udp.h" />
-    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\config.ini" />

@@ -85,7 +85,7 @@ void peer::peer_set(network *net_ptr , logger *log_ptr , configuration *prep, pk
 	_net_ptr->peer_set(this);
 }
 
-
+//
 void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_in cin)
 {
 
@@ -177,7 +177,7 @@ int peer::handle_pkt_in(int sock)
 {
 	ftime(&interval_time);	//--!!0215
 	unsigned long buf_len;
-	unsigned long i;
+//	unsigned long i;
 	int recv_byte;
 	int expect_len;
 	int offset = 0;
@@ -185,9 +185,9 @@ int peer::handle_pkt_in(int sock)
 	unsigned long bandwidth = 0;
 	int different = 0;
 	unsigned long pid;
-	unsigned long manifest;
-	unsigned long n_alpha;
-	unsigned char reply;
+//	unsigned long manifest;
+//	unsigned long n_alpha;
+//	unsigned char reply;
 
 	if(!_time_start) {
 		_log_ptr->time_init();
@@ -270,18 +270,30 @@ int peer::handle_pkt_in(int sock)
 	}
 
 	offset = 0;
+
+//recv ok  
+
 	
 //CHNK_CMD_PEER_DATA
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_DATA) {
+
+
+//the main handle
 		_pk_mgr_ptr->handle_stream(chunk_ptr, sock);
+
+
+
 		_recv_byte_count += chunk_ptr->header.length;
+
+//?????  what's this?
+
+//hidden at 2013/01/16
+/*
         if(~parent_manifest & (1 << (chunk_ptr->header.sequence_number % _pk_mgr_ptr->sub_stream_num))){
             _recv_parent_byte_count += chunk_ptr->header.length; 
             //cout << "parent seq " << chunk_ptr->header.sequence_number << endl;
         }
-
-//write binary log
-//		_log_ptr->write_binary(chunk_ptr->header.sequence_number);
+*/
 
 /*
 		if(_log_ptr->handleAlarm()) {
@@ -295,6 +307,9 @@ int peer::handle_pkt_in(int sock)
 		}
 */
 
+
+//hidden   at  2013/01/09
+/*
 		if(_log_ptr->handleAlarm()) {
 			count++;
 			if(count >= BANDWIDTH_BUCKET) {
@@ -318,11 +333,16 @@ int peer::handle_pkt_in(int sock)
 				}
 			}
 		}
+*/
 		
-		if(chunk_ptr) 
-			delete chunk_ptr;
-		
+
+
+
+//cmd =CHNK_CMD_PEER_BWN
 	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_BWN) {
+
+//hidden at  2013/01/09
+/*
 		if(count >= BANDWIDTH_BUCKET) {
 			memcpy(&bandwidth, (char *)chunk_ptr + sizeof(struct chunk_t), sizeof(unsigned long));
 			different = bandwidth - avg_bandwidth;
@@ -342,13 +362,14 @@ int peer::handle_pkt_in(int sock)
             parent_manifest = manifest;
 			_pk_mgr_ptr->send_rescue(manifest);
 		}
+*/
 		
-		if(chunk_ptr) 
-			delete chunk_ptr;
-		
+
+
+//cmd = CHNK_CMD_PEER_RSC
 	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_RSC) {
-		//cout << "RESCUE" << endl;
-		
+//hidden at 2013/01/13
+/*
 		if(chunk_ptr->header.rsv_1 == REQUEST) {
 			memcpy(&pid, (char *)chunk_ptr + sizeof(struct chunk_t), sizeof(unsigned long));
 			memcpy(&manifest, ((char *)chunk_ptr + sizeof(struct chunk_t) + sizeof(unsigned long)), sizeof(unsigned long));
@@ -357,21 +378,27 @@ int peer::handle_pkt_in(int sock)
 			memcpy(&reply, (char *)chunk_ptr + sizeof(struct chunk_t), sizeof(unsigned char));
 			memcpy(&manifest, ((char *)chunk_ptr + sizeof(struct chunk_t) + sizeof(unsigned char)), sizeof(unsigned long));
 			if(reply == OK) {
-				_pk_mgr_ptr->send_rescue_to_upstream(manifest);
+//				_pk_mgr_ptr->send_rescue_to_upstream(manifest);
 			} else {
 			}
 		}
-		
-		if(chunk_ptr) 
-			delete chunk_ptr;
-		
+*/
+
+
+
+
+//cmd == CHNK_CMD_PEER_CUT
 	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_CUT) {
 		//cout << "CHNK_CMD_PEER_CUT" << endl;
 		memcpy(&pid, (char *)chunk_ptr + sizeof(struct chunk_t), sizeof(unsigned long));
 		_peer_mgr_ptr->cut_rescue_downstream(pid);
-		if(chunk_ptr) 
-			delete chunk_ptr;
+		
+
+
+//cmd == CHNK_CMD_PEER_LATENCY
 	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_LATENCY){
+//hidden at 2013/01/16
+/*
         unsigned long sec, usec, peer_id;
         unsigned long peer_num;
 
@@ -387,10 +414,15 @@ int peer::handle_pkt_in(int sock)
         }
 
         _pk_mgr_ptr->handle_latency(chunk_ptr, sock);
+*/
 
-        if(chunk_ptr) 
-			delete chunk_ptr;
+
+//cmd == CHNK_CMD_RT_NLM
     } else if(chunk_ptr->header.cmd == CHNK_CMD_RT_NLM) {	//--!! 0128
+
+//hidden at 2013/01/16
+/*
+
 		map<unsigned long, int>::iterator pid_fd_iter;
 		map<int, queue<struct chunk_t *> *>::iterator fd_queue_iter;
 		queue<struct chunk_t *> *queue_out_ctrl_ptr = NULL;
@@ -487,15 +519,23 @@ int peer::handle_pkt_in(int sock)
 	    ftime(&interval_time);
 	    tmp = interval_time.time * 1000ull + interval_time.millitm - tmp;
 	    cout<<"interval delay = "<<tmp<<endl;
+*/
 
 	} else {
 		cout << "what's this?" << endl;
 	}
 
+
+	if (chunk_ptr)
+		delete [] (unsigned char*)chunk_ptr;
+
+
+
 	return RET_OK;
 }
 
-
+ 
+//°equeue_out_ctrl_ptr ©Mqueue_out_data_ptr¥X¥h
 int peer::handle_pkt_out(int sock)
 {
 	struct chunk_t *chunk_ptr;
@@ -655,46 +695,46 @@ void peer::data_close(int cfd, const char *reason)
 		}
 	}
 
-	DBG_PRINTF("here\n");
+
 	map_rescue_fd_count_iter = _peer_mgr_ptr->map_rescue_fd_count.find(cfd);
-	DBG_PRINTF("here\n");
+
 	if(map_rescue_fd_count_iter != _peer_mgr_ptr->map_rescue_fd_count.end()) {
-		DBG_PRINTF("here\n");
+
 		if(_peer_mgr_ptr->map_rescue_fd_count.size() == 1) {
-			DBG_PRINTF("here\n");
+
 			_peer_mgr_ptr->map_rescue_fd_count.erase(map_rescue_fd_count_iter);
-			_pk_mgr_ptr->send_rescue_to_upstream(manifest);
+//			_pk_mgr_ptr->send_rescue_to_upstream(manifest);
 		} else if(_peer_mgr_ptr->map_rescue_fd_count.size() == 2) {
-			DBG_PRINTF("here\n");
+
 			for(map_rescue_fd_count_iter2 = _peer_mgr_ptr->map_rescue_fd_count.begin(); map_rescue_fd_count_iter2 != _peer_mgr_ptr->map_rescue_fd_count.end(); map_rescue_fd_count_iter2++) {
 				if(map_rescue_fd_count_iter2->first != cfd) {
 					sockfd = map_rescue_fd_count_iter2->first;
 					_peer_mgr_ptr->map_rescue_fd_count[sockfd] = WIN_COUNTER;
-					DBG_PRINTF("here\n");
+
 				} else {
 					map_rescue_fd_count_iter = map_rescue_fd_count_iter2;
 				}
 			}
 			_peer_mgr_ptr->map_rescue_fd_count.erase(map_rescue_fd_count_iter);
 			cout << "map_rescue_fd_count_size = " << _peer_mgr_ptr->map_rescue_fd_count.size() << endl;
-			DBG_PRINTF("here\n");
+
 		} else {
-			DBG_PRINTF("here\n");
+
 			_peer_mgr_ptr->map_rescue_fd_count.erase(map_rescue_fd_count_iter);
 		}
 	} else {
-		DBG_PRINTF("here\n");
+
 	}
 	
 
 	map_fd_queue_iter = _peer_mgr_ptr->_map_fd_downstream.find(cfd);
-	DBG_PRINTF("here\n");
+
 		
 	map_fd_pid_iter = _peer_mgr_ptr->map_fd_pid.find(cfd);
-	DBG_PRINTF("here\n");
+
 		
 	if(map_fd_queue_iter != _peer_mgr_ptr->_map_fd_downstream.end()) {
-		DBG_PRINTF("here\n");
+
 		_peer_mgr_ptr->_map_fd_downstream.erase(map_fd_queue_iter);
 	}
 

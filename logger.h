@@ -45,6 +45,11 @@ public:
 	void LogHex(int level, const char *data, unsigned long len);
 	void LogHexString(int level, const char *data, unsigned long len);
 
+	void getTickTime(LARGE_INTEGER *tickTime);
+	LONGLONG diffTime_us(LARGE_INTEGER startTime,LARGE_INTEGER endTime);
+	unsigned int diffTime_ms(LARGE_INTEGER startTime,LARGE_INTEGER endTime);
+	
+
 #ifdef WIN32
     int gettimeofday(struct timeval *tp, void *tzp);
 #endif

@@ -5,6 +5,7 @@
 #include "../pk_mgr.h"
 #include <sstream>
 
+
 const	char httpHeader[]=	"HTTP/1.1 200 OK\r\n" 
 							"Date: Mon, 22 Oct 2012 18:46:42 GMT"
 							"Server: Apache/2.2.8 (Win32) PHP/5.2.6"
@@ -13,7 +14,7 @@ const	char httpHeader[]=	"HTTP/1.1 200 OK\r\n"
 							"\r\n";
 
 
-const	 char FLV_Header[] = { 0x46,0x4c,0x56,0x01,0x05,0x00,0x00,0x00,0x09,0x00,0x00,0x00,0x00,0x12,0x00,0x00
+const  char FLV_Header[] = { 0x46,0x4c,0x56,0x01,0x05,0x00,0x00,0x00,0x09,0x00,0x00,0x00,0x00,0x12,0x00,0x00
 							,0xb6,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02,0x00,0x0a,0x6f,0x6e,0x4d,0x65,0x74
 							,0x61,0x44,0x61,0x74,0x61,0x08,0x00,0x00,0x00,0x07,0x00,0x08,0x64,0x75,0x72,0x61
 							,0x74,0x69,0x6f,0x6e,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x05,0x77
@@ -27,7 +28,6 @@ const	 char FLV_Header[] = { 0x46,0x4c,0x56,0x01,0x05,0x00,0x00,0x00,0x09,0x00,0
 							,0x66,0x35,0x32,0x2e,0x38,0x37,0x2e,0x31,0x00,0x08,0x66,0x69,0x6c,0x65,0x73,0x69
 							,0x7a,0x65,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x09,0x00,0x00
 							,0x00,0xc1};
-
 
 
 bit_stream_httpout::bit_stream_httpout(int stream_id,network *net_ptr, logger *log_ptr,bit_stream_server *bit_stream_server_ptr ,pk_mgr *pk_mgr_ptr, list<int> *fd_list,int acceptfd){
@@ -94,11 +94,7 @@ int bit_stream_httpout::handle_pkt_in(int sock){
 //判斷delay是否發生並適當的做取樣,接著就把queue 的資料傳出去
 int bit_stream_httpout::handle_pkt_out(int sock){
 
-	int send_rt_val=0; //send return value
-	int channel_num;
-	int basic_header_type;
-	int ms_type_id = 0;
-	int mss_id = 0;
+	int send_rt_val = 0; //send return value
 
 	//here is http header and flv header
 	if(first_HTTP_Header){
@@ -126,8 +122,8 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 		chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();
 
-//pop until get the first keyframe
 
+//pop until get the first keyframe
 		while(first_pkt){
 			if(_queue_out_data_ptr ->size() >=10){
 				for(int i=0;i<5;i++){
@@ -258,12 +254,16 @@ _log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt sequence_
 		}
 	}//end while (1)
 	}
-void bit_stream_httpout::handle_pkt_error(int sock){
-	}
-void bit_stream_httpout::handle_job_realtime(){
-	}
-void bit_stream_httpout::handle_job_timer(){
-	}
+
+void bit_stream_httpout::handle_pkt_error(int sock)
+{
+}
+void bit_stream_httpout::handle_job_realtime()
+{
+}
+void bit_stream_httpout::handle_job_timer()
+{	
+}
 
 void bit_stream_httpout::set_client_sockaddr(struct sockaddr_in *cin)
 {
@@ -284,7 +284,8 @@ unsigned char bit_stream_httpout::get_stream_pk_id()
 
 
 
-bool bit_stream_httpout::isKeyFrame(struct chunk_bitstream_t *chunk_ptr){
+bool bit_stream_httpout::isKeyFrame(struct chunk_bitstream_t *chunk_ptr)
+{
 	char flvBitFlag;
 	if(*(char*)(chunk_ptr->buf) == 0x09){		//video
 	flvBitFlag = *(char*) ((chunk_ptr->buf) + 11);  //get first byte
@@ -301,7 +302,8 @@ bool bit_stream_httpout::isKeyFrame(struct chunk_bitstream_t *chunk_ptr){
 
 //return  StreamID  ,streamID >0 ,bufferSize 暫時保留沒用到(習慣上會將陣列的大小一起傳進function)
 //example http://127.0.0.1:3000/8877.flv  streamID= 8877
-int  bit_stream_httpout::getStreamID_FromHTTP_Request(char *httpBuffer,unsigned long bufferSize ){
+int  bit_stream_httpout::getStreamID_FromHTTP_Request(char *httpBuffer,unsigned long bufferSize )
+{
 	char *ptr=NULL;
 	int streamID;
 	ptr = strstr(httpBuffer ,"GET /");
@@ -311,13 +313,14 @@ int  bit_stream_httpout::getStreamID_FromHTTP_Request(char *httpBuffer,unsigned 
 	ptr+=5;
 	char temp[5]={'0x0','0x0','0x0','0x0','\0'};
 	memcpy(temp,ptr,4);
-	streamID=atoi(temp);
+	streamID = atoi(temp);
 	return streamID;
 	}
 }
 
 // T=1/F=0
-bool bit_stream_httpout::isStreamID_inChannel(int streamid){
+bool bit_stream_httpout::isStreamID_inChannel(int streamid)
+{
 	list<int>::iterator IDiter;
 	if(streamid < 0)
 	return false;
@@ -330,7 +333,8 @@ bool bit_stream_httpout::isStreamID_inChannel(int streamid){
 }
 
 
-unsigned int bit_stream_httpout::getFlvTimeStamp(struct chunk_bitstream_t *chunk_ptr){
+unsigned int bit_stream_httpout::getFlvTimeStamp(struct chunk_bitstream_t *chunk_ptr)
+{
 	unsigned int timeStampInt=0;
 	unsigned int *intPtr;
 	unsigned int timeStampIntExtend=0;

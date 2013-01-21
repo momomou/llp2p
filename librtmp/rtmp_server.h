@@ -3,7 +3,7 @@
 
 #include "../common.h"
 
-#define MAX_POLL_EVENT 100
+//#define MAX_POLL_EVENT 100
 
 class network;
 class logger;

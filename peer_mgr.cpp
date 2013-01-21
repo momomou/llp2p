@@ -39,7 +39,7 @@ void peer_mgr::peer_mgr_set(network *net_ptr , logger *log_ptr , configuration *
 	peer_ptr->peer_set(_net_ptr, _log_ptr, _prep, _pk_mgr_ptr, this);		
 }
 
-//和所有在同個lane 下的member做連線要求 呼叫build_connection連線
+//除自己之外和所有在同個lane 下的member做連線要求 呼叫build_connection連線
 void peer_mgr::connect_peer(struct chunk_level_msg_t *level_msg_ptr, unsigned long pid)
 {
     set_up_public_ip(level_msg_ptr);
@@ -159,6 +159,7 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 }
 
 
+//只用來接收 CHNK_CMD_PEER_CON的資訊  並把fd 加入監聽
 int peer_mgr::handle_pkt_in(int sock)
 {
 	int recv_byte;	
@@ -257,15 +258,14 @@ int peer_mgr::handle_pkt_in(int sock)
 			break;
 	}
 
-	//_net_ptr->set_nonblocking(new_fd);
+	_net_ptr->set_nonblocking(new_fd);
 	_net_ptr->epoll_control(new_fd, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT);	
 	_net_ptr->set_fd_bcptr_map(new_fd, dynamic_cast<basic_class *>(peer_ptr));
 	fd_list_ptr->push_back(new_fd);
-	//printf("%s, new_fd=> %d\n", __FUNCTION__, new_fd);
+
 	
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_CON) {
 		cout << "CHNK_CMD_PEER_CON" << endl;
-		//PAUSE
 		peer_ptr->handle_connect(new_fd, chunk_ptr,_cin);
 	} 
 
@@ -302,6 +302,9 @@ void peer_mgr::handle_job_timer()
 
 }
 
+// will delete   //sent bandwidth to children 
+// hidden at  2013/01/15
+/* 
 void peer_mgr::send_bandwidth(unsigned long pid, unsigned long avg_bit_rate)
 {
 	map<unsigned long, int>::iterator pid_fd_iter;
@@ -341,8 +344,13 @@ void peer_mgr::send_bandwidth(unsigned long pid, unsigned long avg_bit_rate)
 	} 
 
 }
+*/
 
 
+//will delete  // send_rescueto other peer 
+//認為可以不用  ,可以和一開始peer 間註冊時塞manifest 時的function
+//hidden at  2013/01/15
+/* 
 void peer_mgr::send_rescue(unsigned long pid, unsigned long self_pid, unsigned long manifest)
 {
 
@@ -389,6 +397,7 @@ void peer_mgr::send_rescue(unsigned long pid, unsigned long self_pid, unsigned l
 
 }
 
+*/
 
 void peer_mgr::handle_cut_peer(unsigned long pid, int sock)
 {
@@ -399,14 +408,12 @@ void peer_mgr::handle_cut_peer(unsigned long pid, int sock)
 	fd_pid_iter = map_fd_pid.find(sock);
 	
 	if(fd_pid_iter != map_fd_pid.end()) {
-		DBG_PRINTF("here\n");
 		cout << "the pid we want to cut = " << fd_pid_iter->second << endl;
 		send_cut_peer(pid, sock);
 		for(rescue_pid_iter = rescue_pid_list.begin(); rescue_pid_iter != rescue_pid_list.end(); rescue_pid_iter++) {
 			if(*rescue_pid_iter == fd_pid_iter->second) {
 				rescue_pid_list.erase(rescue_pid_iter);
 				cout << "rescue_pid_list_size = " << rescue_pid_list.size() << endl;
-				DBG_PRINTF("here\n");
 				break;
 			}
 		}
@@ -420,13 +427,13 @@ void peer_mgr::handle_cut_peer(unsigned long pid, int sock)
 		fd_pid_iter = peer_ptr->map_fd_pid.find(sock);
 		if(fd_pid_iter != peer_ptr->map_fd_pid.end()) {
 			cout << "the pid we want to cut = " << fd_pid_iter->second << endl;
-			DBG_PRINTF("here\n");
+
 			send_cut_peer(pid, sock);
 			for(rescue_pid_iter = rescue_pid_list.begin(); rescue_pid_iter != rescue_pid_list.end(); rescue_pid_iter++) {
 				if(*rescue_pid_iter == fd_pid_iter->second) {
 					rescue_pid_list.erase(rescue_pid_iter);
 					cout << "rescue_pid_list_size = " << rescue_pid_list.size() << endl;
-					DBG_PRINTF("here\n");
+
 					break;
 				}
 			}
@@ -660,7 +667,8 @@ void peer_mgr::cut_rescue_peer(int sock)
 	
 }
 
-
+//only called by recv pkt from pk ,cmd == CHNK_CMD_PEER_TCN
+//只有拓樸改變才會呼叫     
 void peer_mgr::del_rescue_downstream()
 {
 	unsigned long pid;
@@ -677,9 +685,9 @@ void peer_mgr::del_rescue_downstream()
 		
 		pid_fd_iter = peer_ptr->map_pid_fd.find(pid);
 		
-		if(pid_fd_iter == peer_ptr->map_pid_fd.end()) {
+		if(pid_fd_iter == peer_ptr->map_pid_fd.end()) { //沒有建立連線
 			continue;
-		} else {
+		} else {										//有建立連線
 			sock = pid_fd_iter->second;
 		}
 		

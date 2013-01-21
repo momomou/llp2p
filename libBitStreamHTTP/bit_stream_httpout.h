@@ -11,6 +11,10 @@ class pk_mgr;
 class bit_stream_server;
 
 
+
+
+
+
 class bit_stream_httpout:public stream {
 public:
 
@@ -59,6 +63,9 @@ private:
 	int getStreamID_FromHTTP_Request(char *httpBuffer,unsigned long BufferSize );
 	bool isKeyFrame(struct chunk_bitstream_t *chunk_ptr);
 	unsigned int getFlvTimeStamp(struct chunk_bitstream_t *chunk_ptr);
+
+
+
 };
 
 #endif

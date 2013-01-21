@@ -31,8 +31,8 @@ public:
 	int connect_other_lane_peer(struct chunk_rescue_list_reply_t *rescue_list_reply_ptr, unsigned long peer_list_member, unsigned long pid, unsigned long outside_lane_rescue_num);
 	int build_connection(struct level_info_t *level_info_ptr, unsigned long pid);
 
-	void send_bandwidth(unsigned long pid, unsigned long avg_bit_rate);
-	void send_rescue(unsigned long pid, unsigned long self_pid, unsigned long manifest);
+//	void send_bandwidth(unsigned long pid, unsigned long avg_bit_rate);
+//	void send_rescue(unsigned long pid, unsigned long self_pid, unsigned long manifest);
 	void handle_cut_peer(unsigned long pid, int sock);
 	void send_cut_peer(unsigned long pid, int sock);
 	void rescue_reply(unsigned long pid, unsigned long manifest);

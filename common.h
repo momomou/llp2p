@@ -2,7 +2,15 @@
 #define __COMMON_H__
 
 
-#define FD_SETSIZE 	2048
+#define FD_SETSIZE		2048
+////resuce PARAMETER////
+#define PARAMETER_X		10
+#define PK_PID			999999
+
+// M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
+#define PARAMETER_M		20
+#define PARAMETER_N		5
+#define PARAMETER_P		2
 
 #include "configuration.h"
 
@@ -181,6 +189,7 @@ struct peer_info_t {
 	unsigned short tcp_port;
 	unsigned short udp_port;
 	unsigned long manifest;
+	int rescueStatsArry[PARAMETER_M];
 };
 
 
@@ -215,6 +224,7 @@ struct ts_block_t {		//--!!0124
 				isDST:1;
 };
 
+///P2P  main  header
 struct chunk_header_t {
 	unsigned char cmd;
 	unsigned char 
@@ -229,6 +239,26 @@ struct chunk_header_t {
 	unsigned int timestamp;
 	unsigned short rsv_3;
 	unsigned short length;
+};
+
+
+//detection Info
+struct detectionInfo{
+	LARGE_INTEGER	lastAlarm;
+	LARGE_INTEGER	firstAlarm;
+	LARGE_INTEGER	previousAlarm;
+
+	unsigned int	last_timestamp;
+	unsigned int	first_timestamp;
+	unsigned long	last_seq;
+
+	unsigned int	measure_N;		//第N次測量
+	unsigned int	count_X;		//X個封包量一次
+
+	unsigned int	total_buffer_delay;
+	double			last_sourceBitrate;
+	double			last_localBitrate;
+	unsigned int	total_byte;
 };
 
 
@@ -255,7 +285,7 @@ struct chunk_t{
 
 struct chunk_rtp_t{
 	struct chunk_header_t header;
-	struct rtp_hdr_t hdr;
+//	struct rtp_hdr_t hdr;
 	unsigned char payload[RTP_PKT_BUF_PAY_SIZE];
 };
 
@@ -304,11 +334,17 @@ struct chunk_bandwidth_t {
 	unsigned long bandwidth;
 };
 
-struct chunk_rescue_t {
+
+///sent to pk , rescue from pk
+struct chunk_pk_rescue_t {
 	struct chunk_header_t header;
 	unsigned long pid;
 	unsigned long manifest;
+	unsigned int from_sequence_number;
+	
 };
+
+
 
 struct chunk_rescue_reply_t {
 	struct chunk_header_t header;

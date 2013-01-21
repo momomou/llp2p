@@ -15,7 +15,6 @@ in main should init sock to listen to listen other peer connected
 #include "pk_mgr.h"
 #include "peer_mgr.h"
 #include "peer.h"
-//#include "stream_server.h"
 #include "librtmp/rtmp_server.h"
 #include "librtmp/rtmp.h"
 #include "librtmp/rtmp_supplement.h"
@@ -73,13 +72,11 @@ void signal_handler(int sig)
 
 int main(int argc, char **argv)
 {
-    extern char *optarg;
+
 	int svc_fd_tcp, svc_fd_udp;
 	unsigned long html_size;
 	int optval = 1;
 	struct sockaddr_in sin;
-	int opt;
-	unsigned short bitStreamServerPort;
 
 	string svc_tcp_port("");
 	string svc_udp_port("");
@@ -270,7 +267,7 @@ int main(int argc, char **argv)
 		net_ptr->epoll_dispatcher();
 
 		Sleep(1);
-	
+
 	}
 
 	net_ptr->garbage_collection();

@@ -38,10 +38,6 @@ int bit_stream_out::handle_pkt_in(int sock){
 int bit_stream_out::handle_pkt_out(int sock){
 
 	int send_rt_val; //send return value
-	int channel_num;
-	int basic_header_type;
-	int ms_type_id = 0;
-	int mss_id = 0;
 	send_rt_val=0;
 
 	while(true){
