@@ -8,9 +8,12 @@
 #define PK_PID			999999
 
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
-#define PARAMETER_M		20
-#define PARAMETER_N		5
-#define PARAMETER_P		2
+#define PARAMETER_M		16
+#define PARAMETER_N		6
+#define PARAMETER_P		3
+
+//  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
+#define BUFF_SIZE		20
 
 #include "configuration.h"
 
@@ -101,7 +104,7 @@ using std::bitset;
 #define SYS_FREQ		1
 
 //#define RTMP_PKT_BUF_MAX	1536	// This value defines the max rtmp packet size
-#define RTMP_PKT_BUF_MAX	1024*30	// This value defines the max rtmp packet size
+#define RTMP_PKT_BUF_MAX	30000	// This value defines the max rtmp packet size
 #define RTMP_PKT_BUF_PAY_SIZE	(RTMP_PKT_BUF_MAX - sizeof(struct chunk_header_t))	// This value defines the max rtp packet size
 
 #define CHNK_CMD_PEER_REG				0x01	// register
@@ -129,7 +132,7 @@ using std::bitset;
 #define OK				0x01
 #define REJECT			0x02
 
-#define RTP_PKT_BUF_MAX	1024*30	// This value defines the max rtp packet size
+#define RTP_PKT_BUF_MAX	30000	// This value defines the max rtp packet size
 #define RTP_PKT_BUF_PAY_SIZE	(RTP_PKT_BUF_MAX - sizeof(struct chunk_header_t) - sizeof(struct rtp_hdr_t))	// This value defines the max rtp packet size
 #define MAXFDS 			2048
 #define EVENTSIZE 		2048

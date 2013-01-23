@@ -48,7 +48,13 @@ public:
 	unsigned long avg_bandwidth;
 	unsigned long current_child_pid;
 	unsigned long current_child_manifest;
-	unsigned int _least_sequence_number;
+
+	
+	unsigned int _least_sequence_number;		//
+	unsigned int _current_send_sequence_number; //current是還沒送的
+
+
+
 	unsigned long stream_number;
 	
 	map<unsigned long, struct peer_info_t *> map_pid_peer_info;		// <pid, struct peer_info_t *>
@@ -87,7 +93,7 @@ public:
 	int get_sock(void);
 
 ///new rescue function
-	int rescue_detecion(struct chunk_t *chunk_ptr);
+	void rescue_detecion(struct chunk_t *chunk_ptr);
 	void init_rescue_detection();
 	void measure();
 //	unsigned int threshold(int peer_ss_num ,double sourceBitrate);
@@ -110,7 +116,7 @@ private:
 	int _time_start;
     int pkt_resent_count;
 
-	unsigned int _current_send_sequence_number;
+
 	unsigned long _recv_byte_count;
 	unsigned long _manifest;
 	unsigned long _check;

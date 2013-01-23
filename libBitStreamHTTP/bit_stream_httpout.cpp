@@ -161,19 +161,19 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 		}
 		else if(differenceValue <=100 && differenceValue >40){  
 			  	if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 3 == 0) ){   //not key frame &&  sampling by 1/3
-					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard ", chunk_ptr ->header.sequence_number);
+					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/3", chunk_ptr ->header.sequence_number);
 					_queue_out_data_ptr->pop();
 					chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();			 //ignore and not send
 					}
 		}else if(differenceValue <=40 && differenceValue >20){
 				if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 5 == 0) ){   //not key frame &&  sampling by 1/5
-					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard ", chunk_ptr ->header.sequence_number);
+					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/5", chunk_ptr ->header.sequence_number);
 					_queue_out_data_ptr->pop();
 					chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();			 //ignore and not send
 					}
 		}else if (differenceValue <=20 && differenceValue >5){
 				if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 7 == 0) ){   //not key frame &&  sampling by 1/7
-					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard ", chunk_ptr ->header.sequence_number);
+					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/7", chunk_ptr ->header.sequence_number);
 					_queue_out_data_ptr->pop();
 					chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();			 //ignore and not send
 					}	

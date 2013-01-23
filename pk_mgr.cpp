@@ -478,8 +478,6 @@ int pk_mgr::handle_pkt_in(int sock)
 			_time_start = 1;
 		}
 */
-		int s=rescue_detecion(chunk_ptr);
-
 
 		handle_stream(chunk_ptr, sock);	
 
@@ -525,6 +523,7 @@ int pk_mgr::handle_pkt_in(int sock)
 
 //cmd == CHNK_CMD_PEER_RSC_LIST	
 	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_RSC_LIST) {
+	printf("cmd =recv CHNK_CMD_PEER_RSC_LIST\n");
 //hidden at 2013/01/16
 /*
 		//printf("%s, CHNK_CMD_PEER_RSC_LIST\n", __FUNCTION__);
@@ -587,6 +586,7 @@ int pk_mgr::handle_pkt_in(int sock)
 	
 
 	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_NOTIFY) {
+		printf("cmd =recv CHNK_CMD_PEER_NOTIFY\n");
 
 //rtmp_chunk_size change
 //  hidden at 2013/01/16
@@ -610,6 +610,7 @@ int pk_mgr::handle_pkt_in(int sock)
 
 //header.cmd == CHNK_CMD_PEER_LATENCY
     } else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_LATENCY){
+	printf("cmd =recv CHNK_CMD_PEER_LATENCY\n");
 //hidden at 2013/01/16
 /*
         unsigned long sec, usec, peer_id;
@@ -633,6 +634,7 @@ int pk_mgr::handle_pkt_in(int sock)
 		
 //cmd == CHNK_CMD_RT_NLM   //network latency measurement
     } else if(chunk_ptr->header.cmd == CHNK_CMD_RT_NLM) {	//--!! 0128 rcv from lightning
+	printf("cmd =recv CHNK_CMD_RT_NLM\n");
 // hidden at 2013/01/13
 /*
 		map<unsigned long, int>::iterator pid_fd_iter;
@@ -758,7 +760,7 @@ int pk_mgr::handle_pkt_in(int sock)
 
 //other
 	}else{
-
+		printf("cmd =%d else\n", chunk_ptr->header.cmd);
 	}
 
 	if (chunk_ptr)
@@ -1136,7 +1138,8 @@ void pk_mgr::handle_latency(struct chunk_t *chunk_ptr, int sockfd)
 */
 
 
-//the main handle steram function 
+//the main handle steram function 需要處理不同序來源的chunk,		
+//送到player 的queue 裡面 必須保證是有方向性的 且最好是依序的
 void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 {
 	unsigned long i;
@@ -1144,15 +1147,16 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	unsigned int seq_ready_to_send;
 	int sock;
 	stream *strm_ptr;
-	struct chunk_rtp_t *temp = NULL;
+//	struct chunk_rtp_t *temp = NULL;
 	struct peer_info_t *peer = NULL;
-	map<int, queue<struct chunk_t *> *>::iterator iter;
+	map<int, queue<struct chunk_t *> *>::iterator iter;		//fd_downstream
 	map<int, unsigned long>::iterator fd_pid_iter;
 	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
-	map<int, int>::iterator map_rescue_fd_count_iter;
+//	map<int, int>::iterator map_rescue_fd_count_iter;
+	unsigned int leastCurrDiff;
 
 	queue<struct chunk_t *> *queue_out_data_ptr;
-	list<unsigned int>::iterator sequence_number_list_iter;
+//	list<unsigned int>::iterator sequence_number_list_iter;
 
 	_log_ptr->write_log_format("s =>s u s u s u s u\n", __FUNCTION__,"stream ID=" ,chunk_ptr->header .stream_id,"recieve pkt seqnum", chunk_ptr->header.sequence_number,"bytes=" ,chunk_ptr ->header.length,"timestamp=",chunk_ptr->header.timestamp);
 
@@ -1168,10 +1172,11 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		memset((char *)(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size)), 0x0, RTP_PKT_BUF_MAX);
 		memcpy((char *)(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size)), chunk_ptr, (sizeof(struct chunk_header_t) + chunk_ptr->header.length));
 		
-		map_rescue_fd_count_iter = _peer_mgr_ptr->map_rescue_fd_count.find(sockfd);
 
 //rescue
 //hidden at 2013/01/16
+
+//		map_rescue_fd_count_iter = _peer_mgr_ptr->map_rescue_fd_count.find(sockfd);
 /*
 		if(map_rescue_fd_count_iter != _peer_mgr_ptr->map_rescue_fd_count.end()) {
 			if(_peer_mgr_ptr->map_rescue_fd_count.size() > 1) {
@@ -1199,16 +1204,17 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		
 	} else if((*(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number == chunk_ptr->header.sequence_number){
 		chunk_ptr->header.length = 0;
-		//cout << "duplicate sequence number in the buffer" << endl;
+//		cout << "duplicate sequence number in the buffer" << endl;
 		return;
 	} else {
 		chunk_ptr->header.length = 0;
-		//cout << "sequence number smaller than the index in the buffer" << endl;
+//		cout << "sequence number smaller than the index in the buffer" << endl;
 		return;
 	}
 	
 
-	
+//add_downstream
+//這邊應該要修改
 	if(lane_member > 1) {
 		for (i = 0; i < lane_member; i++) {
 			if(level_msg_ptr->pid == level_msg_ptr->level_info[i]->pid) {
@@ -1222,6 +1228,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	}
 	
 
+//和上面一樣也是在把chunk丟給和自己連接的下游peer (做兩次?) (須修改)
 	for (iter = _peer_mgr_ptr->_map_fd_downstream.begin(); iter != _peer_mgr_ptr->_map_fd_downstream.end(); iter++) {
 		queue_out_data_ptr = iter->second;
 		sock = iter->first;
@@ -1246,31 +1253,126 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		
 	}
 
+/////////////////////////////////////////////測試版新功能///////////////////////////////////////////////////////////////////////
+///*
 
 
-//why??
+		//差值在BUFF_SIZE 之外可能某個些seq都不到 ,跳過那些seq直到差值在BUFF_SIZE內
+		leastCurrDiff =_least_sequence_number -_current_send_sequence_number;
+
+		if( BUFF_SIZE  <= leastCurrDiff && leastCurrDiff <_bucket_size){
+
+			for(seq_ready_to_send = _current_send_sequence_number; leastCurrDiff < BUFF_SIZE || seq_ready_to_send <= _least_sequence_number;seq_ready_to_send ++){
+					//代表有封包還沒到.略過
+					if((*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.sequence_number != seq_ready_to_send){
+					printf("here1 leastCurrDiff =%d\n",leastCurrDiff);
+//					PAUSE
+					continue;
+					}else{
+					leastCurrDiff =_least_sequence_number -seq_ready_to_send;
+					printf("here\n");
+//					PAUSE
+					}
+			}
+		printf("here3 leastCurrDiff =%d\n",leastCurrDiff);
+		_current_send_sequence_number = seq_ready_to_send;
+
+		//可能某個subtream 追過_bucket_size,直接跳到最後一個 (應該不會發生)
+		}else if (leastCurrDiff >_bucket_size) {
+
+//			PAUSE
+			printf("leastCurrDiff =%d\n",leastCurrDiff);
+			_current_send_sequence_number = _least_sequence_number;  
+
+		//在正常範圍內 正常傳輸丟給player 留給下面處理
+		}else{
+
+		}
+
+		
+		//正常傳輸丟給player
+		for(seq_ready_to_send = _current_send_sequence_number;seq_ready_to_send < _least_sequence_number;seq_ready_to_send ++){
+
+			//下一個還沒到 ,不做處理等待並return
+			if((*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.sequence_number != seq_ready_to_send){
+				_current_send_sequence_number = seq_ready_to_send;
+				printf("wait packet");
+//				PAUSE
+				return;
+
+			//為連續,丟給player
+			}else if((*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.stream == STRM_TYPE_MEDIA) {
+
+				//丟給rescue_detecion一定是有方向性的
+				rescue_detecion(chunk_ptr);
+
+				for (_map_stream_iter = _map_stream_media.begin(); _map_stream_iter != _map_stream_media.end(); _map_stream_iter++) {
+					//per fd mean a player   
+					strm_ptr = _map_stream_iter->second;
+					 //stream_id 和request 一樣才add chunk
+					if((strm_ptr -> _reqStreamID) == (*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.stream_id ){ 
+						strm_ptr->add_chunk((struct chunk_t *)(_chunk_bitstream + (seq_ready_to_send % _bucket_size)));
+						_net_ptr->epoll_control(_map_stream_iter->first, EPOLL_CTL_MOD, EPOLLOUT);
+					}
+				}
+			}
+
+			}
+
+			_current_send_sequence_number = seq_ready_to_send;
+
+		
+
+
+
+
+//*/
+
+
+
+/////////////////////////////////////////////測試版新功能///////////////////////////////////////////////////////////////////////
+
+
+
+//hidden at 2012/01/23
+/*
 	for(seq_ready_to_send = _current_send_sequence_number;seq_ready_to_send <= _least_sequence_number;seq_ready_to_send ++){
 
 		//error handle
+		//代表有空隔
 		if((*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.sequence_number != seq_ready_to_send){
+
+			//seq_ready_to_send substreamID 和chunk的 substreamID一樣 ,且chunk sequence_number >= seq_ready_to_send
+			//lose substream 的packet
             if((seq_ready_to_send % sub_stream_num) == (chunk_ptr->header.sequence_number % sub_stream_num) && chunk_ptr->header.sequence_number >= seq_ready_to_send) {
+
+
+				//相差在10 * sub_stream_num 之內跟PK Server重新要封包
                 if((chunk_ptr->header.sequence_number - seq_ready_to_send) <= (10 * sub_stream_num)) { //sub_stream_num < gap < 2 * sub_stream_num
-                    //send_request_sequence_number_to_pk(seq_ready_to_send,seq_ready_to_send);
+                
+//					send_request_sequence_number_to_pk(seq_ready_to_send,seq_ready_to_send);
 			        printf("recieve pkt %d, request seq %d from pk\n", chunk_ptr->header.sequence_number, seq_ready_to_send);
                     break;
-                } else { //3 * sub_stream_num < gap
+				//差距太大直接跳到最後一個
+                } else { // 3 * sub_stream_num < gap
                     printf("seq_ready_to_send is %d\n", seq_ready_to_send);
                     seq_ready_to_send = _least_sequence_number;  
                     printf("jump seq pointer to %d!\n", seq_ready_to_send);
+
                     continue;
+
                 }
             } else {
+				//lose substream的封包
                 //printf("sub stream not complete!\n");
                 break;
             }
 
+*/
+
 //normal handle stream
-		}else if((*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.stream == STRM_TYPE_AUDIO) {
+//hidden at 2012/01/22
+/*		}else if((*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.stream == STRM_TYPE_AUDIO) {
 			for (_map_stream_iter = _map_stream_audio.begin(); _map_stream_iter != _map_stream_audio.end(); _map_stream_iter++) {
 				strm_ptr = _map_stream_iter->second;
 				strm_ptr->add_chunk((struct chunk_t *)(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size)));
@@ -1283,7 +1385,10 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 				strm_ptr->add_chunk((struct chunk_t *)(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size)));
 				_net_ptr->epoll_control(_rtsp_viewer_ptr->_sock_udp_video, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
 			}
+*/
 
+//hidden at 2012/01/23
+/*
 // STRM_TYPE_MEDIA, main type
 		}else if((*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.stream == STRM_TYPE_MEDIA){
 			for (_map_stream_iter = _map_stream_media.begin(); _map_stream_iter != _map_stream_media.end(); _map_stream_iter++) {
@@ -1303,6 +1408,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	//if(sequence_number_list.size() == ((unsigned int)_bucket_size)) {	
 		//sequence_number_list.clear();
 	//}
+*/
 
 }
 
@@ -1368,7 +1474,7 @@ void pk_mgr::init_rescue_detection()
 
 
 //必須保證進入這個function 的substream 是依序的且不會lose
-int pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
+void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 {
 
 	int substreamID;
@@ -1405,8 +1511,8 @@ int pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 
 	}
 	//開始計算偵測
-	//只有是 substream 的下一個封包才做處理    
-	else if(  ((ssDetect_ptr + substreamID) ->last_seq + sub_stream_num ) == (chunk_ptr->header.sequence_number) ){
+	//只有是 比上次記錄新的sequence_number 才做處理
+	else if(  ((ssDetect_ptr + substreamID) ->last_seq ) < (chunk_ptr->header.sequence_number) ){
 	_log_ptr -> getTickTime(&newAlarm);
 
 //////////////////////////////////////利用頻寬判斷(測量方法一)////////////////////////////////////////////
@@ -1434,7 +1540,7 @@ int pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 		(ssDetect_ptr + substreamID) ->last_sourceBitrate =sourceBitrate ;
 		(ssDetect_ptr + substreamID) ->last_localBitrate =localBitrate;
 
-		printf("source_bitrate=%.5f   local_bitrate=%.5f\n",sourceBitrate,localBitrate);
+//		printf("source_bitrate=%.5f   local_bitrate=%.5f\n",sourceBitrate,localBitrate);
 		
 		//做每個peer substream的加總 且判斷需不需要救
 		measure();
@@ -1473,30 +1579,10 @@ int pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 
 	}
 
-	return 0;
+	return ;
 }
 
 
-//根據每個peer substream的數量 ,sourceBitrate 來判斷這次測量需要rescue 的數量,並且寫入陣列中做統計
-/*
-unsigned int pk_mgr::threshold(int peer_ss_num ,double totalSourceBitrate, double totalSourceBitrate)
-{
-	int ratio;
-
-	ratio = (1- peer_ss_num /2 );
-
-	for(int i=1 ; i<= sub_stream_num ;i++){
-
-		//介在需要rescue i 個substream之間
-		if ( (totalLocalBitrate  < (1 - (2*i-1)/(2*peer_ss_num) )*sourceBitrate )&& ( totalLocalBitrate  > (1 - (2*(i+1)-1)/(2*peer_ss_num) )*sourceBitrate)){
-
-		}
-
-
-
-	return 0;
-}
-*/
 
 //做每個peer substream的加總 且判斷需不需要救
 void pk_mgr::measure()
@@ -1508,10 +1594,8 @@ void pk_mgr::measure()
 	int peerHighestSSID = 0;	//用來確保是跟這次測量做加總,而不是和上一次
 	double totalSourceBitrate =0;
 	double totalLocalBitrate =0 ;
-//	unsigned rescue_ss=0;
 	unsigned int count_N=0;
 	unsigned int continuous_P=0;
-//	unsigned int totalStats=0;
 	unsigned int rescueSS=0;
 	unsigned int tempMax=0;
 
@@ -1549,7 +1633,7 @@ void pk_mgr::measure()
 
 		printf("totalSourceBitrate=%.5f   totalLocalBitrate=%.5f\n",totalSourceBitrate,totalLocalBitrate);
 
-//設定最近偵測的狀態到rescueStatsArry
+		//設定最近偵測的狀態到rescueStatsArry
 		for(int i=0 ; i<= perPeerSS_num ;i++){
 			//介在需要rescue i 個substream之間
 			if ( (totalLocalBitrate < (1 - (double)(2*i-1)/(double)(2*perPeerSS_num) )*totalSourceBitrate ) && ( totalLocalBitrate > (1 - (double)(2*(i+1)-1)/(double)(2*perPeerSS_num) )*totalSourceBitrate)){
@@ -1562,10 +1646,10 @@ void pk_mgr::measure()
 		}
 
 
-//根據rescueStatsArry 來決定要不要觸發rescue
+		//根據rescueStatsArry 來決定要不要觸發rescue
 		for(int i=0 ; i<PARAMETER_M ;i++){
 
-//做統計
+			//做統計
 			( *(statsArryCount_ptr + ( pid_peer_info_iter->second ) ->rescueStatsArry[i]) )++ ;
 
 			if(( pid_peer_info_iter->second ) ->rescueStatsArry[i] >0){
@@ -1573,22 +1657,26 @@ void pk_mgr::measure()
 //			totalStats+=( pid_peer_info_iter->second ) ->rescueStatsArry[i] ;
 //			rescueSS= (totalStats/count_N) +1 ;
 			}
-			//近PARAMETER_P次 發生 P次
-			for(int j=0 ; j<PARAMETER_P ;j++){
-			( pid_peer_info_iter->second ) ->rescueStatsArry[((PARAMETER_M- j)% PARAMETER_M) +i] ;
-			continuous_P++ ;
-			}
+
+
 			
 			printf("%d  ",( pid_peer_info_iter->second ) ->rescueStatsArry[i]);
 		}
 		printf("\n");
 
+			//近PARAMETER_P次 發生 P次
+			for(int j=0 ; j<PARAMETER_P ;j++){
+				if ( ( pid_peer_info_iter->second ) ->rescueStatsArry[ (PARAMETER_M +( (ssDetect_ptr + peerHighestSSID)->measure_N -1)-j )% PARAMETER_M ] >0 ){
+					continuous_P++ ;
+				}
+			}
+
+
 		for(int k=0 ; k<( (ssDetect_ptr + peerHighestSSID)->measure_N -1)% PARAMETER_M ;k++)
 		printf("   ");
 		printf("↑\n");
 
-//找出統計最多的值
-
+		//找出統計最多的值
 		for(int k=0 ;k< (sub_stream_num+1) ;k++){
 		printf("substream%d = %d   \n",k,*(statsArryCount_ptr+ k) );
 
@@ -1596,11 +1684,11 @@ void pk_mgr::measure()
 				tempMax =(*(statsArryCount_ptr+ k)) ;
 				rescueSS = k ;
 				}
-
 		}
-//符合條件觸發rescue 需要救rescue_ss 個
+
+		//符合條件觸發rescue 需要救rescue_ss 個
 		if(count_N >= PARAMETER_N  || continuous_P == PARAMETER_P){
-			printf("\npid=%d need cut %d substream and need rescue\n",( pid_peer_info_iter->second ) ->pid,rescueSS);
+			printf("continuous_P =%d\npid=%d need cut %d substream and need rescue\n",continuous_P,( pid_peer_info_iter->second ) ->pid,rescueSS);
 		}
 
 

@@ -529,7 +529,8 @@ void peer_mgr::rescue_reply(unsigned long pid, unsigned long manifest)
 
 }
 
-
+//利用 pid 找到map_pid_peer_info  ,map_pid_fd 並且辨別是哪個ss_id
+//其實就只是把 chunk_ptr 丟到queue_out_data_ptr 裡面  並把把監聽設為EPOLLOUT , 前提是要 在map_pid_peer_info ,map_pid_fd 留有資訊
 void peer_mgr::add_downstream(unsigned long pid, struct chunk_t *chunk_ptr)
 {
 	map<unsigned long, int>::iterator pid_fd_iter;
@@ -542,10 +543,13 @@ void peer_mgr::add_downstream(unsigned long pid, struct chunk_t *chunk_ptr)
 	pid_fd_iter = peer_ptr->map_pid_fd.find(pid);
 	pid_peer_info_iter = _pk_mgr_ptr->map_pid_peer_info.find(pid);
 
+	//在map_pid_peer_info裡面
 	if(pid_peer_info_iter != _pk_mgr_ptr->map_pid_peer_info.end()) {
 		downstream_peer = pid_peer_info_iter->second;
 		ss_id = (chunk_ptr->header.sequence_number % _pk_mgr_ptr->sub_stream_num);
+		//ss_id符合
 		if((downstream_peer->manifest & (1 << ss_id))) {
+			//不在map_pid_fd裡面
 			if(pid_fd_iter == peer_ptr->map_pid_fd.end()) {
 				return;
 			} else {
