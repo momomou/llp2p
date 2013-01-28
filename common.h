@@ -4,16 +4,17 @@
 
 #define FD_SETSIZE		2048
 ////resuce PARAMETER////
-#define PARAMETER_X		10
+#define PARAMETER_X		20
 #define PK_PID			999999
 
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
 #define PARAMETER_M		16
-#define PARAMETER_N		6
-#define PARAMETER_P		3
+#define PARAMETER_N		8
+#define PARAMETER_P		4
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
 #define BUFF_SIZE		20
+
 
 #include "configuration.h"
 
@@ -126,6 +127,14 @@ using std::bitset;
 #define CHNK_CMD_PEER_NOTIFY        	0x11
 #define CHNK_CMD_PEER_LATENCY           0x12
 #define CHNK_CMD_CHN_UPDATA_DATA        0x13	// update steam id to peer
+#define CHNK_CMD_PEER_RESCUE      		0x14	//rescue from pk
+#define CHNK_CMD_PEER_RESCUE_UPDATE      	0x15
+#define CHNK_CMD_PEER_RESCUE_CAPACITY      	0x16
+#define CHNK_CMD_PEER_RESCUE_LIST      	0x17
+#define CHNK_CMD_PEER_TEST_DELAY		0x18	//test delay to select peer
+#define CHNK_CMD_PEER_SET_MANIFEST		0x19	//set manifest set to parent
+
+
 #define CHNK_CMD_PEER_UNKNOWN			0xFF	// 1 B cmd => 0xFF is reserved for unknown cmd
 
 
@@ -138,10 +147,10 @@ using std::bitset;
 #define EVENTSIZE 		2048
 #define MAX_POLL_EVENT 	64
 #define HTML_SIZE 		8192
-#define BUCKET_SIZE		2048/4
-#define BANDWIDTH_BUCKET	7
-#define MAX_PEER_LIST		30
-#define WIN_COUNTER		50
+//#define BUCKET_SIZE		2048/4
+//#define BANDWIDTH_BUCKET	7
+//#define MAX_PEER_LIST		30
+//#define WIN_COUNTER		50
 
 #define STRM_TYPE_AUDIO	0x00	// 0 = AUDIO STREAM
 #define STRM_TYPE_VIDEO	0x01	// 1 = VIDEO STREAM
@@ -184,6 +193,7 @@ using std::bitset;
 enum RET_VALUE {RET_WRONG_SER_NUM = -3, RET_SOCK_ERROR = -2, RET_ERROR = -1, RET_OK = 0};
 
 
+//down stream
 struct peer_info_t {
 	unsigned long pid;
 	unsigned long level;
@@ -192,8 +202,9 @@ struct peer_info_t {
 	unsigned short tcp_port;
 	unsigned short udp_port;
 	unsigned long manifest;
-	int rescueStatsArry[PARAMETER_M];
+//	int rescueStatsArry[PARAMETER_M];
 };
+
 
 
 struct level_info_t {
@@ -286,6 +297,10 @@ struct chunk_t{
 };
 
 
+
+
+
+
 struct chunk_rtp_t{
 	struct chunk_header_t header;
 //	struct rtp_hdr_t hdr;
@@ -321,6 +336,48 @@ struct chunk_request_pkt_t{
 	unsigned int request_to_sequence_number;
 };
 
+/////////////////////////////////////////////////////
+
+struct peer_connect_down_t {
+	struct peer_info_t peerInfo;
+	int rescueStatsArry[PARAMETER_M];
+};
+
+
+
+struct chunk_delay_test_t{
+	struct chunk_header_t header;
+	unsigned char buf[0];
+};
+
+
+struct chunk_manifest_set_t{
+	struct chunk_header_t header;
+	unsigned long pid;
+	unsigned long manifest;
+
+};
+
+struct chunk_rescue_t {
+	struct chunk_header_t header;
+	unsigned long pid;
+	unsigned long manifest;
+};
+
+
+
+
+///sent to pk , rescue from pk
+struct rescue_pkt_from_server{
+	struct chunk_header_t header;
+	unsigned long pid;
+	unsigned long manifest;
+	unsigned int rescue_seq_start;
+};
+
+
+//////////////////////////////////////////////////
+
 struct chunk_register_reply_t {
 	struct chunk_header_t header;
 	unsigned long pid;
@@ -332,20 +389,12 @@ struct chunk_register_reply_t {
 	struct level_info_t *level_info[0];	
 };
 
+/*
 struct chunk_bandwidth_t {
 	struct chunk_header_t header;
 	unsigned long bandwidth;
 };
-
-
-///sent to pk , rescue from pk
-struct chunk_pk_rescue_t {
-	struct chunk_header_t header;
-	unsigned long pid;
-	unsigned long manifest;
-	unsigned int from_sequence_number;
-	
-};
+*/
 
 
 

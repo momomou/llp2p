@@ -14,9 +14,10 @@ class peer_mgr;
 class peer:public basic_class {
 public:
 
-	unsigned long count;
-	unsigned long avg_bandwidth;
-    unsigned long parent_bandwidth;
+//	unsigned long count;
+//	unsigned long avg_bandwidth;
+//    unsigned long parent_bandwidth;
+	bool first_reply_peer;
 
 	//unsigned long long bandwidth_bucket[BANDWIDTH_BUCKET];
 
@@ -25,10 +26,11 @@ public:
 	
 	map<int, queue<struct chunk_t *> *> map_fd_out_ctrl;	// <fd, queue of chunk pointer which store outgoing control packet(chunk) >
 	map<int, queue<struct chunk_t *> *> map_fd_out_data;		// <fd, queue of chunk pointer which store outgoin data packet(chunk) >
-	map<unsigned long, int> map_pid_fd;
+	map<unsigned long, int> map_in_pid_fd;
+	map<unsigned long, int> map_out_pid_fd;
 	map<int , unsigned long> map_fd_pid;
 
-	list<int> *fd_list_ptr;;
+	list<int> *fd_list_ptr;
 
 	peer(list<int> *fd_list);
 	~peer();
@@ -43,6 +45,8 @@ public:
 	virtual void handle_job_realtime();
 	virtual void handle_job_timer();
 
+
+
 	void data_close(int cfd, const char *reason); 
 
 private:
@@ -56,14 +60,25 @@ private:
 	int _send_byte;
 	int _expect_len;
 	int _offset;
-	int _time_start;
-	unsigned long _recv_byte_count;
+//	int _time_start;
+//	unsigned long _recv_byte_count;
     unsigned long _recv_parent_byte_count;
     unsigned long parent_manifest;
 
+	list<int>::iterator fd_iter;
+	map<int, queue<struct chunk_t *> *>::iterator map_fd_queue_iter;
+	map<int , unsigned long>::iterator map_fd_pid_iter;
+	map<unsigned long, int>::iterator map_pid_fd_iter;
+	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
+	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
+	map<unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
+
+	struct peer_info_t *peerInfoPtr ;
+	struct peer_connect_down_t *peerDownInfoPtr;
+
 	struct chunk_t *_chunk_ptr;
 	struct sockaddr_in _sin, _cin;
-	struct timeb interval_time;	//--!! 0215
+//	struct timeb interval_time;	//--!! 0215
 
 };
 

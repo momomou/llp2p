@@ -14,18 +14,22 @@ peer::peer(list<int> *fd_list)
 {
 	queue_out_ctrl_ptr = NULL;
 	queue_out_data_ptr = NULL;
+	peerInfoPtr = NULL;
+	peerDownInfoPtr = NULL;
+
 	_send_byte = 0;
 	_expect_len = 0;
 	_offset = 0;
-	_recv_byte_count = 0;
+//	_recv_byte_count = 0;
     _recv_parent_byte_count = 0;
-	_time_start = 0;
-	count = 0;
-	avg_bandwidth = 0;
-    parent_bandwidth = 0;
+//	_time_start = 0;
+//	count = 0;
+//	avg_bandwidth = 0;
+//    parent_bandwidth = 0;
     parent_manifest = 0;
 	fd_list_ptr = fd_list;
 	_chunk_ptr = NULL;
+	first_reply_peer =true;
 
 /*
 	for(unsigned long i = 0; i < BANDWIDTH_BUCKET; i++) {
@@ -85,27 +89,33 @@ void peer::peer_set(network *net_ptr , logger *log_ptr , configuration *prep, pk
 	_net_ptr->peer_set(this);
 }
 
-//
+//new queue    只有收到CHNK_CMD_PEER_CON才會呼叫
+//收到一個建立連線的要求(需down stream)
 void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_in cin)
 {
 
 	struct chunk_request_msg_t *chunk_request_ptr = NULL;
 	struct peer_info_t *rescue_peer = NULL;
-	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
+//	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
+	map<unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
 
 	chunk_request_ptr = (struct chunk_request_msg_t *)chunk_ptr;
 
 	queue_out_ctrl_ptr = new std::queue<struct chunk_t *>;
 	queue_out_data_ptr = new std::queue<struct chunk_t *>;
 
-	map_pid_fd[chunk_request_ptr->info.pid] = sock;
+	map_out_pid_fd[chunk_request_ptr->info.pid] = sock;
 	map_fd_pid[sock] = chunk_request_ptr->info.pid;
 	map_fd_out_ctrl[sock] = queue_out_ctrl_ptr;
 	map_fd_out_data[sock] = queue_out_data_ptr;
 
-	pid_peer_info_iter = _pk_mgr_ptr->map_pid_peer_info.find(chunk_request_ptr->info.pid);
+//	pid_peer_info_iter = _pk_mgr_ptr->map_pid_peer_info.find(chunk_request_ptr->info.pid);	//2013/01/24
 	
-	if(pid_peer_info_iter == _pk_mgr_ptr->map_pid_peer_info.end()) {
+//	if(pid_peer_info_iter == _pk_mgr_ptr->map_pid_peer_info.end()) {						//2013/01/24
+
+	map_pid_rescue_peer_info_iter = _pk_mgr_ptr->map_pid_rescue_peer_info.find(chunk_request_ptr->info.pid);
+	if(map_pid_rescue_peer_info_iter == _pk_mgr_ptr->map_pid_rescue_peer_info.end()){
+
 		rescue_peer = new struct peer_info_t;
 		memset(rescue_peer, 0x0 , sizeof(struct peer_info_t));
 		rescue_peer->pid = chunk_request_ptr->info.pid;
@@ -114,11 +124,14 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 		rescue_peer->tcp_port = chunk_request_ptr->info.tcp_port;
 		rescue_peer->udp_port = chunk_request_ptr->info.udp_port;
 		_pk_mgr_ptr->map_pid_rescue_peer_info[rescue_peer->pid] = rescue_peer;
+		printf("rescue_peer->pid = %d",rescue_peer->pid);
 	}
+//	}																			//2013/01/24
 	
 }
 
-
+//只被build connect 呼叫
+//送CHNK_CMD_PEER_ CON 到其他peer
 int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, unsigned long pid)
 {
 	map<unsigned long, int>::iterator map_pid_fd_iter;
@@ -126,10 +139,10 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 	queue_out_ctrl_ptr = new std::queue<struct chunk_t *>;
 	queue_out_data_ptr = new std::queue<struct chunk_t *>;
 
-	map_pid_fd_iter = map_pid_fd.find(level_info_ptr->pid);
+	map_pid_fd_iter = map_in_pid_fd.find(level_info_ptr->pid);
 
-	if(map_pid_fd_iter == map_pid_fd.end())
-		map_pid_fd[level_info_ptr->pid] = sock;
+	if(map_pid_fd_iter == map_in_pid_fd.end())
+		map_in_pid_fd[level_info_ptr->pid] = sock;
 	
 	map_fd_pid[sock] = level_info_ptr->pid;
 	map_fd_out_ctrl[sock] = queue_out_ctrl_ptr;
@@ -175,25 +188,27 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 
 int peer::handle_pkt_in(int sock)
 {
-	ftime(&interval_time);	//--!!0215
+//	ftime(&interval_time);	//--!!0215
 	unsigned long buf_len;
 //	unsigned long i;
 	int recv_byte;
 	int expect_len;
 	int offset = 0;
-	unsigned long total_bit_rate = 0;
-	unsigned long bandwidth = 0;
-	int different = 0;
-	unsigned long pid;
+//	unsigned long total_bit_rate = 0;
+//	unsigned long bandwidth = 0;
+//	int different = 0;
+	unsigned long firstReplyPid=-1;
+	struct peer_info_t *peerInfoPtr;
 //	unsigned long manifest;
 //	unsigned long n_alpha;
 //	unsigned char reply;
 
+/*
 	if(!_time_start) {
 		_log_ptr->time_init();
 		_time_start = 1;
 	}
-
+*/
 	struct chunk_t *chunk_ptr = NULL;
 	struct chunk_header_t *chunk_header_ptr = NULL;
 	
@@ -283,7 +298,7 @@ int peer::handle_pkt_in(int sock)
 
 
 
-		_recv_byte_count += chunk_ptr->header.length;
+//		_recv_byte_count += chunk_ptr->header.length;
 
 //?????  what's this?
 
@@ -366,7 +381,7 @@ int peer::handle_pkt_in(int sock)
 		
 
 
-//cmd = CHNK_CMD_PEER_RSC
+//cmd = CHNK_CMD_ PEER_RSC
 	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_RSC) {
 //hidden at 2013/01/13
 /*
@@ -390,9 +405,12 @@ int peer::handle_pkt_in(int sock)
 //cmd == CHNK_CMD_PEER_CUT
 	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_CUT) {
 		//cout << "CHNK_CMD_PEER_CUT" << endl;
+
+//hidden at 2013/01/27
+/*
 		memcpy(&pid, (char *)chunk_ptr + sizeof(struct chunk_t), sizeof(unsigned long));
 		_peer_mgr_ptr->cut_rescue_downstream(pid);
-		
+*/	
 
 
 //cmd == CHNK_CMD_PEER_LATENCY
@@ -521,6 +539,68 @@ int peer::handle_pkt_in(int sock)
 	    cout<<"interval delay = "<<tmp<<endl;
 */
 
+//	just send return
+	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_TEST_DELAY ){
+
+printf("CHNK_CMD_PEER_TEST_DELAY\n");
+
+		if(chunk_ptr->header.rsv_1 == REQUEST){
+
+			chunk_ptr->header.rsv_1 =REPLY;
+			_net_ptr->set_blocking(sock);
+			_net_ptr ->send (sock,(char*)chunk_ptr,sizeof(struct chunk_header_t) + chunk_ptr->header.length,0) ;
+			_net_ptr->set_nonblocking(sock);
+
+		}else if(chunk_ptr->header.rsv_1 ==REPLY){
+
+			printf("CHNK_CMD_PEER_TEST_DELAY  REPLY\n");
+			//第一個回覆的peer 放入peer_connect_down_t加入測量 並關閉其他連線和清除所有相關table
+			if(first_reply_peer){
+				map_fd_pid_iter = map_fd_pid.find(sock);
+				if(map_fd_pid_iter != map_fd_pid.end()){
+					firstReplyPid = map_fd_pid_iter ->second;
+					printf("first_reply_peer=%d \n",firstReplyPid);
+					pid_peer_info_iter = _pk_mgr_ptr ->map_pid_peer_info.find(firstReplyPid);
+					if(pid_peer_info_iter != _pk_mgr_ptr ->map_pid_peer_info.end()){
+						peerInfoPtr = pid_peer_info_iter->second;
+						_pk_mgr_ptr ->map_pid_peer_info.erase(pid_peer_info_iter);
+						peerDownInfoPtr = new struct peer_connect_down_t ;
+						memset(peerDownInfoPtr , 0x0,sizeof( struct peer_connect_down_t));
+						memcpy(peerDownInfoPtr ,peerInfoPtr,sizeof(struct peer_info_t));
+						delete peerInfoPtr;
+						_pk_mgr_ptr ->map_pid_peerDown_info[firstReplyPid] =peerDownInfoPtr ;
+						//如果是第一個,則跟他要全部的串流
+						if(_pk_mgr_ptr ->map_pid_peerDown_info.size() == 1){
+							for(int ss_id = 0; ss_id < _pk_mgr_ptr->sub_stream_num; ss_id++) {
+							(peerDownInfoPtr ->peerInfo.manifest) |= (1 << ss_id);
+							}
+							
+							_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
+						}
+
+						printf("sent manidest()\n") ;
+///sent manidest()
+
+						for(pid_peer_info_iter =_pk_mgr_ptr ->map_pid_peer_info.begin();pid_peer_info_iter!= _pk_mgr_ptr ->map_pid_peer_info.end();pid_peer_info_iter++){
+							if(pid_peer_info_iter ->first == _peer_mgr_ptr ->self_pid)
+								continue;
+							data_close(map_in_pid_fd[pid_peer_info_iter ->first ],"close by firstReplyPid");
+						}
+						_pk_mgr_ptr ->clear_map_pid_peer_info();
+					}
+				}
+
+				first_reply_peer =false;
+			}
+
+
+
+		}
+
+	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_SET_MANIFEST){
+		printf("CHNK_CMD_PEER_SET_MANIFEST\n");
+		_peer_mgr_ptr ->handle_manifestSet((struct chunk_manifest_set_t *)chunk_ptr); 
+	
 	} else {
 		cout << "what's this?" << endl;
 	}
@@ -638,21 +718,31 @@ void peer::handle_job_timer()
 
 }
 
+
+
+//全部裡面最完整的close
+////注意!!!!!!!!map_in_pid_fd 必須由關閉者自行判斷清除(pid -> fd 是一對多 所以可能會刪到其他的table)
 void peer::data_close(int cfd, const char *reason) 
 {
 	unsigned long pid = 0;
-	unsigned long manifest = 0;
-	list<int>::iterator fd_iter;
-	int sockfd;
-	list<unsigned long>::iterator rescue_pid_iter;
-	//list<unsigned long>::iterator rescue_pid_list_iter;
-	map<int, queue<struct chunk_t *> *>::iterator map_fd_queue_iter;
-	map<int , unsigned long>::iterator map_fd_pid_iter;
-	map<unsigned long, int>::iterator map_pid_fd_iter;
-	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
-	map<int, int>::iterator map_rescue_fd_count_iter;
-	map<int, int>::iterator map_rescue_fd_count_iter2;
-	
+//	list<int>::iterator fd_iter;
+//	map<int, queue<struct chunk_t *> *>::iterator map_fd_queue_iter;
+//	map<int , unsigned long>::iterator map_fd_pid_iter;
+//	map<unsigned long, int>::iterator map_pid_fd_iter;
+//	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
+//	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
+
+//	struct peer_info_t *peerInfoPtr = NULL;
+//	struct peer_connect_down_t *peerDownInfoPtr = NULL;
+
+//	map<int, int>::iterator map_rescue_fd_count_iter;
+//	map<int, int>::iterator map_rescue_fd_count_iter2;
+//	int sockfd;
+//	list<unsigned long>::iterator rescue_pid_iter;
+//	list<unsigned long>::iterator rescue_pid_list_iter;
+//	unsigned long manifest = 0;	
+
+
 	_log_ptr->write_log_format("s => s (s)\n", (char*)__PRETTY_FUNCTION__, "pk", reason);
 	cout << "pk Client " << cfd << " exit by " << reason << ".." << endl;
 	_net_ptr->epoll_control(cfd, EPOLL_CTL_DEL, 0);
@@ -671,21 +761,50 @@ void peer::data_close(int cfd, const char *reason)
 		map_fd_pid.erase(map_fd_pid_iter);
 	}
 
-	map_pid_fd_iter = map_pid_fd.find(pid);
-
-	if(map_pid_fd_iter != map_pid_fd.end()) 
-		map_pid_fd.erase(map_pid_fd_iter);
+//!!!!!!!!map_in_pid_fd 必須由關閉者自行判斷清除(pid -> fd 是一對多 所以可能會刪到其他的table)
+/*
+	map_pid_fd_iter = map_in_pid_fd.find(pid);
+	if(map_pid_fd_iter != map_in_pid_fd.end()) 
+		map_in_pid_fd.erase(map_pid_fd_iter);
+*/
 
 	map_fd_queue_iter = map_fd_out_ctrl.find(cfd);
-
 	if(map_fd_queue_iter != map_fd_out_ctrl.end()) 
 		map_fd_out_ctrl.erase(map_fd_queue_iter);
 	
-	map_fd_queue_iter = map_fd_out_data.find(cfd);
 
+	map_fd_queue_iter = map_fd_out_data.find(cfd);
 	if(map_fd_queue_iter != map_fd_out_data.end()) 
 		map_fd_out_data.erase(map_fd_queue_iter);
 
+
+	pid_peer_info_iter = _pk_mgr_ptr ->map_pid_peer_info.find(pid);
+	if(pid_peer_info_iter != _pk_mgr_ptr ->map_pid_peer_info.end()) {
+		peerInfoPtr = pid_peer_info_iter ->second ;
+		delete peerInfoPtr;
+		_pk_mgr_ptr ->map_pid_peer_info.erase(pid_peer_info_iter);
+
+	}
+
+
+	pid_peer_info_iter =_pk_mgr_ptr ->map_pid_rescue_peer_info.find(pid);
+	if( pid_peer_info_iter != _pk_mgr_ptr ->map_pid_rescue_peer_info.end() ){
+		peerInfoPtr = pid_peer_info_iter ->second ;
+		delete peerInfoPtr;
+		_pk_mgr_ptr ->map_pid_rescue_peer_info.erase(pid_peer_info_iter);
+
+	}
+
+	pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(pid) ;
+	if (pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_peerDown_info.end() ){
+		peerDownInfoPtr = pid_peerDown_info_iter ->second ;
+		delete peerDownInfoPtr;
+		_pk_mgr_ptr ->map_pid_peerDown_info.erase(pid_peerDown_info_iter);
+
+	}
+
+///2013/01/27 關閉所有rescue_pid_list
+/*
 	for(rescue_pid_iter = _peer_mgr_ptr->rescue_pid_list.begin(); rescue_pid_iter != _peer_mgr_ptr->rescue_pid_list.end(); rescue_pid_iter++) {
 		if(*rescue_pid_iter == pid) {
 			_peer_mgr_ptr->rescue_pid_list.erase(rescue_pid_iter);
@@ -694,8 +813,10 @@ void peer::data_close(int cfd, const char *reason)
 			break;
 		}
 	}
+*/
 
-
+//2013/01/27 關閉所有map_rescue_fd_count
+/*
 	map_rescue_fd_count_iter = _peer_mgr_ptr->map_rescue_fd_count.find(cfd);
 
 	if(map_rescue_fd_count_iter != _peer_mgr_ptr->map_rescue_fd_count.end()) {
@@ -725,18 +846,24 @@ void peer::data_close(int cfd, const char *reason)
 	} else {
 
 	}
+*/
 	
-
+//2013/01/27 關閉所有_map_fd_downstream
+/*
 	map_fd_queue_iter = _peer_mgr_ptr->_map_fd_downstream.find(cfd);
 
-		
-	map_fd_pid_iter = _peer_mgr_ptr->map_fd_pid.find(cfd);
-
-		
 	if(map_fd_queue_iter != _peer_mgr_ptr->_map_fd_downstream.end()) {
 
 		_peer_mgr_ptr->_map_fd_downstream.erase(map_fd_queue_iter);
 	}
+
+*/
+
+/*
+	map_fd_pid_iter = _peer_mgr_ptr->map_fd_pid.find(cfd);
+
+		
+
 
 	if(map_fd_pid_iter != _peer_mgr_ptr->map_fd_pid.end()) {
 		DBG_PRINTF("here\n");
@@ -746,6 +873,7 @@ void peer::data_close(int cfd, const char *reason)
 			_peer_mgr_ptr->map_fd_pid.erase(map_fd_pid_iter);
 		//}
 	}
+*/
 	
 }
 

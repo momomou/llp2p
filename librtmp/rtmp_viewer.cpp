@@ -165,7 +165,7 @@ int rtmp_viewer::ServeInvoke(STREAMING_SERVER *server, RTMP * r, RTMPPacket *pac
 		_log_ptr->Log(LOGDEBUG, "Server State: INVOKEMETADATA complete");
 
 		//_rtmp_server->add_seed(r->m_socket,_queue_out_data_ptr);
-		_pk_mgr_ptr->rtmp_sock_set(r->m_socket);
+//		_pk_mgr_ptr->rtmp_sock_set(r->m_socket);
 		_pk_mgr_ptr->add_stream(r->m_socket, (stream *)this, STRM_TYPE_MEDIA);
 
 		_net_ptr->epoll_control(r->m_socket, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);

@@ -145,10 +145,6 @@ bool logger::check_arch_compatible()
 		return false;
 	}
 
-
-	if(sizeof(struct peer_info_t) != (24+PARAMETER_M*4) ) {
-		return false;
-	}
 	
 	return true;
 }
@@ -329,6 +325,18 @@ int logger::gettimeofday(struct timeval *tv, void *tzp)
     return (0);
 }
 #endif
+
+#ifdef WIN32
+unsigned int logger::gettimeofday_ms(struct timeval *tv)
+{
+	unsigned int time_ms;
+	gettimeofday(tv, NULL) ;
+	time_ms= (tv->tv_sec)*1000 + (unsigned int)(tv->tv_usec)/1000 ;
+	return time_ms;
+}
+#endif
+
+
 
 #ifdef WIN32
 void logger::getTickTime(LARGE_INTEGER *tickTime)

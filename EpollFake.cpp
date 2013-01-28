@@ -209,8 +209,9 @@ int epoll_wait (int __epfd, struct epoll_event *__events, int __maxevents, int _
 			        printf("Unknown socket error. ");
 			        break;
 			}
-
+//2013/01/28
 		return -1;
+//		return	0;
 		//perror("select");
 	} else {
 		//cout << "num_ready = " << num_ready << endl;

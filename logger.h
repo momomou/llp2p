@@ -52,9 +52,10 @@ public:
 
 #ifdef WIN32
     int gettimeofday(struct timeval *tp, void *tzp);
+	unsigned int gettimeofday_ms(struct timeval *tv);
 #endif
     unsigned long timevaldiff(struct timeval *starttime, struct timeval *finishtime);
-    double logger::set_diff_timmer();
+    double set_diff_timmer();
 
 	
 	logger( );

@@ -23,23 +23,23 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 	_html_size = html_size;
 	fd_list_ptr = fd_list;
 	level_msg_ptr = NULL;
-	rescue_list_reply_ptr = NULL;
+//	rescue_list_reply_ptr = NULL;
 	_channel_id = 0;
-	_current_pos = 0;
+//	_current_pos = 0;
 	lane_member = 0;
-	_time_start = 0;
-	_recv_byte_count = 0;
+//	_time_start = 0;
+//	_recv_byte_count = 0;
 	 bit_rate = 0;
 	 sub_stream_num = 0;
 	 parallel_rescue_num = 0;
 	 inside_lane_rescue_num = 0;
 	 outside_lane_rescue_num = 0;
-	 peer_list_member = 0;
-	 count = 0;
-	 avg_bandwidth = 0;
+//	 peer_list_member = 0;
+//	 count = 0;
+//	 avg_bandwidth = 0;
 	 _manifest = 0;
-	 _check = 0;
-	 current_child_pid = 0;
+//	 _check = 0;
+//	 current_child_pid = 0;
 	 current_child_manifest = 0;
 	 _least_sequence_number = 0;
 	 stream_number=0;
@@ -68,6 +68,10 @@ pk_mgr::~pk_mgr()
 		free(ssDetect_ptr);
 	if(statsArryCount_ptr)
 		free(statsArryCount_ptr);
+
+	clear_map_pid_peer_info();
+	clear_map_pid_peerDown_info();
+	clear_map_pid_rescue_peer_info();
 	
 }
 
@@ -77,18 +81,28 @@ void pk_mgr::peer_mgr_set(peer_mgr *peer_mgr_ptr)
 
 }
 
+void pk_mgr::peer_set(peer *peer_ptr)
+{
+	_peer_ptr = peer_ptr;
+
+}
+
+
+
+
 void pk_mgr::rtsp_viewer_set(rtsp_viewer *rtsp_viewer_ptr)
 {
 	_rtsp_viewer_ptr = rtsp_viewer_ptr;
 
 }
 
+/*
 void pk_mgr::rtmp_sock_set(int sock)
 {
 	_rtmp_sock = sock;
 
 }
-
+*/
 
 
 void pk_mgr::init()
@@ -125,14 +139,14 @@ void pk_mgr::init()
 	}
 
 	if (handle_register(svc_tcp_port, svc_udp_port)) {
-		cout << "pk_mgr handle_register() success" << endl;
+		cout << "pk_mgr handle_ register() success" << endl;
 		_net_ptr->set_nonblocking(_sock);	// set to non-blocking
 		_net_ptr->epoll_control(_sock, EPOLL_CTL_ADD, EPOLLIN);
 		_net_ptr->set_fd_bcptr_map(_sock, dynamic_cast<basic_class *> (this));
 		fd_list_ptr->push_back(_sock);
 
 	} else {
-		cout << "pk_mgr handle_register() fail" << endl;
+		cout << "pk_mgr handle_ register() fail" << endl;
 		PAUSE
 		exit(0);
 	}
@@ -234,7 +248,7 @@ int pk_mgr::handle_register(string svc_tcp_port, string svc_udp_port)
 
 int pk_mgr::handle_pkt_in(int sock)
 {
-	ftime(&interval_time);	//--!! 0215
+//	ftime(&interval_time);	//--!! 0215
 	unsigned long i;
 	unsigned long buf_len;
 	unsigned long level_msg_size;
@@ -331,11 +345,11 @@ int pk_mgr::handle_pkt_in(int sock)
 
 	offset = 0;
 
-//handle CHNK_CMD_PEER_REG, expect recv  chunk_register_reply_t    from  PK
+//handle CHNK_CMD_PEER_ REG, expect recv  chunk_register_reply_t    from  PK
 //ligh |  pid |  level |   bit_rate|   sub_stream_num |  parallel_rescue_num |  inside_lane_rescue_num | n*struct level_info_t
 //這邊應該包含整條lane 的peer_info 包含自己
 
-	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_REG) {
+	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_REG  ) {
 		lane_member = (buf_len - sizeof(struct chunk_header_t) - 6 * sizeof(unsigned long)) / sizeof(struct level_info_t);
 		level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + lane_member * sizeof(struct level_info_t *);
 
@@ -350,6 +364,7 @@ int pk_mgr::handle_pkt_in(int sock)
 		memcpy(&parallel_rescue_num, ((char *)chunk_ptr + offset + 2 * sizeof(unsigned long)), sizeof(unsigned long));
 		memcpy(&inside_lane_rescue_num, ((char *)chunk_ptr + offset + 3 * sizeof(unsigned long)), sizeof(unsigned long));
 		
+
 		cout<< "bit_rate = " <<  bit_rate << endl;
 		cout<< "sub_stream_num = " <<  sub_stream_num << endl;
 		cout<< "parallel_rescue_num = " <<  parallel_rescue_num << endl;
@@ -369,36 +384,55 @@ int pk_mgr::handle_pkt_in(int sock)
 			memcpy(new_peer, level_msg_ptr->level_info[i], sizeof(struct level_info_t));
 
 	//set manifest all  be flaged		NOused	
+// hidden at 2013/01/24
+/*
 			for(ss_id = 0; ss_id < sub_stream_num; ss_id++) {
 				new_peer->manifest |= (1 << ss_id);
 			}
+*/
+
+			offset += sizeof(struct level_info_t);
+
 
 	//add lane peer_info to map table  NOused
 			map_pid_peer_info[new_peer->pid] = new_peer;
-			offset += sizeof(struct level_info_t);
+
 		}
 
-	//set current_child_manifest all be flaged    //????? Noused
+		_peer_mgr_ptr -> self_pid = level_msg_ptr ->pid ;
+
+//set current_child_ manifest all be flaged    //????? Noused
+// hidden at 2013/01/24	
+/*
 		for(ss_id = 0; ss_id < sub_stream_num; ss_id++) {
 				current_child_manifest |= (1 << ss_id);
 		}
-		
+*/		
 	//Noused  被插在倒數第二個peer 
+// hidden at 2013/01/24
+/*
 		if((level_msg_ptr->level + 1) != lane_member) {
 			current_child_pid = level_msg_ptr->level_info[level_msg_ptr->level + 1]->pid;
 		}
-			
-//收到sub_stream_num後對rescue 偵測結構做初始化
+*/			
+
+		//收到sub_stream_num後對rescue 偵測結構做初始化
 		init_rescue_detection();
 
-	//和lane 每個peer 先建立好連線  // Noused
-		if(lane_member > 1)
+
+	//和lane 每個peer 先建立好連線 
+		if(lane_member >= 1)
 			_peer_mgr_ptr->connect_peer(level_msg_ptr, level_msg_ptr->pid);
+
+		_peer_mgr_ptr->handle_test_delay();
 
 
 //cmd == CHNK_CMD_PEER_TCN   拓樸改變  expect recv , chunk_level_msg_t   基本上就是更新lane peer 的資訊 和收到CHNK_CMD_PEER_REG 做得是差不多
 // light | pid | level   | n*struct level_info_t
 	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_TCN) {
+		printf("CHNK_CMD_PEER_TCN\n");
+/*
+//hidden at 2012/01/23
 
 		for (i = 0; i < lane_member; i++) {
 			if(level_msg_ptr->level_info[i])
@@ -409,7 +443,7 @@ int pk_mgr::handle_pkt_in(int sock)
 			delete level_msg_ptr;
 
 	//map_pid_peer_info.clear();  前把  map_pid_manifest[new_peer->pid] = new_peer->manifest; 先記起來  //(可以不用記)
-		for(pid_peer_info_iter = map_pid_peer_info.begin(); pid_peer_info_iter != map_pid_peer_info.end(); pid_peer_info_iter++) {
+///*		for(pid_peer_info_iter = map_pid_peer_info.begin(); pid_peer_info_iter != map_pid_peer_info.end(); pid_peer_info_iter++) {
 			if(pid_peer_info_iter->second) {
 				new_peer = pid_peer_info_iter->second;
 				map_pid_manifest[new_peer->pid] = new_peer->manifest;
@@ -417,7 +451,8 @@ int pk_mgr::handle_pkt_in(int sock)
 			}
 		}
 		map_pid_peer_info.clear();
-
+////////////////////////////////////////////////
+		clear_map_pid_peer_info();
 
 		lane_member = (buf_len - sizeof(struct chunk_header_t) - sizeof(unsigned long) - sizeof(unsigned long)) / sizeof(struct level_info_t);
 		level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + lane_member * sizeof(struct level_info_t *);
@@ -437,18 +472,34 @@ int pk_mgr::handle_pkt_in(int sock)
 			memset(new_peer, 0x0 , sizeof(struct peer_info_t));
 			memcpy(new_peer, level_msg_ptr->level_info[i], sizeof(struct level_info_t));
 
-			map_pid_manifest_iter = map_pid_manifest.find(new_peer->pid);
+///*			map_pid_manifest_iter = map_pid_manifest.find(new_peer->pid);
 
 	// 把之前記下來的 manifest table 再存回來
+
 			if(map_pid_manifest_iter != map_pid_manifest.end())
 				new_peer->manifest = map_pid_manifest_iter->second;
-		
+
+///////////////
+			offset += sizeof(struct level_info_t);
+
+			pid_peerDown_info_iter = map_pid_peerDown_info.find(new_peer ->pid);
+			if(pid_peerDown_info_iter != map_pid_peerDown_info.end()){
+				delete new_peer;
+				continue;
+			}
 			map_pid_peer_info[new_peer->pid] = new_peer;
 
-			offset += sizeof(struct level_info_t);
+
 		}
 
+
+
+
+
+
+
 	//拓樸改變有可能是多人或少人  可能為不是最後一個或者是最後一個
+///*
 		if((level_msg_ptr->level + 1) != lane_member) {  //如果自己不是最後一個
 			if(current_child_pid != level_msg_ptr->level_info[level_msg_ptr->level + 1]->pid) {
 				current_child_pid = level_msg_ptr->level_info[level_msg_ptr->level + 1]->pid;
@@ -460,14 +511,21 @@ int pk_mgr::handle_pkt_in(int sock)
 			current_child_pid = 0;
 		}
 		
-		_peer_mgr_ptr->del_rescue_downstream();
+//////////////////////////////////
+
+		_peer_ptr->first_reply_peer =true;
+	
+//		_peer_mgr_ptr->del_rescue_downstream();
+
+
 
 		cout << "map_pid_peer_info_size = " << map_pid_peer_info.size() << endl;
+//和lane 每個peer 先建立好連線	
+	if(lane_member >= 1)
+		_peer_mgr_ptr->connect_peer(level_msg_ptr, level_msg_ptr->pid);
 
-		
-		//PAUSE
-///		if(chunk_ptr)
-///			delete chunk_ptr;
+*/
+
 		
 //cmd == CHNK_CMD_PEER_DATA			
 	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_DATA) {
@@ -481,7 +539,7 @@ int pk_mgr::handle_pkt_in(int sock)
 
 		handle_stream(chunk_ptr, sock);	
 
-		_recv_byte_count += chunk_ptr->header.length;
+//		_recv_byte_count += chunk_ptr->header.length;
 		//write binary log
 //		_log_ptr->write_binary(chunk_ptr->header.sequence_number);
 
@@ -610,7 +668,7 @@ int pk_mgr::handle_pkt_in(int sock)
 
 //header.cmd == CHNK_CMD_PEER_LATENCY
     } else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_LATENCY){
-	printf("cmd =recv CHNK_CMD_PEER_LATENCY\n");
+//	printf("cmd =recv CHNK_CMD_PEER_LATENCY\n");
 //hidden at 2013/01/16
 /*
         unsigned long sec, usec, peer_id;
@@ -891,8 +949,8 @@ void pk_mgr::send_rescue_to_pk()
 	send_byte = _net_ptr->send(_sock, html_buf, sizeof(struct chunk_rescue_list_t), 0);
 
 	if( send_byte <= 0 ) {
-		data_close(_sock, "send rescue_list cmd error");
-		_log_ptr->exit(0, "send rescue_list cmd error");
+		data_close(_sock, "send rescue_ list cmd error");
+		_log_ptr->exit(0, "send rescue_ list cmd error");
 	} else {
 		if(rescue_list_ptr)
 			delete rescue_list_ptr;
@@ -923,6 +981,7 @@ void pk_mgr::send_rescue_to_upstream(unsigned long manifest)
 */
 
 //when a peer recv a rescue  packet from other peer how to handle ( only called by peer recv  cmd == CHNK_CMD_PEER_RSC)
+
 void pk_mgr::handle_rescue(unsigned long pid, unsigned long manifest)
 {
 	unsigned long i;
@@ -939,13 +998,15 @@ void pk_mgr::handle_rescue(unsigned long pid, unsigned long manifest)
 				if(level_msg_ptr->pid == level_msg_ptr->level_info[i]->pid) {
 					rescue_peer->manifest = (~manifest);
 					current_child_manifest = rescue_peer->manifest;
-                    _peer_mgr_ptr->clear_ouput_buffer(pid);
+//hidden at 2013/01/27	
+//                    _peer_mgr_ptr->clear_ouput_buffer(pid);
                     cout << "down stream " << pid << " manifest=" << current_child_manifest << endl;
 					break;
 				} else {
 					rescue_peer->manifest = manifest;
 					_peer_mgr_ptr->rescue_reply(pid, manifest);
-					_peer_mgr_ptr->add_rescue_downstream(pid);
+//hidden at 2013/01/27 					
+//					_peer_mgr_ptr->add_rescue_downstream(pid);
                     cout << "pid " << pid << " manifest=" << current_child_manifest << endl;
 					break;
 				} 
@@ -957,8 +1018,9 @@ void pk_mgr::handle_rescue(unsigned long pid, unsigned long manifest)
 			rescue_peer = pid_peer_info_iter->second;
 			rescue_peer->manifest = manifest;
 			_peer_mgr_ptr->rescue_reply(pid, manifest);
-			_peer_mgr_ptr->add_rescue_downstream(pid);
-		}else{		//not find in map_pid_rescue_peer_info
+//hidden at 2013/01/27	
+//			_peer_mgr_ptr->add_rescue_downstream(pid);
+		}else{		//not find in map_pid_rescue_ peer_info
 
 
 		}
@@ -1143,14 +1205,16 @@ void pk_mgr::handle_latency(struct chunk_t *chunk_ptr, int sockfd)
 void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 {
 	unsigned long i;
-	unsigned long pid;
+//	unsigned long pid;
 	unsigned int seq_ready_to_send;
-	int sock;
+	int downStreamSock;
+	int downStreamPid;
 	stream *strm_ptr;
 //	struct chunk_rtp_t *temp = NULL;
 	struct peer_info_t *peer = NULL;
 	map<int, queue<struct chunk_t *> *>::iterator iter;		//fd_downstream
-	map<int, unsigned long>::iterator fd_pid_iter;
+//	map<int, unsigned long>::iterator fd_pid_iter;
+	map<unsigned long, int>::iterator map_pid_fd_iter;
 	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 //	map<int, int>::iterator map_rescue_fd_count_iter;
 	unsigned int leastCurrDiff;
@@ -1213,8 +1277,9 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	}
 	
 
-//add_downstream
-//這邊應該要修改
+//add_downstream(同個lane)(須修改)
+//hidden at 2013/01/28
+/*
 	if(lane_member > 1) {
 		for (i = 0; i < lane_member; i++) {
 			if(level_msg_ptr->pid == level_msg_ptr->level_info[i]->pid) {
@@ -1226,14 +1291,18 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 			} 
 		}
 	}
-	
+*/
 
-//和上面一樣也是在把chunk丟給和自己連接的下游peer (做兩次?) (須修改)
+//和上面一樣也是在把chunk丟給和自己連接的下游peer (其他 rescue peer) (須修改)
+//hidden at 2013/01/27
+/*
 	for (iter = _peer_mgr_ptr->_map_fd_downstream.begin(); iter != _peer_mgr_ptr->_map_fd_downstream.end(); iter++) {
 		queue_out_data_ptr = iter->second;
 		sock = iter->first;
+		
 		fd_pid_iter = _peer_mgr_ptr->map_fd_pid.find(sock);
 		pid = fd_pid_iter->second;
+		
 		pid_peer_info_iter = map_pid_peer_info.find(pid);
 		
 		if(pid_peer_info_iter != map_pid_peer_info.end()) {
@@ -1252,9 +1321,33 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		//_net_ptr->epoll_control(iter->first, EPOLL_CTL_ADD, EPOLLOUT);
 		
 	}
+*/
+
+
 
 /////////////////////////////////////////////測試版新功能///////////////////////////////////////////////////////////////////////
 ///*
+	
+//down stream to other peer if SSID match and in map_pid_rescue_peer_info
+	for(pid_peer_info_iter = map_pid_rescue_peer_info.begin();pid_peer_info_iter !=map_pid_rescue_peer_info.end();pid_peer_info_iter++){
+		
+		downStreamPid =pid_peer_info_iter ->first;			//get downStreamPid
+		peer = pid_peer_info_iter ->second;					//get peer info
+		map_pid_fd_iter = _peer_ptr ->map_out_pid_fd.find(downStreamPid) ;
+		if(map_pid_fd_iter != _peer_ptr ->map_out_pid_fd.end() ){
+			downStreamSock = map_pid_fd_iter ->second;		//get downStreamSock
+
+			iter = _peer_ptr ->map_fd_out_data.find(downStreamSock) ;
+			if(iter != _peer_ptr ->map_fd_out_data.end())
+				queue_out_data_ptr = iter ->second ;		//get queue_out_data_ptr
+		}
+
+		if((peer->manifest & (1 << (chunk_ptr->header.sequence_number % sub_stream_num))) ) {
+			queue_out_data_ptr->push((struct chunk_t *)(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size)));
+			_net_ptr->epoll_control(downStreamSock, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
+		}
+	}
+
 
 
 		//差值在BUFF_SIZE 之外可能某個些seq都不到 ,跳過那些seq直到差值在BUFF_SIZE內
@@ -1262,7 +1355,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 		if( BUFF_SIZE  <= leastCurrDiff && leastCurrDiff <_bucket_size){
 
-			for(seq_ready_to_send = _current_send_sequence_number; leastCurrDiff < BUFF_SIZE || seq_ready_to_send <= _least_sequence_number;seq_ready_to_send ++){
+			for(seq_ready_to_send = _current_send_sequence_number; leastCurrDiff > BUFF_SIZE || seq_ready_to_send <= _least_sequence_number;seq_ready_to_send ++){
 					//代表有封包還沒到.略過
 					if((*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.sequence_number != seq_ready_to_send){
 					printf("here1 leastCurrDiff =%d\n",leastCurrDiff);
@@ -1270,7 +1363,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 					continue;
 					}else{
 					leastCurrDiff =_least_sequence_number -seq_ready_to_send;
-					printf("here\n");
+					printf("here2\n");
 //					PAUSE
 					}
 			}
@@ -1296,10 +1389,10 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 			//下一個還沒到 ,不做處理等待並return
 			if((*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.sequence_number != seq_ready_to_send){
 				_current_send_sequence_number = seq_ready_to_send;
-				printf("wait packet");
+//				printf("wait packet\n");
 //				PAUSE
-				return;
-
+//				return;
+				continue;
 			//為連續,丟給player
 			}else if((*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.stream == STRM_TYPE_MEDIA) {
 
@@ -1414,11 +1507,13 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 void pk_mgr::add_stream(int strm_addr, stream *strm, unsigned strm_type)
 {
+/*
 	if (strm_type == STRM_TYPE_AUDIO) {
 		_map_stream_audio[strm_addr] = strm;
 	} else if (strm_type == STRM_TYPE_VIDEO) {
 		_map_stream_video[strm_addr] = strm;
-	} else if (strm_type == STRM_TYPE_MEDIA) {
+	} else */
+	if (strm_type == STRM_TYPE_MEDIA) {
 		_map_stream_media[strm_addr] = strm;
 	}
 }
@@ -1426,11 +1521,13 @@ void pk_mgr::add_stream(int strm_addr, stream *strm, unsigned strm_type)
 
 void pk_mgr::del_stream(int strm_addr, stream *strm, unsigned strm_type)
 {
+/*
 	if (strm_type == STRM_TYPE_AUDIO) {
 		_map_stream_audio.erase(strm_addr);
 	} else if (strm_type == STRM_TYPE_VIDEO) {
 		_map_stream_video.erase(strm_addr);
-	} else if (strm_type == STRM_TYPE_MEDIA) {
+	} else */
+	if (strm_type == STRM_TYPE_MEDIA) {
 		_map_stream_media.erase(strm_addr);
 	}
 }
@@ -1461,6 +1558,8 @@ int pk_mgr::get_sock()
 ///////////////////////////////////////Rescue////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
+
+
 void pk_mgr::init_rescue_detection()
 {
 	//Detect substream 的buff
@@ -1490,16 +1589,16 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 	substreamID= (chunk_ptr ->header.sequence_number) % sub_stream_num  ;
 	static int X = stream_number * PARAMETER_X;								//測量參數X 和stream_number成正比
 
-	static bool first=true;
+//	static bool first=true;
 
-/*
-	if(first){
+//
+//	if(first){
 
-		printf("X= %d\n",X);
+//		printf("X= %d\n",X);
 		
-		first=false;
-	}
-*/
+//		first=false;
+//	}
+//
 
 
 	if(! ( (ssDetect_ptr + substreamID) -> last_seq ) ){  //第一個封包做初始化
@@ -1551,7 +1650,7 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 		(ssDetect_ptr + substreamID) ->firstAlarm = (ssDetect_ptr + substreamID) ->previousAlarm ;
 		(ssDetect_ptr + substreamID) ->first_timestamp = chunk_ptr->header.timestamp;
 	}
-//**********************************(測量方法一結束)***********************************************************
+//////////////////////////////////////(測量方法一結束)///////////////////////////////////////////////////////////
 
 
 ////////////////////////////////////單看兩個連續封包的delay取max (測量方法二)///////////////////////////////////
@@ -1570,7 +1669,7 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 
 	(ssDetect_ptr + substreamID) ->lastAlarm = newAlarm ;
 	(ssDetect_ptr + substreamID) ->last_timestamp = chunk_ptr->header.timestamp;
-//**********************************(測量方法二結束)***************************************************************
+//////////////////////////////////////(測量方法二結束)///////////////////////////////////////////////////////////
 
 
 
@@ -1587,9 +1686,10 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 //做每個peer substream的加總 且判斷需不需要救
 void pk_mgr::measure()
 {	
-	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
-	struct peer_info_t *connectPeerInfo = NULL;
-	unsigned long tempManifest ;
+	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
+	struct peer_connect_down_t *connectPeerInfo = NULL;
+	unsigned long tempManifest=0 ;
+	unsigned long afterManifest=0 ;
 	int perPeerSS_num = 1;		//針對一個peer sub stream 的個數 //至少有一個
 	int peerHighestSSID = 0;	//用來確保是跟這次測量做加總,而不是和上一次
 	double totalSourceBitrate =0;
@@ -1598,12 +1698,15 @@ void pk_mgr::measure()
 	unsigned int continuous_P=0;
 	unsigned int rescueSS=0;
 	unsigned int tempMax=0;
+	static bool triggerContinue=true;
+	unsigned int lastTrigger=0;
 
 	memset( statsArryCount_ptr , 0x00 ,sizeof(int) * (sub_stream_num+1)  ); 
 
-	for(pid_peer_info_iter = map_pid_peer_info.begin(); pid_peer_info_iter != map_pid_peer_info.end(); pid_peer_info_iter++) {
+	for(pid_peerDown_info_iter = map_pid_peerDown_info.begin(); pid_peerDown_info_iter != map_pid_peerDown_info.end(); pid_peerDown_info_iter++) {
 
-	tempManifest = ( pid_peer_info_iter->second ) ->manifest ;
+		tempManifest = (pid_peerDown_info_iter->second)-> peerInfo.manifest;
+		connectPeerInfo =pid_peerDown_info_iter->second ;
 		
 		//先取得perPeerSS_num ,和peerHighestSSID
 		for(int i=0 ;i< sub_stream_num ;i++ ){
@@ -1638,11 +1741,11 @@ void pk_mgr::measure()
 			//介在需要rescue i 個substream之間
 			if ( (totalLocalBitrate < (1 - (double)(2*i-1)/(double)(2*perPeerSS_num) )*totalSourceBitrate ) && ( totalLocalBitrate > (1 - (double)(2*(i+1)-1)/(double)(2*perPeerSS_num) )*totalSourceBitrate)){
 			//rescue i substream
-			( pid_peer_info_iter->second ) ->rescueStatsArry[( (ssDetect_ptr + peerHighestSSID)->measure_N -1)% PARAMETER_M ] =i;
+			connectPeerInfo ->rescueStatsArry[( (ssDetect_ptr + peerHighestSSID)->measure_N -1)% PARAMETER_M ] =i;
 			}
 		}
 		if( (totalLocalBitrate > (1 - (double)(-1)/(double)(2*perPeerSS_num) )*totalSourceBitrate )){
-			( pid_peer_info_iter->second ) ->rescueStatsArry[( (ssDetect_ptr + peerHighestSSID)->measure_N -1)% PARAMETER_M ] =0;
+			connectPeerInfo ->rescueStatsArry[( (ssDetect_ptr + peerHighestSSID)->measure_N -1)% PARAMETER_M ] =0;
 		}
 
 
@@ -1650,9 +1753,9 @@ void pk_mgr::measure()
 		for(int i=0 ; i<PARAMETER_M ;i++){
 
 			//做統計
-			( *(statsArryCount_ptr + ( pid_peer_info_iter->second ) ->rescueStatsArry[i]) )++ ;
+			( *(statsArryCount_ptr + connectPeerInfo ->rescueStatsArry[i]) )++ ;
 
-			if(( pid_peer_info_iter->second ) ->rescueStatsArry[i] >0){
+			if(connectPeerInfo ->rescueStatsArry[i] >0){
 			count_N++;
 //			totalStats+=( pid_peer_info_iter->second ) ->rescueStatsArry[i] ;
 //			rescueSS= (totalStats/count_N) +1 ;
@@ -1660,13 +1763,13 @@ void pk_mgr::measure()
 
 
 			
-			printf("%d  ",( pid_peer_info_iter->second ) ->rescueStatsArry[i]);
+			printf("%d  ",connectPeerInfo ->rescueStatsArry[i]);
 		}
 		printf("\n");
 
 			//近PARAMETER_P次 發生 P次
 			for(int j=0 ; j<PARAMETER_P ;j++){
-				if ( ( pid_peer_info_iter->second ) ->rescueStatsArry[ (PARAMETER_M +( (ssDetect_ptr + peerHighestSSID)->measure_N -1)-j )% PARAMETER_M ] >0 ){
+				if ( connectPeerInfo ->rescueStatsArry[ (PARAMETER_M +( (ssDetect_ptr + peerHighestSSID)->measure_N -1)-j )% PARAMETER_M ] >0 ){
 					continuous_P++ ;
 				}
 			}
@@ -1688,7 +1791,23 @@ void pk_mgr::measure()
 
 		//符合條件觸發rescue 需要救rescue_ss 個
 		if(count_N >= PARAMETER_N  || continuous_P == PARAMETER_P){
-			printf("continuous_P =%d\npid=%d need cut %d substream and need rescue\n",continuous_P,( pid_peer_info_iter->second ) ->pid,rescueSS);
+
+			if(triggerContinue){
+				printf("continuous_P =%d\npid=%d need cut %d substream and need rescue\n",continuous_P,connectPeerInfo ->peerInfo.pid,rescueSS);
+
+				afterManifest = manifestFactory (connectPeerInfo ->peerInfo.manifest , rescueSS);
+
+				send_rescueManifestToPK(  connectPeerInfo ->peerInfo.manifest &(~afterManifest)  );
+				connectPeerInfo ->peerInfo.manifest = afterManifest ;
+				_peer_mgr_ptr->send_manifest_to_parent(afterManifest ,connectPeerInfo ->peerInfo.pid);
+				lastTrigger = (ssDetect_ptr + peerHighestSSID)->measure_N ;
+				triggerContinue =false ;
+			}else{
+				
+//				if(((ssDetect_ptr + peerHighestSSID)->measure_N  -lastTrigger ) >=PARAMETER_N)
+//				triggerContinue =true ;
+			}
+
 		}
 
 
@@ -1698,4 +1817,98 @@ void pk_mgr::measure()
 
 
 
+void pk_mgr::send_rescueManifestToPK(unsigned long manifestValue)
+{
 
+	struct rescue_pkt_from_server  *chunk_rescueManifestPtr = NULL;
+	
+	chunk_rescueManifestPtr = new struct rescue_pkt_from_server;
+
+
+
+	memset(chunk_rescueManifestPtr, 0x0, sizeof(struct rescue_pkt_from_server));
+	
+	chunk_rescueManifestPtr->header.cmd = CHNK_CMD_PEER_RESCUE ;
+	chunk_rescueManifestPtr->header.length = (sizeof(struct rescue_pkt_from_server)-sizeof(struct chunk_header_t)) ;	//pkt_buf paylod length
+	chunk_rescueManifestPtr->header.rsv_1 = REQUEST ;
+	chunk_rescueManifestPtr->pid = _peer_mgr_ptr ->self_pid ;
+	chunk_rescueManifestPtr->manifest = manifestValue ;
+	chunk_rescueManifestPtr->rescue_seq_start =_current_send_sequence_number ;
+
+	_net_ptr->set_blocking(_sock);
+	
+	_net_ptr ->send(_sock , (char*)chunk_rescueManifestPtr ,sizeof(struct rescue_pkt_from_server),0) ;
+
+	_net_ptr->set_nonblocking(_sock);
+	
+	return ;
+	 
+}
+
+
+
+
+void pk_mgr::clear_map_pid_peer_info(){
+
+	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
+	struct peer_info_t *peerInfoPtr =NULL;
+
+	for(pid_peer_info_iter =map_pid_peer_info.begin();pid_peer_info_iter!=map_pid_peer_info.end(); pid_peer_info_iter++){
+		peerInfoPtr=pid_peer_info_iter ->second;
+		delete peerInfoPtr;
+	}
+
+	map_pid_peer_info.clear();
+
+}
+
+void pk_mgr::clear_map_pid_peerDown_info(){
+
+	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
+	struct peer_connect_down_t *peerDownInfoPtr =NULL;
+
+	for(pid_peerDown_info_iter =map_pid_peerDown_info.begin();pid_peerDown_info_iter!= map_pid_peerDown_info.end(); pid_peerDown_info_iter++){
+		peerDownInfoPtr=pid_peerDown_info_iter ->second;
+		delete peerDownInfoPtr;
+	}
+
+	map_pid_peerDown_info.clear();
+
+}
+
+void pk_mgr::clear_map_pid_rescue_peer_info(){
+
+	map<unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
+	struct peer_info_t *peerInfoPtr =NULL;
+
+	for(map_pid_rescue_peer_info_iter =map_pid_rescue_peer_info.begin();map_pid_rescue_peer_info_iter!= map_pid_rescue_peer_info.end(); map_pid_rescue_peer_info_iter++){
+		peerInfoPtr=map_pid_rescue_peer_info_iter ->second;
+		delete peerInfoPtr;
+	}
+
+	map_pid_rescue_peer_info.clear();
+
+}
+
+//回傳cut掉ssNumber 數量的manifestValue
+unsigned long pk_mgr::manifestFactory(unsigned long manifestValue,unsigned int ssNumber){
+
+	unsigned long afterManifestValue=0;
+	unsigned int countss=0;
+
+	for(int i=0 ;  i< sub_stream_num; i++){
+	
+		if(  (1 << i) & manifestValue){
+		
+		afterManifestValue |= (1 << i) ;
+		countss++;
+		if(countss == ssNumber)
+			break;
+		}
+	
+		manifestValue &= (~afterManifestValue);
+		return manifestValue;
+	}
+
+
+}

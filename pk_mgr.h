@@ -12,53 +12,57 @@ class logger;
 class peer_mgr;
 class rtsp_viewer;
 class stream;
+class peer;
 
 class pk_mgr:public basic_class {
 public:
 
 	list<int> *fd_list_ptr;
-	list<struct level_info_t *> rescue_list ;
+//	list<struct level_info_t *> rescue_list ;
 	list<int> outside_rescue_list;
-	list<unsigned int> sequence_number_list;
+//	list<unsigned int> sequence_number_list;
 	list <int> streamID_list;
 
-	map<unsigned long, unsigned long> map_pid_manifest;
-	
+//	map<unsigned long, unsigned long> map_pid_manifest;
+
+	map<unsigned long, struct peer_info_t *> map_pid_peer_info; 	// <pid, struct peer_info_t *>
+	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		// <pid, struct peer_info_t *>
+	map<unsigned long, struct peer_connect_down_t *> map_pid_peerDown_info ; //// <pid, struct peer_connect_down_t *>
+
     map<unsigned char, int> map_rtmp_chunk_size;
-    map<string, unsigned char> map_stream_name_id;
+//    map<string, unsigned char> map_stream_name_id;
 		
 	struct chunk_level_msg_t *level_msg_ptr ;
-	struct chunk_rescue_list_reply_t *rescue_list_reply_ptr;
+//	struct chunk_rescue_list_reply_t *rescue_list_reply_ptr;
 	unsigned long lane_member;
-	unsigned long peer_list_member;
+//	unsigned long peer_list_member;
 	struct chunk_bitstream_t *_chunk_bitstream;
 
 	//rescue
 	struct detectionInfo *ssDetect_ptr;
 	int *statsArryCount_ptr ;
 
-	int _current_pos, _bucket_size;
+//	int _current_pos;
+	int	_bucket_size;
 	unsigned long _channel_id;
 	unsigned long bit_rate;
 	unsigned long sub_stream_num;
+
 	unsigned long parallel_rescue_num;
 	unsigned long inside_lane_rescue_num;
 	unsigned long outside_lane_rescue_num;
-	unsigned long count;
-	unsigned long avg_bandwidth;
-	unsigned long current_child_pid;
+//	unsigned long count;
+//	unsigned long avg_bandwidth;
+//	unsigned long current_child_pid;
 	unsigned long current_child_manifest;
+	int _sock; 		//PK socket
+
 
 	
-	unsigned int _least_sequence_number;		//
-	unsigned int _current_send_sequence_number; //current是還沒送的
+	unsigned int _least_sequence_number;		//最新的seq
+	volatile unsigned int _current_send_sequence_number; //最後送給player的seq
 
-
-
-	unsigned long stream_number;
-	
-	map<unsigned long, struct peer_info_t *> map_pid_peer_info;		// <pid, struct peer_info_t *>
-	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		// <pid, struct peer_info_t *>
+	unsigned long stream_number;	//channel 下stream的個數
 	
 	
 	pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , logger *log_ptr , configuration *prep);
@@ -92,41 +96,48 @@ public:
 	void data_close(int cfd, const char *reason); 
 	int get_sock(void);
 
+	void clear_map_pid_peer_info();
+	void clear_map_pid_peerDown_info();
+	void clear_map_pid_rescue_peer_info();
 ///new rescue function
+
 	void rescue_detecion(struct chunk_t *chunk_ptr);
 	void init_rescue_detection();
 	void measure();
-//	unsigned int threshold(int peer_ss_num ,double sourceBitrate);
-//	void isSameMeasureN(int rescue_ss_num);
+	void send_rescueManifestToPK(unsigned long manifestValue);
+	unsigned long manifestFactory(unsigned long manifestValue,unsigned int ssNumber);
 
+	void peer_set(peer *peer_ptr);
 	void rtsp_viewer_set(rtsp_viewer *rtsp_viewer_ptr);
-	void rtmp_sock_set(int sock);
+//	void rtmp_sock_set(int sock);
 
 private:
+	
 
-	int _sock;
 	unsigned long _html_size;
 
 	network *_net_ptr;
 	logger *_log_ptr;
 	configuration *_prep;
 	peer_mgr * _peer_mgr_ptr;
+	peer *_peer_ptr;
 	rtsp_viewer *_rtsp_viewer_ptr;
-	int _rtmp_sock;
-	int _time_start;
-    int pkt_resent_count;
+//	int _rtmp_sock;
+//	int _time_start;
+//    int pkt_resent_count;
 
 
-	unsigned long _recv_byte_count;
+//	unsigned long _recv_byte_count;
 	unsigned long _manifest;
-	unsigned long _check;
+//	unsigned long _check;
 
-	struct timeb interval_time;	//--!! 0215
+//	struct timeb interval_time;	//--!! 0215
 	
-	map<int, stream *> _map_stream_audio;	// <strm_addr, stream *>
-	map<int, stream *> _map_stream_video;	// <strm_addr, stream *>
+//	map<int, stream *> _map_stream_audio;	// <strm_addr, stream *>
+//	map<int, stream *> _map_stream_video;	// <strm_addr, stream *>
 	map<int, stream *> _map_stream_media;	// <strm_addr, stream *>
 	map<int, stream *>::iterator _map_stream_iter;	// <strm_addr, stream *>
+	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 
 };
 
