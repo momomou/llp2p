@@ -4,16 +4,16 @@
 
 #define FD_SETSIZE		2048
 ////resuce PARAMETER////
-#define PARAMETER_X		20
+#define PARAMETER_X		15
 #define PK_PID			999999
 
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
-#define PARAMETER_M		16
-#define PARAMETER_N		8
-#define PARAMETER_P		4
+#define PARAMETER_M		10
+#define PARAMETER_N		5
+#define PARAMETER_P		3
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
-#define BUFF_SIZE		20
+#define BUFF_SIZE		100
 
 
 #include "configuration.h"

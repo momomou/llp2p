@@ -42,7 +42,7 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 //	 current_child_pid = 0;
 	 current_child_manifest = 0;
 	 _least_sequence_number = 0;
-	 stream_number=0;
+	 stream_number=1;
 	 _current_send_sequence_number = -1;
 	 
 	_prep->read_key("bucket_size", _bucket_size);
@@ -1206,7 +1206,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 {
 	unsigned long i;
 //	unsigned long pid;
-	unsigned int seq_ready_to_send;
+	unsigned int seq_ready_to_send=0;
 	int downStreamSock;
 	int downStreamPid;
 	stream *strm_ptr;
@@ -1217,12 +1217,12 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	map<unsigned long, int>::iterator map_pid_fd_iter;
 	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 //	map<int, int>::iterator map_rescue_fd_count_iter;
-	unsigned int leastCurrDiff;
+	int leastCurrDiff=0;
 
 	queue<struct chunk_t *> *queue_out_data_ptr;
 //	list<unsigned int>::iterator sequence_number_list_iter;
 
-	_log_ptr->write_log_format("s =>s u s u s u s u\n", __FUNCTION__,"stream ID=" ,chunk_ptr->header .stream_id,"recieve pkt seqnum", chunk_ptr->header.sequence_number,"bytes=" ,chunk_ptr ->header.length,"timestamp=",chunk_ptr->header.timestamp);
+//	_log_ptr->write_log_format("s =>s u s u s u s u\n", __FUNCTION__,"stream ID=" ,chunk_ptr->header .stream_id,"recieve pkt seqnum", chunk_ptr->header.sequence_number,"bytes=" ,chunk_ptr ->header.length,"timestamp=",chunk_ptr->header.timestamp);
 
 	if(chunk_ptr->header.sequence_number > _least_sequence_number){
 		_least_sequence_number = chunk_ptr->header.sequence_number;
@@ -1351,27 +1351,28 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 
 		//差值在BUFF_SIZE 之外可能某個些seq都不到 ,跳過那些seq直到差值在BUFF_SIZE內
-		leastCurrDiff =_least_sequence_number -_current_send_sequence_number;
+		leastCurrDiff = (int)(_least_sequence_number -_current_send_sequence_number);
 
 		if( BUFF_SIZE  <= leastCurrDiff && leastCurrDiff <_bucket_size){
 
-			for(seq_ready_to_send = _current_send_sequence_number; leastCurrDiff > BUFF_SIZE || seq_ready_to_send <= _least_sequence_number;seq_ready_to_send ++){
+			for(; leastCurrDiff > BUFF_SIZE || _current_send_sequence_number < _least_sequence_number ;){
 					//代表有封包還沒到.略過
-					if((*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.sequence_number != seq_ready_to_send){
+					if((*(_chunk_bitstream + (_current_send_sequence_number % _bucket_size))).header.sequence_number != _current_send_sequence_number){
 					printf("here1 leastCurrDiff =%d\n",leastCurrDiff);
+					_current_send_sequence_number++ ;
 //					PAUSE
 					continue;
 					}else{
-					leastCurrDiff =_least_sequence_number -seq_ready_to_send;
+					leastCurrDiff =_least_sequence_number -_current_send_sequence_number;
 					printf("here2\n");
 //					PAUSE
 					}
 			}
 		printf("here3 leastCurrDiff =%d\n",leastCurrDiff);
-		_current_send_sequence_number = seq_ready_to_send;
+//		_current_send_sequence_number = seq_ready_to_send;
 
 		//可能某個subtream 追過_bucket_size,直接跳到最後一個 (應該不會發生)
-		}else if (leastCurrDiff >_bucket_size) {
+		}else if (leastCurrDiff > _bucket_size) {
 
 //			PAUSE
 			printf("leastCurrDiff =%d\n",leastCurrDiff);
@@ -1384,35 +1385,39 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 		
 		//正常傳輸丟給player
-		for(seq_ready_to_send = _current_send_sequence_number;seq_ready_to_send < _least_sequence_number;seq_ready_to_send ++){
+		for(;_current_send_sequence_number <= _least_sequence_number;){
 
 			//下一個還沒到 ,不做處理等待並return
-			if((*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.sequence_number != seq_ready_to_send){
-				_current_send_sequence_number = seq_ready_to_send;
-//				printf("wait packet\n");
+			if((*(_chunk_bitstream + (_current_send_sequence_number % _bucket_size))).header.sequence_number != _current_send_sequence_number){
+				printf("wait packet\n");
+//				_current_send_sequence_number = seq_ready_to_send;
+//	_log_ptr->write_log_format("s u s u s u s u\n","seq_ready_to_send",seq_ready_to_send,"_least_sequence_number",_least_sequence_number);
 //				PAUSE
-//				return;
-				continue;
+				return ;
+//				continue;
+
 			//為連續,丟給player
-			}else if((*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.stream == STRM_TYPE_MEDIA) {
+			}else if((*(_chunk_bitstream + (_current_send_sequence_number % _bucket_size))).header.stream == STRM_TYPE_MEDIA) {
 
 				//丟給rescue_detecion一定是有方向性的
 				rescue_detecion(chunk_ptr);
+
 
 				for (_map_stream_iter = _map_stream_media.begin(); _map_stream_iter != _map_stream_media.end(); _map_stream_iter++) {
 					//per fd mean a player   
 					strm_ptr = _map_stream_iter->second;
 					 //stream_id 和request 一樣才add chunk
-					if((strm_ptr -> _reqStreamID) == (*(_chunk_bitstream + (seq_ready_to_send % _bucket_size))).header.stream_id ){ 
-						strm_ptr->add_chunk((struct chunk_t *)(_chunk_bitstream + (seq_ready_to_send % _bucket_size)));
+					if((strm_ptr -> _reqStreamID) == (*(_chunk_bitstream + (_current_send_sequence_number % _bucket_size))).header.stream_id ){ 
+						strm_ptr->add_chunk((struct chunk_t *)(_chunk_bitstream + (_current_send_sequence_number % _bucket_size)));
 						_net_ptr->epoll_control(_map_stream_iter->first, EPOLL_CTL_MOD, EPOLLOUT);
 					}
 				}
+				_current_send_sequence_number++;
 			}
 
 			}
 
-			_current_send_sequence_number = seq_ready_to_send;
+//			_current_send_sequence_number = seq_ready_to_send;
 
 		
 
@@ -1572,7 +1577,7 @@ void pk_mgr::init_rescue_detection()
 
 
 
-//必須保證進入這個function 的substream 是依序的且不會lose
+//必須保證進入這個function 的substream 是依序的
 void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 {
 
@@ -1587,7 +1592,7 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 
 
 	substreamID= (chunk_ptr ->header.sequence_number) % sub_stream_num  ;
-	static int X = stream_number * PARAMETER_X;								//測量參數X 和stream_number成正比
+	int X = stream_number * PARAMETER_X;								//測量參數X 和stream_number成正比
 
 //	static bool first=true;
 
@@ -1690,6 +1695,7 @@ void pk_mgr::measure()
 	struct peer_connect_down_t *connectPeerInfo = NULL;
 	unsigned long tempManifest=0 ;
 	unsigned long afterManifest=0 ;
+	unsigned long sentToPKManifest=0 ;
 	int perPeerSS_num = 1;		//針對一個peer sub stream 的個數 //至少有一個
 	int peerHighestSSID = 0;	//用來確保是跟這次測量做加總,而不是和上一次
 	double totalSourceBitrate =0;
@@ -1796,8 +1802,8 @@ void pk_mgr::measure()
 				printf("continuous_P =%d\npid=%d need cut %d substream and need rescue\n",continuous_P,connectPeerInfo ->peerInfo.pid,rescueSS);
 
 				afterManifest = manifestFactory (connectPeerInfo ->peerInfo.manifest , rescueSS);
-
-				send_rescueManifestToPK(  connectPeerInfo ->peerInfo.manifest &(~afterManifest)  );
+				sentToPKManifest = (connectPeerInfo ->peerInfo.manifest &(~afterManifest) );
+				send_rescueManifestToPK(sentToPKManifest );
 				connectPeerInfo ->peerInfo.manifest = afterManifest ;
 				_peer_mgr_ptr->send_manifest_to_parent(afterManifest ,connectPeerInfo ->peerInfo.pid);
 				lastTrigger = (ssDetect_ptr + peerHighestSSID)->measure_N ;
@@ -1891,7 +1897,8 @@ void pk_mgr::clear_map_pid_rescue_peer_info(){
 }
 
 //回傳cut掉ssNumber 數量的manifestValue
-unsigned long pk_mgr::manifestFactory(unsigned long manifestValue,unsigned int ssNumber){
+unsigned long pk_mgr::manifestFactory(unsigned long manifestValue,unsigned int ssNumber)
+{
 
 	unsigned long afterManifestValue=0;
 	unsigned int countss=0;
@@ -1905,10 +1912,12 @@ unsigned long pk_mgr::manifestFactory(unsigned long manifestValue,unsigned int s
 		if(countss == ssNumber)
 			break;
 		}
-	
-		manifestValue &= (~afterManifestValue);
-		return manifestValue;
+		
 	}
+
+	manifestValue &= (~afterManifestValue);
+	return manifestValue;
+	
 
 
 }

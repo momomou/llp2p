@@ -59,8 +59,8 @@ public:
 
 
 	
-	unsigned int _least_sequence_number;		//程穝seq
-	volatile unsigned int _current_send_sequence_number; //程癳倒playerseq
+	volatile unsigned int _least_sequence_number;		//程穝seq
+	volatile unsigned int _current_send_sequence_number; //程癳倒playerseq(临⊿癳)
 
 	unsigned long stream_number;	//channel stream计
 	

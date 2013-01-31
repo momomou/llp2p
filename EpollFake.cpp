@@ -129,8 +129,9 @@ int epoll_wait (int __epfd, struct epoll_event *__events, int __maxevents, int _
 	//cout << "bbbbbbbbbbbbbbb" <<endl;
 
 	max_fd = find_max_fd(fd_list);
+	num_ready = select(max_fd + 1, &read_fds, &write_fds, &error_fds, &tv);
 
-	if((num_ready = select(max_fd + 1, &read_fds, &write_fds, &error_fds, &tv)) < 0) {
+	if(num_ready < 0) {
 		//cout << "max_fd = " << max_fd << endl;
 		//cout << "select" << endl;
 	
@@ -213,8 +214,10 @@ int epoll_wait (int __epfd, struct epoll_event *__events, int __maxevents, int _
 		return -1;
 //		return	0;
 		//perror("select");
-	} else {
-		//cout << "num_ready = " << num_ready << endl;
+	} else if(num_ready == 0){
+		
+	}else{
+	//normal
 	}
 
 	int ret_count = 0;

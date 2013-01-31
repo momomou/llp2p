@@ -571,7 +571,7 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 						_pk_mgr_ptr ->map_pid_peerDown_info[firstReplyPid] =peerDownInfoPtr ;
 						//如果是第一個,則跟他要全部的串流
 						if(_pk_mgr_ptr ->map_pid_peerDown_info.size() == 1){
-							for(int ss_id = 0; ss_id < _pk_mgr_ptr->sub_stream_num; ss_id++) {
+							for(unsigned long ss_id = 0; ss_id < _pk_mgr_ptr->sub_stream_num; ss_id++) {
 							(peerDownInfoPtr ->peerInfo.manifest) |= (1 << ss_id);
 							}
 							
