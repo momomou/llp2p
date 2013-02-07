@@ -146,7 +146,7 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 #ifdef _WIN32
 		::closesocket(_sock);
 		::WSACleanup();
-		peer_ptr ->data_close(_sock,"peer_mgr::build_connection") ;
+		peer_ptr ->data_close(_sock,"peer_mgr::build_connection",DONT_CARE) ;
 #else
 		::close(_sock);
 #endif
@@ -779,6 +779,8 @@ void peer_mgr::clear_ouput_buffer(unsigned long pid)
 			queue_out_data_ptr = fd_queue_iter->second;		
 		}
 	}
+	
+	printf("clear_ouput_buffer size = %d \n",queue_out_data_ptr->size());
 
 	while(queue_out_data_ptr->size() != 0 ) {
 		queue_out_data_ptr->pop();
@@ -972,6 +974,8 @@ void peer_mgr::handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr)
 	rescuePeerInfoPtr = map_pid_rescue_peer_info_iter ->second;
 
 	rescuePeerInfoPtr ->manifest = chunk_ptr ->manifest ;
+
+	printf("children pid= %u set manifest=%d\n",rescuePeerInfoPtr ->pid,rescuePeerInfoPtr ->manifest);
 
 	}
 

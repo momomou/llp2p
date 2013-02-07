@@ -47,7 +47,7 @@ public:
 
 
 
-	void data_close(int cfd, const char *reason); 
+	void data_close(int cfd, const char *reason ,int type); 
 
 private:
 	

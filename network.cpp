@@ -158,7 +158,7 @@ void network::epoll_dispatcher(void)
 				cout << "something wrong: fd = " << cfd << endl;
 				//PAUSE
 				_map_fd_del_hdl_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
-				_peer_ptr->data_close(cfd, "This socket is closed by client (client has sent a FIN)");
+				_peer_ptr->data_close(cfd, "This socket is closed by client (client has sent a FIN)",DONT_CARE);
 				continue;
 			}
 			

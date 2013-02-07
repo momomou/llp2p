@@ -4,16 +4,16 @@
 
 #define FD_SETSIZE		2048
 ////resuce PARAMETER////
-#define PARAMETER_X		15
+#define PARAMETER_X		20
 #define PK_PID			999999
 
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
-#define PARAMETER_M		10
-#define PARAMETER_N		5
-#define PARAMETER_P		3
+#define PARAMETER_M		8
+#define PARAMETER_N		4
+#define PARAMETER_P		2
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
-#define BUFF_SIZE		100
+#define BUFF_SIZE		200
 
 
 #include "configuration.h"
@@ -109,7 +109,7 @@ using std::bitset;
 #define RTMP_PKT_BUF_PAY_SIZE	(RTMP_PKT_BUF_MAX - sizeof(struct chunk_header_t))	// This value defines the max rtp packet size
 
 #define CHNK_CMD_PEER_REG				0x01	// register
-#define CHNK_CMD_PEER_TCN				0x02	// topology change notification
+#define CHNK_CMD_RESCUE_LIST			0x02	// recv rescue list
 #define CHNK_CMD_PEER_RSC				0x03	// rescue cmd
 #define CHNK_CMD_PEER_CUT				0x04	// cut cmd
 #define CHNK_CMD_PEER_BWN				0x05	// bandwidth notification cmd
@@ -177,6 +177,10 @@ using std::bitset;
 
 #define REQUEST				0
 #define REPLY				1
+
+#define CLOSE_PARENT			0
+#define CLOSE_CHILD				1
+#define DONT_CARE				2
 
 #define DBG_MODE
 
@@ -341,6 +345,9 @@ struct chunk_request_pkt_t{
 struct peer_connect_down_t {
 	struct peer_info_t peerInfo;
 	int rescueStatsArry[PARAMETER_M];
+	volatile unsigned int timeOutLastSeq;
+	volatile unsigned int timeOutNewSeq;
+	
 };
 
 

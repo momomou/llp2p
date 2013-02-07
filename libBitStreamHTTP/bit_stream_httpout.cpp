@@ -124,6 +124,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 
 //pop until get the first keyframe
+
 		while(first_pkt){
 			if(_queue_out_data_ptr ->size() >=10){
 				for(int i=0;i<5;i++){
@@ -142,7 +143,8 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 		}
 
 
-//here is to down-sampling
+//here is to down-sampling (這邊可能有些bug 可能會去pop一個空的_queue_out_data_ptr!?)
+/*
 		int sentSequenceNumber = chunk_ptr ->header.sequence_number ;
 		int differenceValue = (_pk_mgr_ptr ->_least_sequence_number -sentSequenceNumber);
 		if (differenceValue > 100){ //if (recv -sent)diff >100 pkt pop until  queue <=30 and continuance pop until last key frame
@@ -178,7 +180,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 					chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();			 //ignore and not send
 					}	
 		}
-
+*/
 
 
 //for debug

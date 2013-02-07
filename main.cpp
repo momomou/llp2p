@@ -120,7 +120,9 @@ int main(int argc, char **argv)
 	peer_mgr_ptr->peer_mgr_set(net_ptr, log_ptr, prep, pk_mgr_ptr);
 	//peer_mgr_ptr->pk_mgr_set(pk_mgr_ptr);
 	pk_mgr_ptr->peer_mgr_set(peer_mgr_ptr);
-	
+
+//	_beginthread(pk_mgr::threadTimeout, 0,NULL );
+//	_beginthread(pk_mgr_ptr ->threadTimeout, 0,NULL );
 
 #ifndef _WIN32
 	signal(SIGALRM, signal_handler);

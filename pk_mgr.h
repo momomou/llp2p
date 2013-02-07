@@ -14,14 +14,21 @@ class rtsp_viewer;
 class stream;
 class peer;
 
+
+
 class pk_mgr:public basic_class {
+
+
+
 public:
 
+	static void __cdecl threadTimeout( void *);
 	list<int> *fd_list_ptr;
 //	list<struct level_info_t *> rescue_list ;
 	list<int> outside_rescue_list;
 //	list<unsigned int> sequence_number_list;
 	list <int> streamID_list;
+	struct peer_connect_down_t *pkDownInfoPtr;
 
 //	map<unsigned long, unsigned long> map_pid_manifest;
 
@@ -107,8 +114,11 @@ public:
 	void send_rescueManifestToPK(unsigned long manifestValue);
 	unsigned long manifestFactory(unsigned long manifestValue,unsigned int ssNumber);
 
+
+
 	void peer_set(peer *peer_ptr);
 	void rtsp_viewer_set(rtsp_viewer *rtsp_viewer_ptr);
+
 //	void rtmp_sock_set(int sock);
 
 private:
