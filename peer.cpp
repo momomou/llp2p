@@ -30,7 +30,7 @@ peer::peer(list<int> *fd_list)
 	fd_list_ptr = fd_list;
 	_chunk_ptr = NULL;
 	first_reply_peer =true;
-
+	firstReplyPid=-1;
 /*
 	for(unsigned long i = 0; i < BANDWIDTH_BUCKET; i++) {
 		bandwidth_bucket[i] = 0;
@@ -198,7 +198,7 @@ int peer::handle_pkt_in(int sock)
 //	unsigned long total_bit_rate = 0;
 //	unsigned long bandwidth = 0;
 //	int different = 0;
-	unsigned long firstReplyPid=-1;
+
 	struct peer_info_t *peerInfoPtr;
 //	unsigned long manifest;
 //	unsigned long n_alpha;
@@ -293,64 +293,9 @@ int peer::handle_pkt_in(int sock)
 //CHNK_CMD_PEER_DATA
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_DATA) {
 
-
 //the main handle
 		_pk_mgr_ptr->handle_stream(chunk_ptr, sock);
 
-
-
-//		_recv_byte_count += chunk_ptr->header.length;
-
-//?????  what's this?
-
-//hidden at 2013/01/16
-/*
-        if(~parent_manifest & (1 << (chunk_ptr->header.sequence_number % _pk_mgr_ptr->sub_stream_num))){
-            _recv_parent_byte_count += chunk_ptr->header.length; 
-            //cout << "parent seq " << chunk_ptr->header.sequence_number << endl;
-        }
-*/
-
-/*
-		if(_log_ptr->handleAlarm()) {
-			bandwidth_bucket[count % BANDWIDTH_BUCKET] = _recv_byte_count;
-			count++;
-			if(count >= BANDWIDTH_BUCKET) {
-				avg_bandwidth = (unsigned long)((bandwidth_bucket[(count -1) % BANDWIDTH_BUCKET] - bandwidth_bucket[count % BANDWIDTH_BUCKET]) * 8 / 1000 / (BANDWIDTH_BUCKET - 1));
-				cout << "avg bandwidth = " << avg_bandwidth << " kbps" <<endl;
-				_pk_mgr_ptr->handle_bandwidth(avg_bandwidth);
-			}
-		}
-*/
-
-
-//hidden   at  2013/01/09
-/*
-		if(_log_ptr->handleAlarm()) {
-			count++;
-			if(count >= BANDWIDTH_BUCKET) {
-				if(count == BANDWIDTH_BUCKET) {
-					avg_bandwidth = _recv_byte_count * 8 / 1000 / BANDWIDTH_BUCKET;
-                    parent_bandwidth = _recv_parent_byte_count * 8 / 1000 / BANDWIDTH_BUCKET;
-					//cout << "avg bandwidth = " << avg_bandwidth << " kbps" << endl;
-                    //cout << "parent bandwidth = " << parent_bandwidth << " kbps" << endl;
-					_recv_byte_count = 0;
-                    _recv_parent_byte_count = 0;
-					_pk_mgr_ptr->handle_bandwidth(avg_bandwidth);
-					
-				} else {
-					avg_bandwidth = avg_bandwidth * (BANDWIDTH_BUCKET - 1) / BANDWIDTH_BUCKET + _recv_byte_count * 8 / 1000 / BANDWIDTH_BUCKET; 
-                    parent_bandwidth = parent_bandwidth * (BANDWIDTH_BUCKET - 1) / BANDWIDTH_BUCKET + _recv_parent_byte_count * 8 / 1000 / BANDWIDTH_BUCKET; 
-					//cout << "avg bandwidth = " << avg_bandwidth << " kbps" << endl;
-                    //cout << "parent bandwidth = " << parent_bandwidth << " kbps" << endl;
-					_recv_byte_count = 0;
-                    _recv_parent_byte_count = 0;
-					_pk_mgr_ptr->handle_bandwidth(avg_bandwidth);
-				}
-			}
-		}
-*/
-		
 
 	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY) {
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
@@ -396,29 +341,7 @@ int peer::handle_pkt_in(int sock)
 //cmd =CHNK_CMD_PEER_BWN
 	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_BWN) {
 
-//hidden at  2013/01/09
-/*
-		if(count >= BANDWIDTH_BUCKET) {
-			memcpy(&bandwidth, (char *)chunk_ptr + sizeof(struct chunk_t), sizeof(unsigned long));
-			different = bandwidth - avg_bandwidth;
-			//cout << "different = " << different << " kbps" << endl;
-		}
 
-		if(different > (int)(bandwidth / _pk_mgr_ptr->sub_stream_num )) {
-            different = (bandwidth - parent_bandwidth) * 0.9;
-			//n_alpha = (different /(int)(_pk_mgr_ptr->bit_rate / _pk_mgr_ptr->sub_stream_num)) + 1;
-            n_alpha = (different /(int)(bandwidth / _pk_mgr_ptr->sub_stream_num)) + 1;
-			cout << "rescue " << n_alpha << " alpha" << endl;
-            cout << "need bandwidth = " << (bandwidth / _pk_mgr_ptr->sub_stream_num) <<endl;
-            //cout << "bandwidth = " << bandwidth << " avg_bandwidth = " << avg_bandwidth <<endl;
-			for(i = 0; i < n_alpha; i++) {
-				manifest |= (1 << (_pk_mgr_ptr->sub_stream_num - (1 + i)));
-			}
-            parent_manifest = manifest;
-			_pk_mgr_ptr->send_rescue(manifest);
-		}
-*/
-		
 
 
 //cmd = CHNK_CMD_ PEER_RSC
@@ -610,16 +533,11 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 						delete peerInfoPtr;
 						_pk_mgr_ptr ->map_pid_peerDown_info[firstReplyPid] =peerDownInfoPtr ;
 						//如果是第一個parent,則跟他要全部的串流 (其中pk為第一個)
-						if(_pk_mgr_ptr ->map_pid_peerDown_info.size() == 2){
-							for(unsigned long ss_id = 0; ss_id < _pk_mgr_ptr->sub_stream_num; ss_id++) {
-							(peerDownInfoPtr ->peerInfo.manifest) |= (1 << ss_id);
-							}
-							
-							_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
-						}
 
-						printf("sent manidest()\n") ;
-///sent manidest()
+							_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
+
+
+
 
 						for(pid_peer_info_iter =_pk_mgr_ptr ->map_pid_peer_info.begin();pid_peer_info_iter!= _pk_mgr_ptr ->map_pid_peer_info.end();pid_peer_info_iter++){
 							if(pid_peer_info_iter ->first == _peer_mgr_ptr ->self_pid)
@@ -640,6 +558,8 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_SET_MANIFEST){
 		printf("CHNK_CMD_PEER_SET_MANIFEST\n");
 		_peer_mgr_ptr ->handle_manifestSet((struct chunk_manifest_set_t *)chunk_ptr); 
+
+// should sent capacity to pk
 		
 		map_fd_pid_iter= map_fd_pid.find(sock);
 		if(map_fd_pid_iter !=map_fd_pid.end())

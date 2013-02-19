@@ -136,6 +136,8 @@ using std::bitset;
 //////////////////////////////////////////////////////////////////////////////////measure start delay
 #define CHNK_CMD_PEER_START_DELAY				0X1a
 //////////////////////////////////////////////////////////////////////////////////
+#define CHNK_CMD_PEER_SEED				0X1b
+
 
 #define CHNK_CMD_PEER_UNKNOWN			0xFF	// 1 B cmd => 0xFF is reserved for unknown cmd
 
@@ -183,6 +185,10 @@ using std::bitset;
 #define CLOSE_PARENT			0
 #define CLOSE_CHILD				1
 #define DONT_CARE				2
+
+#define CAPACITY_THRESHOLD 0.75
+#define CAPACITY_BASE 5
+#define MAX_PEER_LIST		5
 
 #define DBG_MODE
 
@@ -558,6 +564,17 @@ struct rescue_peer_capacity_measurement{
 	long long *source_delay_measur[0];
 };
 //////////////////////////////////////////////////////////////////////////////////
+struct seed_notify{
+	struct chunk_header_t header;
+	unsigned int manifest;
+};
+
+struct chunk_rescue_list {
+	struct chunk_header_t header;
+	unsigned long pid;
+	unsigned long manifest;
+	struct rescue_peer_info *rescue_peer_info[MAX_PEER_LIST];	
+};
 
 
 

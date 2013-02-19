@@ -251,7 +251,7 @@ void pk_mgr::send_capacity_to_pk(int sock){
 	chunk_capacity_ptr->content_integrity = 1;
 	chunk_capacity_ptr->NAT_status = 1;
 	//chunk_capacity_ptr->rescue_condition = 0;
-	chunk_capacity_ptr->rescue_num = 0;
+	chunk_capacity_ptr->rescue_num = rescueNumAccumulate();
 	for(int i=0;i<sub_stream_num;i++){
 		if((delay_table+i)->start_delay_struct.init_flag == 0){
 			printf("send capacity error start delay have to init\n");
@@ -637,6 +637,14 @@ int pk_mgr::handle_pkt_in(int sock)
 		offset += sizeof(unsigned long) * 4;
 
 	//將收到的封包放進  去除掉bit_rate .sub_stream_num .parallel_rescue_num . inside_lane_rescue_num  ,後放進  chunk_level_msg_t
+
+		//註冊時要的manifest是要全部的substream
+		unsigned long tempManifes=0;
+		for(unsigned long ss_id = 0; ss_id < sub_stream_num; ss_id++) {
+							tempManifes |= (1 << ss_id);
+							}
+
+
 		for (i = 0; i < lane_member; i++) {
 			level_msg_ptr->level_info[i] = new struct level_info_t;
 			new_peer = new struct peer_info_t;
@@ -649,10 +657,9 @@ int pk_mgr::handle_pkt_in(int sock)
 
 			offset += sizeof(struct level_info_t);
 
-
-	//add lane peer_info to map table  NOused
+	//add lane peer_info to map table
 			map_pid_peer_info[new_peer->pid] = new_peer;
-
+			new_peer ->manifest = tempManifes;
 		}
 
 		pkDownInfoPtr = new struct peer_connect_down_t ;
@@ -686,19 +693,22 @@ int pk_mgr::handle_pkt_in(int sock)
 
 
 
-// light | pid | level   | n*struct level_info_t
+
 	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY) {
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
+
 		printf("CHNK_CMD_PEER_START_DELAY pk mgr\n");
 		if(chunk_ptr->header.rsv_1 == REQUEST){
-			printf("CHNK_CMD_PEER_START_DELAY pk mgr request\n");
-			unsigned long temp_start_delay;
+
+			printf(" not go here!!!!!!!!!!!!!!!!!!!CHNK_CMD_PEER_START_DELAY pk mgr request\n");
+/*			unsigned long temp_start_delay;
 			unsigned long request_sub_id;
 
 			memcpy(&request_sub_id, (char *)chunk_ptr + sizeof(struct chunk_header_t) + sizeof(unsigned long), sizeof(unsigned long));
 
 			temp_start_delay = (delay_table+request_sub_id)->start_delay_struct.start_delay;
 			send_back_start_delay_measure_token(sock, temp_start_delay, request_sub_id);
+*/
 		}
 		else{
 			printf("CHNK_CMD_PEER_START_DELAY pk mgr reply\n");
@@ -727,11 +737,11 @@ int pk_mgr::handle_pkt_in(int sock)
 			}
 		}
 	//////////////////////////////////////////////////////////////////////////////////
+
+
+// light | pid | level   | n*struct rescue_peer_info
 	} else if (chunk_ptr->header.cmd == CHNK_CMD_RESCUE_LIST) {
 		printf("CHNK_CMD_RESCUE_LIST\n");
-
-//hidden at 2012/01/23
-
 
 ////////////////////////////////////////////////
 		clear_map_pid_peer_info();
@@ -777,10 +787,12 @@ int pk_mgr::handle_pkt_in(int sock)
 	
 
 //和lane 每個peer 先建立好連線	
+//
 		if(lane_member >= 1)
 			_peer_mgr_ptr->connect_peer(level_msg_ptr, level_msg_ptr->pid);
 
 		_peer_mgr_ptr->handle_test_delay();
+
 
 		for (i = 0; i < lane_member; i++) {
 			if(level_msg_ptr->level_info[i])
@@ -1031,7 +1043,11 @@ int pk_mgr::handle_pkt_in(int sock)
 		for(int i=0 ; i< stream_number ;i++){
 		printf("streamID = %d\n",*(intptr+i));
 		streamID_list.push_back(*(intptr+i));
-	}
+		}
+	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_SEED){
+		printf("cmd =recv CHNK_CMD_PEER_SEED\n");
+
+		pkDownInfoPtr ->peerInfo.manifest = ((struct seed_notify *)chunk_ptr) ->manifest ;
 
 //other
 	}else{
@@ -1819,7 +1835,7 @@ int pk_mgr::get_sock()
 /////////////////////////////////////////////////////////////////////////////////////////
 
 
-
+// call after register
 void pk_mgr::init_rescue_detection()
 {
 	//Detect substream 的buff
@@ -2068,8 +2084,8 @@ void pk_mgr::measure()
 
 				//PID是PK的有問題 (代表是這個peer下載能力有問題)
 				if(connectPeerInfo ->peerInfo.pid ==PK_PID){
-					printf("peer need set dead\n");
-					PAUSE
+					printf("download have problem , peer need set dead\n");
+					exit(1);
 				
 				//PID是其他peer
 				}else{

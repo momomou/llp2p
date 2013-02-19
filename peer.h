@@ -14,12 +14,9 @@ class peer_mgr;
 class peer:public basic_class {
 public:
 
-//	unsigned long count;
-//	unsigned long avg_bandwidth;
-//    unsigned long parent_bandwidth;
-	bool first_reply_peer;
 
-	//unsigned long long bandwidth_bucket[BANDWIDTH_BUCKET];
+	bool first_reply_peer;
+	unsigned long firstReplyPid;
 
 	queue<struct chunk_t *> *queue_out_ctrl_ptr;
 	queue<struct chunk_t *> *queue_out_data_ptr;

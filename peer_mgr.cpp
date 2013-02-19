@@ -286,7 +286,7 @@ int peer_mgr::handle_pkt_in(int sock)
 		peer_ptr->handle_connect(new_fd, chunk_ptr,_cin);
 	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY) {
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
-		printf("CHNK_CMD_PEER_START_DELAY peer mgr\n");
+		printf("!!!!!!!!!!!!!!!!!CHNK_CMD_PEER_START_DELAY peer mgr\n");
 		if(chunk_ptr->header.rsv_1 == REQUEST){
 			printf("CHNK_CMD_PEER_START_DELAY peer mgr request\n");
 			unsigned long temp_start_delay;
@@ -298,7 +298,7 @@ int peer_mgr::handle_pkt_in(int sock)
 			_pk_mgr_ptr->send_back_start_delay_measure_token(sock, temp_start_delay, request_sub_id);
 		}
 		else{
-			printf("CHNK_CMD_PEER_START_DELAY peer mgr reply\n");
+			printf("!!!!!!!!!!!!!!!!!!CHNK_CMD_PEER_START_DELAY peer mgr reply\n");
 			unsigned long request_sub_id;
 			long long parent_start_delay;
 
