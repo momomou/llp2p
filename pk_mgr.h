@@ -64,7 +64,20 @@ public:
 	unsigned long current_child_manifest;
 	int _sock; 		//PK socket
 
-
+	//////////////////////////////////////////////////////////////////////////////////measure start delay
+	struct source_delay *delay_table;
+	void delay_table_init();
+	void source_delay_init(unsigned long init_ssid);
+	void send_start_delay_measure_token(int sock,unsigned long sub_id);
+	void send_back_start_delay_measure_token(int sock,long long peer_start_delay,unsigned long sub_id);
+	//////////////////////////////////////////////////////////////////////////////////
+	
+	//////////////////////////////////////////////////////////////////////////////////send capacity
+	int peer_start_delay_count;
+	int peer_join_send;
+	void send_capacity_init();
+	void send_capacity_to_pk(int sock);
+	//////////////////////////////////////////////////////////////////////////////////
 	
 	volatile unsigned int _least_sequence_number;		//最新的seq
 	volatile unsigned int _current_send_sequence_number; //最後送給player的seq(還沒送)

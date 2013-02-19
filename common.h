@@ -133,7 +133,9 @@ using std::bitset;
 #define CHNK_CMD_PEER_RESCUE_LIST      	0x17
 #define CHNK_CMD_PEER_TEST_DELAY		0x18	//test delay to select peer
 #define CHNK_CMD_PEER_SET_MANIFEST		0x19	//set manifest set to parent
-
+//////////////////////////////////////////////////////////////////////////////////measure start delay
+#define CHNK_CMD_PEER_START_DELAY				0X1a
+//////////////////////////////////////////////////////////////////////////////////
 
 #define CHNK_CMD_PEER_UNKNOWN			0xFF	// 1 B cmd => 0xFF is reserved for unknown cmd
 
@@ -512,7 +514,50 @@ struct peer_latency_measure {
 	struct peer_timestamp_info_t peer_timestamp_info[0];
 };
 
+//////////////////////////////////////////////////////////////////////////////////measure start delay
+struct substream_start_delay {
+	int sub_stream_id;
+	int init_flag;
+	long long start_delay;
+	LARGE_INTEGER start_clock;
+	LARGE_INTEGER end_clock;
+};
 
+struct source_delay {
+	struct substream_start_delay start_delay_struct;
+	long long source_delay_time;
+	LARGE_INTEGER client_start_time;
+	unsigned long start_seq_num;
+	unsigned int start_seq_abs_time;
+	unsigned long end_seq_num;
+	unsigned int end_seq_abs_time;
+	int source_delay_init;
+};
+
+struct start_delay_measure_send{
+	struct chunk_header_t header;
+	unsigned long pid;
+	unsigned long ssid; 
+};
+
+struct start_delay_measure_receive{
+	struct chunk_header_t header;
+	unsigned long pid;
+	unsigned long ssid;
+	long long source_delay_recev;
+};
+//////////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////////////////////////send capacity
+struct rescue_peer_capacity_measurement{
+	struct chunk_header_t header;
+	unsigned int rescue_num;
+	//int rescue_condition;
+	char NAT_status;
+	char content_integrity;
+	long long *source_delay_measur[0];
+};
+//////////////////////////////////////////////////////////////////////////////////
 
 
 

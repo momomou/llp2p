@@ -284,6 +284,46 @@ int peer_mgr::handle_pkt_in(int sock)
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_CON) {
 		cout << "CHNK_CMD_PEER_CON" << endl;
 		peer_ptr->handle_connect(new_fd, chunk_ptr,_cin);
+	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY) {
+	//////////////////////////////////////////////////////////////////////////////////measure start delay
+		printf("CHNK_CMD_PEER_START_DELAY peer mgr\n");
+		if(chunk_ptr->header.rsv_1 == REQUEST){
+			printf("CHNK_CMD_PEER_START_DELAY peer mgr request\n");
+			unsigned long temp_start_delay;
+			unsigned long request_sub_id;
+
+			memcpy(&request_sub_id, (char *)chunk_ptr + sizeof(struct chunk_header_t) + sizeof(unsigned long), sizeof(unsigned long));
+
+			temp_start_delay = (_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_delay;
+			_pk_mgr_ptr->send_back_start_delay_measure_token(sock, temp_start_delay, request_sub_id);
+		}
+		else{
+			printf("CHNK_CMD_PEER_START_DELAY peer mgr reply\n");
+			unsigned long request_sub_id;
+			long long parent_start_delay;
+
+			memcpy(&request_sub_id, (char *)chunk_ptr + sizeof(struct chunk_header_t) + sizeof(unsigned long), sizeof(unsigned long));
+			memcpy(&parent_start_delay, (char *)chunk_ptr + sizeof(struct chunk_header_t) + (2*sizeof(unsigned long)), sizeof(long long));
+
+			if((_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.init_flag == 1){
+				_log_ptr -> getTickTime(&((_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.end_clock));
+				(_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_delay = _log_ptr ->diffTime_ms((_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_clock,(_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.end_clock);
+				(_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_delay = parent_start_delay + ((_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_delay/2);
+				//(_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.init_flag = 1;
+				printf("start delay : %ld\n",(_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_delay);
+				//////////////////////////////////////////////////////////////////////////////////send capacity
+				_pk_mgr_ptr->peer_start_delay_count++;
+				if((_pk_mgr_ptr->peer_start_delay_count == _pk_mgr_ptr->sub_stream_num)&&(!(_pk_mgr_ptr->peer_join_send))&&((_pk_mgr_ptr->delay_table+request_sub_id)->start_seq_num != 0)&&((_pk_mgr_ptr->delay_table+request_sub_id)->end_seq_num != 0)){
+					_pk_mgr_ptr->send_capacity_to_pk(_pk_mgr_ptr->_sock);
+					_pk_mgr_ptr->peer_join_send = 1;
+				}
+				//////////////////////////////////////////////////////////////////////////////////
+			}
+			else{
+				printf("start_delay error\n");
+			}
+		}
+	//////////////////////////////////////////////////////////////////////////////////
 	} 
 
 	if(chunk_ptr)

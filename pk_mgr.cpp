@@ -76,6 +76,269 @@ pk_mgr::~pk_mgr()
 	
 }
 
+//////////////////////////////////////////////////////////////////////////////////measure start delay
+void pk_mgr::source_delay_init(unsigned long init_ssid){
+	_log_ptr -> getTickTime(&((delay_table+init_ssid)->client_start_time));
+	(delay_table+init_ssid)->source_delay_init = 1;
+}
+
+void pk_mgr::delay_table_init()
+{
+	delay_table = (struct source_delay *)malloc(sizeof(struct source_delay) * sub_stream_num );
+	memset( delay_table , 0x00 ,sizeof(struct source_delay) * sub_stream_num ); 
+
+	for(int i=0;i<sub_stream_num;i++){
+		(delay_table+i)->start_delay_struct.init_flag = 0;
+		(delay_table+i)->start_delay_struct.sub_stream_id = i;
+		(delay_table+i)->start_delay_struct.start_delay = -1;
+		(delay_table+i)->start_delay_struct.end_clock;
+		(delay_table+i)->start_delay_struct.start_clock;
+		(delay_table+i)->client_start_time;
+		(delay_table+i)->source_delay_time = -1;
+		(delay_table+i)->start_seq_num = 0;
+		(delay_table+i)->source_delay_init = 0;
+		(delay_table+i)->start_seq_abs_time = 0;
+		(delay_table+i)->end_seq_num = 0;
+		(delay_table+i)->end_seq_abs_time = 0;
+	}
+	printf("%d %d %d\n",(delay_table+2)->start_seq_num,sizeof(struct source_delay),sub_stream_num);
+	printf("====================================================================\n");
+}
+
+void pk_mgr::send_start_delay_measure_token(int sock,unsigned long sub_id){
+	map<unsigned long, int>::iterator pid_fd_iter;
+	map<int, queue<struct chunk_t *> *>::iterator fd_queue_iter;
+	queue<struct chunk_t *> *queue_out_ctrl_ptr = NULL;
+
+	struct start_delay_measure_send *chunk_delay_ptr = NULL;
+	map<int , unsigned long>::iterator temp_map_fd_pid_iter;
+	
+	
+	chunk_delay_ptr = (struct start_delay_measure_send *)new unsigned char[sizeof(struct start_delay_measure_send)];
+	
+	memset(chunk_delay_ptr, 0x0, sizeof(struct start_delay_measure_send));
+	
+	chunk_delay_ptr->header.cmd = CHNK_CMD_PEER_START_DELAY;
+	chunk_delay_ptr->header.rsv_1 = REQUEST;
+	chunk_delay_ptr->header.length = sizeof(struct start_delay_measure_send) - sizeof(struct chunk_header_t);
+	chunk_delay_ptr->ssid = sub_id;
+
+	temp_map_fd_pid_iter = _peer_ptr->map_fd_pid.find(sock);
+	if(temp_map_fd_pid_iter == _peer_ptr->map_fd_pid.end()){
+		printf("can not find fd error send_start_delay_measure_token\n");
+		//exit(1);
+		chunk_delay_ptr->pid = -5;
+
+		printf("starting send start delay token to pk ...\n");
+		int send_byte = 0;
+		int expect_len = chunk_delay_ptr->header.length + sizeof(struct chunk_header_t);
+		char send_buf[sizeof(struct start_delay_measure_send)];
+		_net_ptr->set_blocking(sock);	// set to blocking
+
+		memset(send_buf, 0x0, sizeof(struct start_delay_measure_send));
+		memcpy(send_buf, chunk_delay_ptr, expect_len);
+	
+		send_byte = _net_ptr->send(sock, send_buf, expect_len, 0);
+		if( send_byte <= 0 ) {
+			data_close(sock, "send pkt error");
+			_log_ptr->exit(0, "send pkt error");
+		} else {
+			if(chunk_delay_ptr)
+				delete chunk_delay_ptr;
+			_net_ptr->set_nonblocking(sock);	// set to non-blocking
+		}
+		_log_ptr -> getTickTime(&((delay_table+sub_id)->start_delay_struct.start_clock));
+	}
+	else{
+		fd_queue_iter = _peer_ptr->map_fd_out_ctrl.find(sock);
+		if(fd_queue_iter == _peer_ptr->map_fd_out_ctrl.end()){
+			printf("can not find out ctrl queue error send_start_delay_measure_token\n");
+			exit(1);
+		}
+
+		chunk_delay_ptr->pid = temp_map_fd_pid_iter->second;
+
+		queue_out_ctrl_ptr = fd_queue_iter->second;
+		queue_out_ctrl_ptr->push((struct chunk_t *)chunk_delay_ptr);
+
+		_log_ptr -> getTickTime(&((delay_table+sub_id)->start_delay_struct.start_clock));
+
+		if(queue_out_ctrl_ptr->size() != 0 ) {
+			_net_ptr->epoll_control(fd_queue_iter->first, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
+		} 
+	}
+	printf("send_start_delay_measure_token end\n");
+}
+
+
+void pk_mgr::send_back_start_delay_measure_token(int sock,long long peer_start_delay,unsigned long sub_id){
+	map<unsigned long, int>::iterator pid_fd_iter;
+	map<int, queue<struct chunk_t *> *>::iterator fd_queue_iter;
+	queue<struct chunk_t *> *queue_out_ctrl_ptr = NULL;
+
+	struct start_delay_measure_receive *chunk_delay_ptr = NULL;
+	map<int , unsigned long>::iterator temp_map_fd_pid_iter;
+	
+	chunk_delay_ptr = (struct start_delay_measure_receive *)new unsigned char[sizeof(struct start_delay_measure_receive)];
+	
+	memset(chunk_delay_ptr, 0x0, sizeof(struct start_delay_measure_receive));
+	
+	chunk_delay_ptr->header.cmd = CHNK_CMD_PEER_START_DELAY;
+	chunk_delay_ptr->header.rsv_1 = REPLY;
+	chunk_delay_ptr->header.length = sizeof(struct start_delay_measure_receive) - sizeof(struct chunk_header_t);
+	chunk_delay_ptr->ssid = sub_id;
+	chunk_delay_ptr->source_delay_recev = peer_start_delay;
+
+	temp_map_fd_pid_iter = _peer_ptr->map_fd_pid.find(sock);
+	if(temp_map_fd_pid_iter == _peer_ptr->map_fd_pid.end()){
+		printf("can not find fd error send_back_start_delay_measure_token\n");
+		exit(1);
+	}
+	else{
+		fd_queue_iter = _peer_ptr->map_fd_out_ctrl.find(sock);
+		if(fd_queue_iter == _peer_ptr->map_fd_out_ctrl.end()){
+			printf("can not find out ctrl queue error send_back_start_delay_measure_token\n");
+			exit(1);
+		}
+
+
+		chunk_delay_ptr->pid = temp_map_fd_pid_iter->second;
+		queue_out_ctrl_ptr = fd_queue_iter->second;
+		queue_out_ctrl_ptr->push((struct chunk_t *)chunk_delay_ptr);
+
+
+		if(queue_out_ctrl_ptr->size() != 0 ) {
+			_net_ptr->epoll_control(fd_queue_iter->first, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
+		} 
+	}
+}
+//////////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////////////////////////send capacity
+	/*
+	unsigned int rescue_num;
+	int rescue_condition;
+	unsigned int source_delay;
+	char NAT_status;
+	char content_integrity;
+	*/
+void pk_mgr::send_capacity_init(){
+	peer_start_delay_count = 0;
+	peer_join_send = 0;
+}
+
+void pk_mgr::send_capacity_to_pk(int sock){
+	/*map<unsigned long, int>::iterator pid_fd_iter;
+	map<int, queue<struct chunk_t *> *>::iterator fd_queue_iter;
+	queue<struct chunk_t *> *queue_out_ctrl_ptr = NULL;*/
+	map<int , unsigned long>::iterator temp_map_fd_pid_iter;
+	struct rescue_peer_capacity_measurement *chunk_capacity_ptr = NULL;
+	//struct chunk_t * chunk_ptr = NULL;
+	int msg_size,send_size;
+	
+	msg_size = sizeof(struct rescue_peer_capacity_measurement) + sizeof(long long *)*sub_stream_num;
+	send_size = msg_size - sizeof(long long *)*sub_stream_num + sizeof(long long)*sub_stream_num; 
+
+	chunk_capacity_ptr = (struct rescue_peer_capacity_measurement *)new unsigned char[msg_size];
+	//chunk_ptr = (struct chunk_t *) new unsigned char[send_size];
+
+	memset(chunk_capacity_ptr, 0x0, msg_size);
+	//memset(chunk_ptr, 0x0, send_size);
+	
+	chunk_capacity_ptr->header.cmd = CHNK_CMD_PEER_RESCUE_CAPACITY;
+	chunk_capacity_ptr->header.rsv_1 = REPLY;
+	chunk_capacity_ptr->header.length = send_size - sizeof(struct chunk_header_t);
+	chunk_capacity_ptr->content_integrity = 1;
+	chunk_capacity_ptr->NAT_status = 1;
+	//chunk_capacity_ptr->rescue_condition = 0;
+	chunk_capacity_ptr->rescue_num = 0;
+	for(int i=0;i<sub_stream_num;i++){
+		if((delay_table+i)->start_delay_struct.init_flag == 0){
+			printf("send capacity error start delay have to init\n");
+			exit(1);
+		}
+		else{
+			LARGE_INTEGER client_end_clock;
+			_log_ptr -> getTickTime(&client_end_clock);
+			(delay_table+i)->source_delay_time = _log_ptr ->diffTime_ms((delay_table+i)->client_start_time,client_end_clock);
+			if((delay_table+i)->end_seq_num == 0){
+				printf("start delay end seq error in send_capacity_to_pk\n");
+				exit(1);
+			}
+			else if(((delay_table+i)->end_seq_num)< ((delay_table+i)->start_seq_num)){
+				printf("start delay end seq < start seq error in send_capacity_to_pk\n");
+				exit(1);
+			}
+			else if(((delay_table+i)->end_seq_num) == ((delay_table+i)->start_seq_num)){
+				printf("start delay end seq == start seq warning in send_capacity_to_pk\n");
+				printf("abs start seq : %d\n",(delay_table+i)->start_seq_num);
+			}
+			else{
+				unsigned int temp;
+				long long diff_temp;
+				temp = (delay_table+i)->end_seq_abs_time - (delay_table+i)->start_seq_abs_time;
+				diff_temp = (delay_table+i)->source_delay_time - (long long)temp;
+				//printf("source_delay_time : %ld",(delay_table+i)->source_delay_time);
+				//printf(" time : %d\n",temp);
+				printf("abs start seq : %d time : %d\n",(delay_table+i)->start_seq_num,(delay_table+i)->start_seq_abs_time);
+				printf("abs end seq : %d time : %d\n",(delay_table+i)->end_seq_num,(delay_table+i)->end_seq_abs_time);
+				printf("differ : %d\n",diff_temp);
+				if(diff_temp < 0){
+					printf("diff error in send_capacity_to_pk\n");
+					printf("differ : %d\n",diff_temp);
+					(delay_table+i)->source_delay_time = 0;
+					//exit(1);
+				}
+				else{
+					(delay_table+i)->source_delay_time = diff_temp;
+				}
+			}
+			(delay_table+i)->source_delay_time = (delay_table+i)->source_delay_time + (delay_table+i)->start_delay_struct.start_delay;
+			chunk_capacity_ptr->source_delay_measur[i] = new (long long);
+			memset(chunk_capacity_ptr->source_delay_measur[i], 0x0 , sizeof(long long));
+			memcpy(chunk_capacity_ptr->source_delay_measur[i],&((delay_table+i)->source_delay_time),sizeof(long long));
+			printf("start delay : %ld ",(delay_table+i)->start_delay_struct.start_delay);
+			printf(" source delay : %ld\n",*(chunk_capacity_ptr->source_delay_measur[i]));
+		}
+	}
+
+	//memcpy(chunk_ptr,chunk_capacity_ptr,send_size);
+
+	/*if(chunk_capacity_ptr)
+		delete chunk_capacity_ptr;*/
+
+	int send_byte = 0;
+	int expect_len = chunk_capacity_ptr->header.length + sizeof(struct chunk_header_t);
+	char *send_buf;
+	int capacity_chunk_offset = expect_len - sizeof(long long)*sub_stream_num;
+	_net_ptr->set_blocking(sock);	// set to blocking
+
+	send_buf = (char *)new char[send_size];
+	memset(send_buf, 0x0, send_size);
+	memcpy(send_buf, chunk_capacity_ptr, capacity_chunk_offset);
+	for(int i=0;i<sub_stream_num;i++){
+		memcpy((send_buf+capacity_chunk_offset),chunk_capacity_ptr->source_delay_measur[i],sizeof(long long));
+		capacity_chunk_offset+=sizeof(long long);
+	}
+	
+	printf("%ld\n",*((long long *)(send_buf+sizeof(chunk_header_t)+sizeof(unsigned int)+sizeof(int)+sizeof(char)+sizeof(char))));
+	printf("%d %d\n",capacity_chunk_offset,expect_len);
+
+	send_byte = _net_ptr->send(sock, send_buf, expect_len, 0);
+	if( send_byte <= 0 ) {
+		data_close(sock, "send pkt error");
+		_log_ptr->exit(0, "send pkt error");
+	} else {
+		if(send_buf)
+			delete send_buf;
+		if(chunk_capacity_ptr)
+			delete chunk_capacity_ptr;
+		_net_ptr->set_nonblocking(sock);	// set to non-blocking
+	}
+	printf("send_capacity_to_pk end\n");
+}
+//////////////////////////////////////////////////////////////////////////////////
+
 void pk_mgr::peer_mgr_set(peer_mgr *peer_mgr_ptr)
 {
 	_peer_mgr_ptr = peer_mgr_ptr;
@@ -402,7 +665,11 @@ int pk_mgr::handle_pkt_in(int sock)
 		//收到sub_stream_num後對rescue 偵測結構做初始化
 		init_rescue_detection();
 
-
+		//////////////////////////////////////////////////////////////////////////////////measure start delay
+		init_rescue_detection();
+		delay_table_init();
+		send_capacity_init();
+		//////////////////////////////////////////////////////////////////////////////////
 	//和lane 每個peer 先建立好連線 
 		if(lane_member >= 1)
 			_peer_mgr_ptr->connect_peer(level_msg_ptr, level_msg_ptr->pid);
@@ -420,6 +687,46 @@ int pk_mgr::handle_pkt_in(int sock)
 
 
 // light | pid | level   | n*struct level_info_t
+	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY) {
+	//////////////////////////////////////////////////////////////////////////////////measure start delay
+		printf("CHNK_CMD_PEER_START_DELAY pk mgr\n");
+		if(chunk_ptr->header.rsv_1 == REQUEST){
+			printf("CHNK_CMD_PEER_START_DELAY pk mgr request\n");
+			unsigned long temp_start_delay;
+			unsigned long request_sub_id;
+
+			memcpy(&request_sub_id, (char *)chunk_ptr + sizeof(struct chunk_header_t) + sizeof(unsigned long), sizeof(unsigned long));
+
+			temp_start_delay = (delay_table+request_sub_id)->start_delay_struct.start_delay;
+			send_back_start_delay_measure_token(sock, temp_start_delay, request_sub_id);
+		}
+		else{
+			printf("CHNK_CMD_PEER_START_DELAY pk mgr reply\n");
+			unsigned long request_sub_id;
+			long long parent_start_delay;
+
+			memcpy(&request_sub_id, (char *)chunk_ptr + sizeof(struct chunk_header_t) + sizeof(unsigned long), sizeof(unsigned long));
+			memcpy(&parent_start_delay, (char *)chunk_ptr + sizeof(struct chunk_header_t) + (2*sizeof(unsigned long)), sizeof(long long));
+
+			if((delay_table+request_sub_id)->start_delay_struct.init_flag == 1){
+				_log_ptr -> getTickTime(&((delay_table+request_sub_id)->start_delay_struct.end_clock));
+				(delay_table+request_sub_id)->start_delay_struct.start_delay = _log_ptr ->diffTime_ms((delay_table+request_sub_id)->start_delay_struct.start_clock,(delay_table+request_sub_id)->start_delay_struct.end_clock);
+				(delay_table+request_sub_id)->start_delay_struct.start_delay = parent_start_delay + ((delay_table+request_sub_id)->start_delay_struct.start_delay/2);
+				//(delay_table+request_sub_id)->start_delay_struct.init_flag = 1;
+				printf("start delay : %ld parent start delay : %ld\n",(delay_table+request_sub_id)->start_delay_struct.start_delay,parent_start_delay);
+				//////////////////////////////////////////////////////////////////////////////////send capacity
+				peer_start_delay_count++;
+				if((peer_start_delay_count == sub_stream_num)&&(!peer_join_send)&&((delay_table+request_sub_id)->start_seq_num != 0)&&((delay_table+request_sub_id)->end_seq_num != 0)){
+					send_capacity_to_pk(_sock);
+					peer_join_send = 1;
+				}
+				//////////////////////////////////////////////////////////////////////////////////
+			}
+			else{
+				printf("start_delay update error\n");
+			}
+		}
+	//////////////////////////////////////////////////////////////////////////////////
 	} else if (chunk_ptr->header.cmd == CHNK_CMD_RESCUE_LIST) {
 		printf("CHNK_CMD_RESCUE_LIST\n");
 
@@ -1257,7 +1564,23 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 /////////////////////////////////////////////測試版新功能///////////////////////////////////////////////////////////////////////
 ///*
+	//////////////////////////////////////////////////////////////////////////////////measure start delay
+	unsigned long temp_sub_id = (chunk_ptr ->header.sequence_number) % sub_stream_num;
+	//printf("%d %d\n",(delay_table+temp_sub_id)->start_delay_struct.init_flag,temp_sub_id);
+	if(!((delay_table+temp_sub_id)->start_delay_struct.init_flag)){
+		printf("start measure start delay\n");
+		send_start_delay_measure_token(sockfd, temp_sub_id);
+		(delay_table+temp_sub_id)->start_seq_num = chunk_ptr ->header.sequence_number;
+		(delay_table+temp_sub_id)->start_seq_abs_time = chunk_ptr->header.timestamp;
+		(delay_table+temp_sub_id)->start_delay_struct.init_flag = 1;
+		source_delay_init(temp_sub_id);
+	}
+	//////////////////////////////////////////////////////////////////////////////////send capacity
+	(delay_table+temp_sub_id)->end_seq_num = chunk_ptr ->header.sequence_number;
+	(delay_table+temp_sub_id)->end_seq_abs_time = chunk_ptr ->header.timestamp;
+	//////////////////////////////////////////////////////////////////////////////////
 	
+	//////////////////////////////////////////////////////////////////////////////////
 //send down stream(UPLOAD) to other peer if SSID match and in map_pid_rescue_peer_info
 	for(pid_peer_info_iter = map_pid_rescue_peer_info.begin();pid_peer_info_iter !=map_pid_rescue_peer_info.end();pid_peer_info_iter++){
 		
