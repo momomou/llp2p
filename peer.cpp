@@ -727,15 +727,16 @@ void peer::handle_job_timer()
 
 //全部裡面最完整的close
 ////注意!!!!!!!!map_in_pid_fd 必須由關閉者自行判斷清除(pid -> fd 是一對多 所以可能會刪到其他的table)
+//這邊的iter 都不參考class 的iter(因位會開thread 來close socket 會搶iter 使用)
 void peer::data_close(int cfd, const char *reason ,int type) 
 {
 	unsigned long pid = -1;
-//	list<int>::iterator fd_iter;
-//	map<int, queue<struct chunk_t *> *>::iterator map_fd_queue_iter;
-//	map<int , unsigned long>::iterator map_fd_pid_iter;
-//	map<unsigned long, int>::iterator map_pid_fd_iter;
-//	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
-//	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
+	list<int>::iterator fd_iter;
+	map<int, queue<struct chunk_t *> *>::iterator map_fd_queue_iter;
+	map<int , unsigned long>::iterator map_fd_pid_iter;
+	map<unsigned long, int>::iterator map_pid_fd_iter;
+	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
+	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 
 //	struct peer_info_t *peerInfoPtr = NULL;
 //	struct peer_connect_down_t *peerDownInfoPtr = NULL;
@@ -750,7 +751,7 @@ void peer::data_close(int cfd, const char *reason ,int type)
 
 	_log_ptr->write_log_format("s => s (s)\n", (char*)__PRETTY_FUNCTION__, "pk", reason);
 	cout << "pk Client " << cfd << " exit by " << reason << ".." << endl;
-	_net_ptr->epoll_control(cfd, EPOLL_CTL_DEL, 0);
+//	_net_ptr->epoll_control(cfd, EPOLL_CTL_DEL, 0);
 	_net_ptr->close(cfd);
 	
 	for(fd_iter = fd_list_ptr->begin(); fd_iter != fd_list_ptr->end(); fd_iter++) {

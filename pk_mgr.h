@@ -22,7 +22,7 @@ class pk_mgr:public basic_class {
 
 public:
 
-	static void __cdecl threadTimeout( void *);
+
 	list<int> *fd_list_ptr;
 //	list<struct level_info_t *> rescue_list ;
 	list<int> outside_rescue_list;
@@ -106,14 +106,16 @@ public:
 	void clear_map_pid_peer_info();
 	void clear_map_pid_peerDown_info();
 	void clear_map_pid_rescue_peer_info();
-///new rescue function
 
+///new rescue function
 	void rescue_detecion(struct chunk_t *chunk_ptr);
 	void init_rescue_detection();
 	void measure();
 	void send_rescueManifestToPK(unsigned long manifestValue);
 	unsigned long manifestFactory(unsigned long manifestValue,unsigned int ssNumber);
-
+	void threadTimeout();
+	static void launchThread(void * arg);
+	unsigned int pk_mgr::rescueNumAccumulate();
 
 
 	void peer_set(peer *peer_ptr);

@@ -1507,7 +1507,7 @@ void pk_mgr::init_rescue_detection()
 	memset( statsArryCount_ptr , 0x00 ,sizeof(int) * (sub_stream_num+1)  ); 
 
 //	_beginthread(threadTimeout(), 0,NULL );
-	_beginthread(threadTimeout, 0,NULL );
+	_beginthread(launchThread, 0,this );
 
 
 }
@@ -1799,6 +1799,8 @@ void pk_mgr::send_rescueManifestToPK(unsigned long manifestValue)
 	_net_ptr ->send(_sock , (char*)chunk_rescueManifestPtr ,sizeof(struct rescue_pkt_from_server),0) ;
 
 	_net_ptr->set_nonblocking(_sock);
+
+	delete chunk_rescueManifestPtr;
 	
 	return ;
 	 
@@ -1877,10 +1879,10 @@ unsigned long pk_mgr::manifestFactory(unsigned long manifestValue,unsigned int s
 
 //close socket and sent rescue to pk
 
- void pk_mgr::threadTimeout( void *)
+ void pk_mgr::threadTimeout()
 {
 
-
+	printf("thread start \n");
 	int sock=-1;
 	struct peer_connect_down_t *parentPeerPtr=NULL;
 	unsigned long parentPid=0;
@@ -1890,11 +1892,11 @@ unsigned long pk_mgr::manifestFactory(unsigned long manifestValue,unsigned int s
 
 	while(1){
 
-/*
+
 		for(pid_peerDown_info_iter =map_pid_peerDown_info.begin(); pid_peerDown_info_iter!= map_pid_peerDown_info.end() ;pid_peerDown_info_iter++)	{
 
-			parentPid = parentPeerPtr ->peerInfo.pid;			//get parent pid
 			parentPeerPtr = pid_peerDown_info_iter ->second;	//get parent peer info 
+			parentPid = parentPeerPtr ->peerInfo.pid;			//get parent pid
 
 			map_pid_fd_iter = _peer_ptr ->map_in_pid_fd.find(parentPid);
 			if(map_pid_fd_iter!= _peer_ptr ->map_in_pid_fd.end())
@@ -1903,9 +1905,11 @@ unsigned long pk_mgr::manifestFactory(unsigned long manifestValue,unsigned int s
 
 			if(parentPeerPtr ->timeOutLastSeq == parentPeerPtr->timeOutNewSeq && parentPeerPtr->peerInfo.manifest!=0){
 	
-				printf("Pid =%d Time out\n",parentPeerPtr ->peerInfo.pid);
+				printf("Pid =%d Time out\n",parentPid);
 				send_rescueManifestToPK (parentPeerPtr->peerInfo.manifest);
 				_peer_ptr ->data_close(sock ,"time out data_close ",CLOSE_PARENT);
+				pid_peerDown_info_iter =map_pid_peerDown_info.begin();
+
 			}else{
 
 
@@ -1914,7 +1918,7 @@ unsigned long pk_mgr::manifestFactory(unsigned long manifestValue,unsigned int s
 			}
 
 		}
-*/
+
 //		printf("hello thread\n");
 		Sleep(3000);	
 
@@ -1925,3 +1929,35 @@ unsigned long pk_mgr::manifestFactory(unsigned long manifestValue,unsigned int s
 }
 
 
+  void pk_mgr::launchThread(void * arg){
+ 
+	pk_mgr * pk_mgr_ptr = NULL ;
+
+	pk_mgr_ptr = static_cast<pk_mgr *>(arg);
+	pk_mgr_ptr ->threadTimeout();
+	
+	printf("not go to here\n");
+ }
+
+
+  unsigned int pk_mgr::rescueNumAccumulate(){
+  
+  	map<unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
+	unsigned long tempManifest=0;
+	unsigned int totalRescueNum =0;
+
+	for(map_pid_rescue_peer_info_iter = map_pid_rescue_peer_info.begin();map_pid_rescue_peer_info_iter!=map_pid_rescue_peer_info.end();map_pid_rescue_peer_info_iter++){
+	
+		tempManifest = map_pid_rescue_peer_info_iter ->second ->manifest;
+		for(int i=0 ; i<sub_stream_num ; i++){
+			if( (1 << i) &  tempManifest )
+				totalRescueNum++;
+		}
+
+	
+	}
+
+	printf("totalRescueNum = %d \n",totalRescueNum);
+	return totalRescueNum ;
+  
+  }
