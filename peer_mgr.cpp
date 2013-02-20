@@ -284,6 +284,8 @@ int peer_mgr::handle_pkt_in(int sock)
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_CON) {
 		cout << "CHNK_CMD_PEER_CON" << endl;
 		peer_ptr->handle_connect(new_fd, chunk_ptr,_cin);
+
+
 	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY) {
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
 		printf("!!!!!!!!!!!!!!!!!CHNK_CMD_PEER_START_DELAY peer mgr\n");
@@ -550,7 +552,7 @@ void peer_mgr::add_downstream(unsigned long pid, struct chunk_t *chunk_ptr)
 {
 	map<unsigned long, int>::iterator pid_fd_iter;
 	map<int, queue<struct chunk_t *> *>::iterator fd_queue_iter;
-	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
+	multimap<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 	queue<struct chunk_t *> *queue_out_data_ptr = NULL;
 	struct peer_info_t *downstream_peer = NULL;
 	unsigned long ss_id;
@@ -840,7 +842,7 @@ void peer_mgr::set_up_public_ip(struct chunk_level_msg_t *level_msg_ptr)
 }
 
 //用來測試peer間的delay
-void peer_mgr::send_test_delay(int sock)
+void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 {
 	int send_byte = 0;
 	char html_buf[8192];
@@ -859,6 +861,8 @@ void peer_mgr::send_test_delay(int sock)
 	chunk_delay_ptr->header.length = (8192 -sizeof(chunk_delay_test_t)) ;	//pkt_buf paylod length
 	chunk_delay_ptr->header.rsv_1 = REQUEST ;
 	chunk_delay_ptr->header.timestamp = _log_ptr->gettimeofday_ms(&detail_time);
+	//in this test, sequence_number is empty so use sent manifest
+	chunk_delay_ptr->header.sequence_number = (unsigned long)manifest;  
 //	chunk_delay_ptr->header.pid = _peer_mgr_ptr ->self_pid;
 	
 
@@ -881,23 +885,24 @@ void peer_mgr::send_test_delay(int sock)
 
 
 //select_peer test delay
-void peer_mgr::handle_test_delay()
+void peer_mgr::handle_test_delay(unsigned long manifest)
 {
-	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
+	multimap <unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 	map<unsigned long, int> ::iterator map_pid_fd_iter;
 	int sock;
 	int pid;
 
 	for(pid_peer_info_iter = (_pk_mgr_ptr ->map_pid_peer_info).begin(); pid_peer_info_iter != (_pk_mgr_ptr ->map_pid_peer_info).end(); pid_peer_info_iter++) {
 
-		pid = (pid_peer_info_iter ->first) ;
+		if(pid_peer_info_iter ->second->manifest == manifest){
+			pid = (pid_peer_info_iter ->first) ;
 
-		map_pid_fd_iter = peer_ptr ->map_in_pid_fd.find(pid);
+			map_pid_fd_iter = peer_ptr ->map_in_pid_fd.find(pid);
+			if(map_pid_fd_iter != peer_ptr ->map_in_pid_fd.end() ){
+				sock =peer_ptr ->map_in_pid_fd [pid] ;
 
-		if(map_pid_fd_iter != peer_ptr ->map_in_pid_fd.end() ){
-		sock =peer_ptr ->map_in_pid_fd [pid] ;
-
-		send_test_delay (sock);
+				send_test_delay (sock,manifest);
+			}
 		}
 
 	}

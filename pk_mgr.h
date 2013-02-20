@@ -32,7 +32,7 @@ public:
 
 //	map<unsigned long, unsigned long> map_pid_manifest;
 
-	map<unsigned long, struct peer_info_t *> map_pid_peer_info; 	// <pid, struct peer_info_t *>
+	multimap <unsigned long, struct peer_info_t *> map_pid_peer_info; 	// <pid, struct peer_info_t *>
 	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		// <pid, struct peer_info_t *>
 	map<unsigned long, struct peer_connect_down_t *> map_pid_peerDown_info ; //// <pid, struct peer_connect_down_t *>
 
@@ -116,9 +116,7 @@ public:
 	void data_close(int cfd, const char *reason); 
 	int get_sock(void);
 
-	void clear_map_pid_peer_info();
-	void clear_map_pid_peerDown_info();
-	void clear_map_pid_rescue_peer_info();
+
 
 ///new rescue function
 	void rescue_detecion(struct chunk_t *chunk_ptr);
@@ -129,6 +127,13 @@ public:
 	void threadTimeout();
 	static void launchThread(void * arg);
 	unsigned int pk_mgr::rescueNumAccumulate();
+
+//clear
+	void clear_map_pid_peer_info();
+	void clear_map_pid_peer_info(unsigned long manifest);
+	void clear_map_pid_peerDown_info();
+	void clear_map_pid_rescue_peer_info();
+
 
 
 	void peer_set(peer *peer_ptr);

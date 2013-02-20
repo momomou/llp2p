@@ -66,7 +66,7 @@ private:
 	map<int, queue<struct chunk_t *> *>::iterator map_fd_queue_iter;
 	map<int , unsigned long>::iterator map_fd_pid_iter;
 	map<unsigned long, int>::iterator map_pid_fd_iter;
-	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
+	multimap<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 	map<unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
 

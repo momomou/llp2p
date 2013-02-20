@@ -347,20 +347,6 @@ int peer::handle_pkt_in(int sock)
 //cmd = CHNK_CMD_ PEER_RSC
 	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_RSC) {
 //hidden at 2013/01/13
-/*
-		if(chunk_ptr->header.rsv_1 == REQUEST) {
-			memcpy(&pid, (char *)chunk_ptr + sizeof(struct chunk_t), sizeof(unsigned long));
-			memcpy(&manifest, ((char *)chunk_ptr + sizeof(struct chunk_t) + sizeof(unsigned long)), sizeof(unsigned long));
-			_pk_mgr_ptr->handle_rescue(pid, manifest);
-		} else if(chunk_ptr->header.rsv_1 == REPLY) {
-			memcpy(&reply, (char *)chunk_ptr + sizeof(struct chunk_t), sizeof(unsigned char));
-			memcpy(&manifest, ((char *)chunk_ptr + sizeof(struct chunk_t) + sizeof(unsigned char)), sizeof(unsigned long));
-			if(reply == OK) {
-//				_pk_mgr_ptr->send_rescue_to_upstream(manifest);
-			} else {
-			}
-		}
-*/
 
 
 
@@ -379,128 +365,14 @@ int peer::handle_pkt_in(int sock)
 //cmd == CHNK_CMD_PEER_LATENCY
 	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_LATENCY){
 //hidden at 2013/01/16
-/*
-        unsigned long sec, usec, peer_id;
-        unsigned long peer_num;
 
-        memcpy(&sec, (char *)chunk_ptr + sizeof(struct chunk_t), sizeof(unsigned long));
-        memcpy(&usec, (char *)chunk_ptr + sizeof(struct chunk_t) + sizeof(unsigned long), sizeof(unsigned long));
-        memcpy(&peer_num, (char *)chunk_ptr + sizeof(struct chunk_t) + 2 * sizeof(unsigned long), sizeof(unsigned long));
-        //printf("server time: %ld.%06ld\n", sec, usec);
-        for(int i = 0;i < peer_num;i ++){
-            memcpy(&peer_id, (char *)chunk_ptr + sizeof(struct chunk_t) + 3 * sizeof(unsigned long) + i * sizeof(struct peer_timestamp_info_t), sizeof(unsigned long));
-            memcpy(&sec, (char *)chunk_ptr + sizeof(struct chunk_t) + 4 * sizeof(unsigned long) + i * sizeof(struct peer_timestamp_info_t), sizeof(unsigned long));
-            memcpy(&usec, (char *)chunk_ptr + sizeof(struct chunk_t) + 5 * sizeof(unsigned long) + i * sizeof(struct peer_timestamp_info_t), sizeof(unsigned long));
-            //printf("peer %d time: %ld.%03ld\n", peer_id, sec, usec);
-        }
-
-        _pk_mgr_ptr->handle_latency(chunk_ptr, sock);
-*/
 
 
 //cmd == CHNK_CMD_RT_NLM
     } else if(chunk_ptr->header.cmd == CHNK_CMD_RT_NLM) {	//--!! 0128
 
 //hidden at 2013/01/16
-/*
 
-		map<unsigned long, int>::iterator pid_fd_iter;
-		map<int, queue<struct chunk_t *> *>::iterator fd_queue_iter;
-		queue<struct chunk_t *> *queue_out_ctrl_ptr = NULL;
-		if(chunk_ptr->header.rsv_1 ==  REQUEST) {
-			if(_pk_mgr_ptr->current_child_pid == 0) {	//reply
-				struct chunk_t *reply_msg_ptr = chunk_ptr;
-				reply_msg_ptr->header.rsv_1 = REPLY;
-				//send $(*reply_msg_ptr) to his parent
-				if (_pk_mgr_ptr->level_msg_ptr->level == 0) {
-					//to lightning
-					_net_ptr->send(_pk_mgr_ptr->get_sock(), (char *)reply_msg_ptr, sizeof(struct chunk_header_t) + chunk_ptr->header.length, 0);
-					if (chunk_ptr)
-						delete [] (unsigned char*)chunk_ptr;
-					//no check 4 success
-				} else {
-					pid_fd_iter = map_pid_fd.find(_pk_mgr_ptr->level_msg_ptr->level_info[_pk_mgr_ptr->level_msg_ptr->level-1]->pid);
-					fd_queue_iter = map_fd_out_ctrl.find(pid_fd_iter->second);
-					if (pid_fd_iter == map_pid_fd.end() || fd_queue_iter == map_fd_out_ctrl.end()) {
-						if (chunk_ptr)
-							delete [] (unsigned char*)chunk_ptr;
-						return RET_OK;
-					}
-					queue_out_ctrl_ptr = fd_queue_iter->second;
-					queue_out_ctrl_ptr->push((struct chunk_t *)reply_msg_ptr);
-					_net_ptr->epoll_control(pid_fd_iter->second, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
-				}
-			} else {	//--!! 0218
-				struct timeb tmpt;
-				ftime(&tmpt);
-				//check if sending 
-				pid_fd_iter = map_pid_fd.find(_pk_mgr_ptr->current_child_pid);
-				if (pid_fd_iter != map_pid_fd.end()) {
-					fd_queue_iter = map_fd_out_ctrl.find(pid_fd_iter->second);
-					if (fd_queue_iter != map_fd_out_ctrl.end()) {
-						//send $(*req_msg_ptr) to his child !!--!!0128
-						int chunk_size = sizeof(struct chunk_header_t) + chunk_ptr->header.length;
-						struct chunk_rt_latency_t *req_msg_ptr = (struct chunk_rt_latency_t *) new unsigned char[(chunk_size + sizeof(struct ts_block_t))];
-						struct ts_block_t *ts_ptr =(struct ts_block_t*)( (char*)req_msg_ptr + chunk_size);
-				
-						memset(ts_ptr, 0x0, sizeof(struct ts_block_t));
-						memcpy(req_msg_ptr, chunk_ptr, chunk_size);
-						//cout << "req_msg_ptr->dts_length = " << req_msg_ptr->dts_length << endl;
-						//cout << "req_msg_ptr->dts_offset = " << req_msg_ptr->dts_offset << endl;
-						req_msg_ptr->dts_offset += sizeof(struct ts_block_t);
-						ts_ptr->pid = _pk_mgr_ptr->level_msg_ptr->pid;
-						ts_ptr->time_stamp = tmpt.time * 1000ull + tmpt.millitm;
-						req_msg_ptr->header.length += sizeof(struct ts_block_t);
-						
-						queue_out_ctrl_ptr = fd_queue_iter->second;
-						queue_out_ctrl_ptr->push((struct chunk_t *)req_msg_ptr);
-						_net_ptr->epoll_control(pid_fd_iter->second, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
-					}
-				}
-				if(chunk_ptr)	//--!! 0218 
-					delete [] (unsigned char*)chunk_ptr;
-			}
-		} else {
-				struct chunk_rt_latency_t *reply_msg_ptr = (struct chunk_rt_latency_t*) chunk_ptr;
-				struct ts_block_t *ts_ptr = (struct ts_block_t*)( (char*)reply_msg_ptr->buf + reply_msg_ptr->dts_offset - sizeof(struct ts_block_t));
-				struct timeb tmpt;
-				//if() compare if pid equals
-				if (ts_ptr->pid == _pk_mgr_ptr->level_msg_ptr->pid) {
-					ftime(&tmpt);
-					ts_ptr->time_stamp = tmpt.time * 1000ull + tmpt.millitm - ts_ptr->time_stamp;
-					ts_ptr->isDST = REPLY;
-					
-					reply_msg_ptr->dts_offset = reply_msg_ptr->dts_offset - sizeof(struct ts_block_t);
-					reply_msg_ptr->dts_length = reply_msg_ptr->dts_length + sizeof(struct ts_block_t);
-
-					//transmit to his parent
-					if (_pk_mgr_ptr->level_msg_ptr->level == 0) {
-						//to lightning
-						_net_ptr->send(_pk_mgr_ptr->get_sock(), (char *)reply_msg_ptr, sizeof(struct chunk_header_t) + chunk_ptr->header.length, 0);
-						if (chunk_ptr)
-							delete [] (unsigned char*)chunk_ptr;
-						//no check 4 success
-					} else {
-						pid_fd_iter = map_pid_fd.find(_pk_mgr_ptr->level_msg_ptr->level_info[_pk_mgr_ptr->level_msg_ptr->level-1]->pid);
-						fd_queue_iter = map_fd_out_ctrl.find(pid_fd_iter->second);
-						if (pid_fd_iter == map_pid_fd.end() || fd_queue_iter == map_fd_out_ctrl.end()) {
-							if (chunk_ptr)
-								delete [] (unsigned char*)chunk_ptr;
-							return RET_OK;
-						}
-						queue_out_ctrl_ptr = fd_queue_iter->second;
-						queue_out_ctrl_ptr->push((struct chunk_t *)reply_msg_ptr);
-						_net_ptr->epoll_control(pid_fd_iter->second, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
-					}
-				} else {
-					cout << "should be the same, what's going on?" << endl;
-				}
-		}
-	    unsigned long tmp =  interval_time.time * 1000ull + interval_time.millitm;
-	    ftime(&interval_time);
-	    tmp = interval_time.time * 1000ull + interval_time.millitm - tmp;
-	    cout<<"interval delay = "<<tmp<<endl;
-*/
 
 //	just send return
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_TEST_DELAY ){
@@ -517,34 +389,63 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 		}else if(chunk_ptr->header.rsv_1 ==REPLY){
 
 			printf("CHNK_CMD_PEER_TEST_DELAY  REPLY\n");
+
+			unsigned long replyManifest =chunk_ptr->header.sequence_number;
 			//第一個回覆的peer 放入peer_connect_down_t加入測量 並關閉其他連線和清除所有相關table
 			if(first_reply_peer){
+
 				map_fd_pid_iter = map_fd_pid.find(sock);
 				if(map_fd_pid_iter != map_fd_pid.end()){
 					firstReplyPid = map_fd_pid_iter ->second;
-					printf("first_reply_peer=%d \n",firstReplyPid);
+
+					//在這裡面sequence_number 裡面塞的是manifest
+					printf("first_reply_peer=%d  manifest =%d \n",firstReplyPid,replyManifest);
+
 					pid_peer_info_iter = _pk_mgr_ptr ->map_pid_peer_info.find(firstReplyPid);
 					if(pid_peer_info_iter != _pk_mgr_ptr ->map_pid_peer_info.end()){
+
+						for(int i=0 ; i<_pk_mgr_ptr ->map_pid_peer_info.count(firstReplyPid);i++){
 						peerInfoPtr = pid_peer_info_iter->second;
-						_pk_mgr_ptr ->map_pid_peer_info.erase(pid_peer_info_iter);
-						peerDownInfoPtr = new struct peer_connect_down_t ;
-						memset(peerDownInfoPtr , 0x0,sizeof( struct peer_connect_down_t));
-						memcpy(peerDownInfoPtr ,peerInfoPtr,sizeof(struct peer_info_t));
-						delete peerInfoPtr;
-						_pk_mgr_ptr ->map_pid_peerDown_info[firstReplyPid] =peerDownInfoPtr ;
-						//如果是第一個parent,則跟他要全部的串流 (其中pk為第一個)
+						if (pid_peer_info_iter->second->manifest == replyManifest){
+							_pk_mgr_ptr ->map_pid_peer_info.erase(pid_peer_info_iter);
 
-							_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
+							pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(firstReplyPid);
+							if(pid_peerDown_info_iter == _pk_mgr_ptr ->map_pid_peerDown_info.end()){
+
+								peerDownInfoPtr = new struct peer_connect_down_t ;
+								memset(peerDownInfoPtr , 0x0,sizeof( struct peer_connect_down_t));
+								memcpy(peerDownInfoPtr ,peerInfoPtr,sizeof(struct peer_info_t));
+								delete peerInfoPtr;
+								_pk_mgr_ptr ->map_pid_peerDown_info[firstReplyPid] =peerDownInfoPtr ;
+							}else{
+								pid_peerDown_info_iter ->second->peerInfo.manifest |= replyManifest;
+							
+							}
+
+						}
+						pid_peer_info_iter++;
+						}
 
 
+
+						_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
 
 
 						for(pid_peer_info_iter =_pk_mgr_ptr ->map_pid_peer_info.begin();pid_peer_info_iter!= _pk_mgr_ptr ->map_pid_peer_info.end();pid_peer_info_iter++){
-							if(pid_peer_info_iter ->first == _peer_mgr_ptr ->self_pid)
+							peerInfoPtr = pid_peer_info_iter->second;
+
+							if (peerInfoPtr->manifest == replyManifest){
+							//若是自己或是先前已經建立過連線的parent 則不close (會關到正常連線)
+							if(pid_peer_info_iter ->first == _peer_mgr_ptr ->self_pid){
 								continue;
-							data_close(map_in_pid_fd[pid_peer_info_iter ->first ],"close by firstReplyPid",CLOSE_PARENT);
+							}else if(_pk_mgr_ptr ->map_pid_peerDown_info.find(pid_peer_info_iter ->first) != _pk_mgr_ptr ->map_pid_peerDown_info.end()){
+								continue;
+							}
+
+							data_close(map_in_pid_fd[peerInfoPtr->pid ],"close by firstReplyPid",CLOSE_PARENT);
+							}
+							_pk_mgr_ptr ->clear_map_pid_peer_info(replyManifest);
 						}
-						_pk_mgr_ptr ->clear_map_pid_peer_info();
 					}
 				}
 
@@ -687,6 +588,7 @@ void peer::handle_job_timer()
 //全部裡面最完整的close
 ////注意!!!!!!!!map_in_pid_fd 必須由關閉者自行判斷清除(pid -> fd 是一對多 所以可能會刪到其他的table)
 //這邊的iter 都不參考class 的iter(因位會開thread 來close socket 會搶iter 使用)
+////暫時不close  pid_peer_info 須自行清理
 void peer::data_close(int cfd, const char *reason ,int type) 
 {
 	unsigned long pid = -1;
@@ -694,7 +596,7 @@ void peer::data_close(int cfd, const char *reason ,int type)
 	map<int, queue<struct chunk_t *> *>::iterator map_fd_queue_iter;
 	map<int , unsigned long>::iterator map_fd_pid_iter;
 	map<unsigned long, int>::iterator map_pid_fd_iter;
-	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
+//	multimap <unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 
 //	struct peer_info_t *peerInfoPtr = NULL;
@@ -761,11 +663,11 @@ void peer::data_close(int cfd, const char *reason ,int type)
 			map_out_pid_fd.erase(map_pid_fd_iter);
 
 
-		pid_peer_info_iter =_pk_mgr_ptr ->map_pid_rescue_peer_info.find(pid);
-		if( pid_peer_info_iter != _pk_mgr_ptr ->map_pid_rescue_peer_info.end() ){
-			peerInfoPtr = pid_peer_info_iter ->second ;
+		map_pid_rescue_peer_info_iter =_pk_mgr_ptr ->map_pid_rescue_peer_info.find(pid);
+		if( map_pid_rescue_peer_info_iter != _pk_mgr_ptr ->map_pid_rescue_peer_info.end() ){
+			peerInfoPtr = map_pid_rescue_peer_info_iter ->second ;
 			delete peerInfoPtr;
-			_pk_mgr_ptr ->map_pid_rescue_peer_info.erase(pid_peer_info_iter);
+			_pk_mgr_ptr ->map_pid_rescue_peer_info.erase(map_pid_rescue_peer_info_iter);
 
 		}
 	
@@ -780,11 +682,11 @@ void peer::data_close(int cfd, const char *reason ,int type)
 
 		}
 
-		pid_peer_info_iter =_pk_mgr_ptr ->map_pid_rescue_peer_info.find(pid);
-		if( pid_peer_info_iter != _pk_mgr_ptr ->map_pid_rescue_peer_info.end() ){
-			peerInfoPtr = pid_peer_info_iter ->second ;
+		map_pid_rescue_peer_info_iter =_pk_mgr_ptr ->map_pid_rescue_peer_info.find(pid);
+		if( map_pid_rescue_peer_info_iter != _pk_mgr_ptr ->map_pid_rescue_peer_info.end() ){
+			peerInfoPtr = map_pid_rescue_peer_info_iter ->second ;
 			delete peerInfoPtr;
-			_pk_mgr_ptr ->map_pid_rescue_peer_info.erase(pid_peer_info_iter);
+			_pk_mgr_ptr ->map_pid_rescue_peer_info.erase(map_pid_rescue_peer_info_iter);
 
 		}
 
@@ -798,7 +700,8 @@ void peer::data_close(int cfd, const char *reason ,int type)
 
 	}
 
-
+//暫時不close  pid_peer_info_iter 
+/*
 	pid_peer_info_iter = _pk_mgr_ptr ->map_pid_peer_info.find(pid);
 	if(pid_peer_info_iter != _pk_mgr_ptr ->map_pid_peer_info.end()) {
 		peerInfoPtr = pid_peer_info_iter ->second ;
@@ -806,114 +709,19 @@ void peer::data_close(int cfd, const char *reason ,int type)
 		_pk_mgr_ptr ->map_pid_peer_info.erase(pid_peer_info_iter);
 
 	}
-
+*/
 
 
 
 
 
 ///2013/01/27 關閉所有rescue_pid_list
-/*
-	for(rescue_pid_iter = _peer_mgr_ptr->rescue_pid_list.begin(); rescue_pid_iter != _peer_mgr_ptr->rescue_pid_list.end(); rescue_pid_iter++) {
-		if(*rescue_pid_iter == pid) {
-			_peer_mgr_ptr->rescue_pid_list.erase(rescue_pid_iter);
-			cout << "rescue_pid_list_size = " << _peer_mgr_ptr->rescue_pid_list.size() << endl;
-			DBG_PRINTF("here\n");
-			break;
-		}
-	}
-*/
+
 
 //2013/01/27 關閉所有map_rescue_fd_count
-/*
-	map_rescue_fd_count_iter = _peer_mgr_ptr->map_rescue_fd_count.find(cfd);
 
-	if(map_rescue_fd_count_iter != _peer_mgr_ptr->map_rescue_fd_count.end()) {
-
-		if(_peer_mgr_ptr->map_rescue_fd_count.size() == 1) {
-
-			_peer_mgr_ptr->map_rescue_fd_count.erase(map_rescue_fd_count_iter);
-//			_pk_mgr_ptr->send_rescue_to_upstream(manifest);
-		} else if(_peer_mgr_ptr->map_rescue_fd_count.size() == 2) {
-
-			for(map_rescue_fd_count_iter2 = _peer_mgr_ptr->map_rescue_fd_count.begin(); map_rescue_fd_count_iter2 != _peer_mgr_ptr->map_rescue_fd_count.end(); map_rescue_fd_count_iter2++) {
-				if(map_rescue_fd_count_iter2->first != cfd) {
-					sockfd = map_rescue_fd_count_iter2->first;
-					_peer_mgr_ptr->map_rescue_fd_count[sockfd] = WIN_COUNTER;
-
-				} else {
-					map_rescue_fd_count_iter = map_rescue_fd_count_iter2;
-				}
-			}
-			_peer_mgr_ptr->map_rescue_fd_count.erase(map_rescue_fd_count_iter);
-			cout << "map_rescue_fd_count_size = " << _peer_mgr_ptr->map_rescue_fd_count.size() << endl;
-
-		} else {
-
-			_peer_mgr_ptr->map_rescue_fd_count.erase(map_rescue_fd_count_iter);
-		}
-	} else {
-
-	}
-*/
 	
 //2013/01/27 關閉所有_map_fd_downstream
-/*
-	map_fd_queue_iter = _peer_mgr_ptr->_map_fd_downstream.find(cfd);
-
-	if(map_fd_queue_iter != _peer_mgr_ptr->_map_fd_downstream.end()) {
-
-		_peer_mgr_ptr->_map_fd_downstream.erase(map_fd_queue_iter);
-	}
-
-*/
-
-/*
-	map_fd_pid_iter = _peer_mgr_ptr->map_fd_pid.find(cfd);
-
-		
 
 
-	if(map_fd_pid_iter != _peer_mgr_ptr->map_fd_pid.end()) {
-		DBG_PRINTF("here\n");
-		//if(map_fd_queue_iter == _peer_mgr_ptr->_map_fd_downstream.end()) {
-			//_pk_mgr_ptr->send_rescue_to_upstream(manifest);
-		//} else {
-			_peer_mgr_ptr->map_fd_pid.erase(map_fd_pid_iter);
-		//}
-	}
-*/
-	
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
