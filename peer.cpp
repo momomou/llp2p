@@ -402,29 +402,37 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 					printf("first_reply_peer=%d  manifest =%d \n",firstReplyPid,replyManifest);
 
 					pid_peer_info_iter = _pk_mgr_ptr ->map_pid_peer_info.find(firstReplyPid);
+
 					if(pid_peer_info_iter != _pk_mgr_ptr ->map_pid_peer_info.end()){
 
-						for(int i=0 ; i<_pk_mgr_ptr ->map_pid_peer_info.count(firstReplyPid);i++){
-						peerInfoPtr = pid_peer_info_iter->second;
-						if (pid_peer_info_iter->second->manifest == replyManifest){
-							_pk_mgr_ptr ->map_pid_peer_info.erase(pid_peer_info_iter);
 
-							pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(firstReplyPid);
-							if(pid_peerDown_info_iter == _pk_mgr_ptr ->map_pid_peerDown_info.end()){
+						for(int i=0 ;i< _pk_mgr_ptr ->map_pid_peer_info.count(firstReplyPid);i++){
+							peerInfoPtr = pid_peer_info_iter->second;
+							if (pid_peer_info_iter->second->manifest == replyManifest){
+								_pk_mgr_ptr ->map_pid_peer_info.erase(pid_peer_info_iter);
 
-								peerDownInfoPtr = new struct peer_connect_down_t ;
-								memset(peerDownInfoPtr , 0x0,sizeof( struct peer_connect_down_t));
-								memcpy(peerDownInfoPtr ,peerInfoPtr,sizeof(struct peer_info_t));
-								delete peerInfoPtr;
-								_pk_mgr_ptr ->map_pid_peerDown_info[firstReplyPid] =peerDownInfoPtr ;
-							}else{
-								pid_peerDown_info_iter ->second->peerInfo.manifest |= replyManifest;
+								pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(firstReplyPid);
+								if(pid_peerDown_info_iter == _pk_mgr_ptr ->map_pid_peerDown_info.end()){
+
+									peerDownInfoPtr = new struct peer_connect_down_t ;
+									memset(peerDownInfoPtr , 0x0,sizeof( struct peer_connect_down_t));
+									memcpy(peerDownInfoPtr ,peerInfoPtr,sizeof(struct peer_info_t));
+									delete peerInfoPtr;
+									_pk_mgr_ptr ->map_pid_peerDown_info[firstReplyPid] =peerDownInfoPtr ;
+								}else{
+									pid_peerDown_info_iter ->second->peerInfo.manifest |= replyManifest;
 							
+								}
+								break;
+
 							}
 
+								pid_peer_info_iter++;
+							printf("test");
 						}
-						pid_peer_info_iter++;
-						}
+
+
+
 
 
 

@@ -390,6 +390,11 @@ void pk_mgr::init()
 	cout << "channel_id=" << _channel_id << endl;
 	cout << "svc_tcp_port=" << svc_tcp_port << endl;
 	cout << "svc_udp_port=" << svc_udp_port << endl;
+
+	pkDownInfoPtr = new struct peer_connect_down_t ;
+	memset(pkDownInfoPtr , 0x0,sizeof( struct peer_connect_down_t));
+	pkDownInfoPtr ->peerInfo.pid =PK_PID;
+	map_pid_peerDown_info[PK_PID] =pkDownInfoPtr;
 	
     //web_ctrl_sever_ptr = new web_ctrl_sever(_net_ptr, _log_ptr, fd_list_ptr, &map_stream_name_id); 
     //web_ctrl_sever_ptr->init();
@@ -617,6 +622,8 @@ int pk_mgr::handle_pkt_in(int sock)
 		lane_member = (buf_len - sizeof(struct chunk_header_t) - 6 * sizeof(unsigned long)) / sizeof(struct level_info_t);
 		level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + lane_member * sizeof(struct level_info_t *);
 
+		printf("lane_member = %d ",lane_member);
+
 		level_msg_ptr = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
 		memset(level_msg_ptr, 0x0, level_msg_size);
 		memcpy(level_msg_ptr, chunk_ptr, (level_msg_size - lane_member * sizeof(struct level_info_t *)));
@@ -663,11 +670,6 @@ int pk_mgr::handle_pkt_in(int sock)
 
 			new_peer ->manifest = tempManifes;
 		}
-
-		pkDownInfoPtr = new struct peer_connect_down_t ;
-		memset(pkDownInfoPtr , 0x0,sizeof( struct peer_connect_down_t));
-		pkDownInfoPtr ->peerInfo.pid =PK_PID;
-		map_pid_peerDown_info[PK_PID] =pkDownInfoPtr;
 
 		_peer_mgr_ptr -> self_pid = level_msg_ptr ->pid ;
 
@@ -1464,7 +1466,7 @@ void pk_mgr::init_rescue_detection()
 	memset( statsArryCount_ptr , 0x00 ,sizeof(int) * (sub_stream_num+1)  ); 
 
 //	_beginthread(threadTimeout(), 0,NULL );
-	_beginthread(launchThread, 0,this );
+//	_beginthread(launchThread, 0,this );
 
 
 }
@@ -1880,7 +1882,7 @@ unsigned long pk_mgr::manifestFactory(unsigned long manifestValue,unsigned int s
 				sock=map_pid_fd_iter ->second;					//get parent sock
 
 
-			if(parentPeerPtr ->timeOutLastSeq == parentPeerPtr->timeOutNewSeq && parentPeerPtr->peerInfo.manifest!=0){
+			if(parentPeerPtr->peerInfo.pid!=PK_PID && parentPeerPtr ->timeOutLastSeq == parentPeerPtr->timeOutNewSeq && parentPeerPtr->peerInfo.manifest!=0){
 	
 				printf("Pid =%d Time out\n",parentPid);
 				send_rescueManifestToPK (parentPeerPtr->peerInfo.manifest);
