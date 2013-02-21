@@ -73,6 +73,10 @@ public:
 	void send_back_start_delay_measure_token(int sock,long long peer_start_delay,unsigned long sub_id);
 	//////////////////////////////////////////////////////////////////////////////////
 	
+	//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
+	void send_start_delay_update(int sock, unsigned long start_delay_manifest, int start_delay_differ);
+	//////////////////////////////////////////////////////////////////////////////////
+
 	//////////////////////////////////////////////////////////////////////////////////send capacity
 	int peer_start_delay_count;
 	int peer_join_send;
@@ -105,15 +109,15 @@ public:
 	virtual void handle_job_timer();
 
 //	void handle_bandwidth(unsigned long avg_bit_rate);
-	void send_rescue(unsigned long manifest);
-	void send_rescue_to_pk();
+//	void send_rescue(unsigned long manifest);
+//	void send_rescue_to_pk();
 //	void send_rescue_to_upstream(unsigned long manifest);
 	void send_request_sequence_number_to_pk(unsigned int req_from, unsigned int req_to);
     void send_pkt_to_pk(struct chunk_t *chunk_ptr);
-	void handle_rescue(unsigned long pid, unsigned long manifest);
+//	void handle_rescue(unsigned long pid, unsigned long manifest);
 //    void handle_latency(struct chunk_t *chunk_ptr, int sockfd);
 	void handle_stream(struct chunk_t *chunk_ptr, int sockfd);
-    void store_stream_id_map(char user_name[], unsigned char stream_id);
+//    void store_stream_id_map(char user_name[], unsigned char stream_id);
 	void data_close(int cfd, const char *reason); 
 	int get_sock(void);
 

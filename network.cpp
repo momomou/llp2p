@@ -154,6 +154,7 @@ void network::epoll_dispatcher(void)
 			bc_ptr = _map_fd_bc_tbl_iter->second;
 
 			if (events[i].events & (EPOLLRDHUP | EPOLLERR)) {
+				//printf("%d sock error\n",cfd);
 				// EPOLLRDHUP => This socket is closed by client (client has sent a FIN), we have to close it.
 				cout << "something wrong: fd = " << cfd << endl;
 				//PAUSE
@@ -163,6 +164,7 @@ void network::epoll_dispatcher(void)
 			}
 			
 			if(events[i].events & EPOLLIN)
+				//printf("%d sock in\n",cfd);
 				if (bc_ptr->handle_pkt_in(cfd) == RET_SOCK_ERROR) {		// readable
                     printf("%s,handle in sock error\n",__FUNCTION__);
 					if(_map_fd_del_hdl_tbl.find(cfd) != _map_fd_del_hdl_tbl.end()){
@@ -172,6 +174,7 @@ void network::epoll_dispatcher(void)
                 }
 
 			if(events[i].events & EPOLLOUT)
+				//printf("%d sock out\n",cfd);
 				if (bc_ptr->handle_pkt_out(cfd) == RET_SOCK_ERROR) {		// writable
 					printf("%s,handle out sock error\n",__FUNCTION__);
 					if(_map_fd_del_hdl_tbl.find(cfd) != _map_fd_del_hdl_tbl.end()){
@@ -181,6 +184,7 @@ void network::epoll_dispatcher(void)
 				}
 
 			if(events[i].events & ~(EPOLLIN | EPOLLOUT))
+				//printf("%d error\n",cfd);
 				bc_ptr->handle_pkt_error(cfd);		// error
 
 		} else {

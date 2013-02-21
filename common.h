@@ -138,7 +138,7 @@ using std::bitset;
 //////////////////////////////////////////////////////////////////////////////////
 #define CHNK_CMD_PEER_SEED				0X1b
 #define CHNK_CMD_PEER_PARENT_CHILDREN	0x1c
-
+#define CHNK_CMD_PEER_START_DELAY_UPDATE			0X1d
 
 #define CHNK_CMD_PEER_UNKNOWN			0xFF	// 1 B cmd => 0xFF is reserved for unknown cmd
 
@@ -582,6 +582,16 @@ struct chunk_rescue_list {
 struct chunk_ParentChildren_token {
 	struct chunk_header_t header;
 	unsigned int manifest;
+};
+
+struct start_delay_update_info{
+	unsigned long substream_id;
+	int start_delay_update;
+};
+
+struct update_start_delay{
+	struct chunk_header_t header;
+	struct start_delay_update_info *update_info[0];
 };
 
 

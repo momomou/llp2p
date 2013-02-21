@@ -340,6 +340,94 @@ void pk_mgr::send_capacity_to_pk(int sock){
 }
 //////////////////////////////////////////////////////////////////////////////////
 
+//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
+void pk_mgr::send_start_delay_update(int sock, unsigned long start_delay_manifest, int start_delay_differ){
+	
+	struct update_start_delay *update_start_delay_ptr = NULL;
+	struct chunk_t * chunk_ptr = NULL;
+	unsigned long msg_size;
+	unsigned long reply_size;
+	unsigned long offset = 0;
+	/*
+	initial an output structure
+	*/
+	msg_size = sizeof(struct chunk_header_t) + sub_stream_num * sizeof(struct start_delay_update_info *);
+	reply_size = msg_size - sub_stream_num * sizeof(struct start_delay_update_info *) + sub_stream_num * sizeof(struct start_delay_update_info);
+
+	update_start_delay_ptr = (struct update_start_delay *) new unsigned char[msg_size];
+	chunk_ptr = (struct chunk_t *) new unsigned char[reply_size];
+		
+	memset(update_start_delay_ptr, 0x0, msg_size );
+	memset(chunk_ptr, 0x0, reply_size );
+
+	offset = offset + sizeof(struct chunk_header_t);
+	
+	for(int i=0;i<sub_stream_num;i++){
+		if(start_delay_manifest & (1<<i)){
+			update_start_delay_ptr->update_info[i] = new struct start_delay_update_info;
+			memset(update_start_delay_ptr->update_info[i], 0x0 , sizeof(struct start_delay_update_info));
+
+			update_start_delay_ptr->update_info[i]->substream_id = i;
+			update_start_delay_ptr->update_info[i]->start_delay_update = start_delay_differ;
+
+			memcpy((char *)chunk_ptr + offset, update_start_delay_ptr->update_info[i], sizeof(struct start_delay_update_info));
+			if(update_start_delay_ptr->update_info[i])
+					delete update_start_delay_ptr->update_info[i];
+			offset += sizeof(struct start_delay_update_info);
+		}
+		else{
+			update_start_delay_ptr->update_info[i] = new struct start_delay_update_info;
+			memset(update_start_delay_ptr->update_info[i], 0x0 , sizeof(struct start_delay_update_info));
+
+			update_start_delay_ptr->update_info[i]->substream_id = i;
+			update_start_delay_ptr->update_info[i]->start_delay_update = 0;
+
+			memcpy((char *)chunk_ptr + offset, update_start_delay_ptr->update_info[i], sizeof(struct start_delay_update_info));
+			if(update_start_delay_ptr->update_info[i])
+					delete update_start_delay_ptr->update_info[i];
+			offset += sizeof(struct start_delay_update_info);
+		}
+	}
+
+	offset = 0;
+	
+	update_start_delay_ptr->header.cmd = CHNK_CMD_PEER_START_DELAY_UPDATE;
+	update_start_delay_ptr->header.length = reply_size - sizeof(struct chunk_header_t);
+	update_start_delay_ptr->header.rsv_1 = REPLY;
+	
+	
+	memcpy((char *)chunk_ptr + offset, update_start_delay_ptr, (sizeof(struct chunk_header_t)));
+	
+	if(update_start_delay_ptr)
+		delete update_start_delay_ptr;
+	/*
+	push it to the output ctrl buffer
+	*/
+	map<unsigned long, struct peer_info_t *>::iterator temp_map_pid_rescue_peer_info;	
+	map<unsigned long, int>::iterator temp_map_pid_fd_iter;
+	map<int, queue<struct chunk_t *> *>::iterator fd_out_ctrl_iter;
+	queue<struct chunk_t *> *queue_out_ctrl_ptr;
+	
+	for(temp_map_pid_rescue_peer_info = map_pid_rescue_peer_info.begin(); temp_map_pid_rescue_peer_info != map_pid_rescue_peer_info.end();temp_map_pid_rescue_peer_info++){
+		temp_map_pid_fd_iter = _peer_ptr->map_out_pid_fd.find(temp_map_pid_rescue_peer_info->first);
+		if(temp_map_pid_fd_iter == _peer_ptr->map_out_pid_fd.end()){
+			printf("can not find output pid in map_out_pid_fd (send_start_delay_update)\n");
+			exit(1);
+		}
+		else{
+			fd_out_ctrl_iter = _peer_ptr->map_fd_out_ctrl.find(temp_map_pid_fd_iter->second);
+			if(fd_out_ctrl_iter == _peer_ptr->map_fd_out_ctrl.end()){
+				printf("can not find output ctrl queue in map_fd_out_ctrl (send_start_delay_update)\n");
+				exit(1);
+			}
+			queue_out_ctrl_ptr = fd_out_ctrl_iter->second;
+			queue_out_ctrl_ptr->push(chunk_ptr);
+			_net_ptr->epoll_control(temp_map_pid_fd_iter->second, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
+		}
+	}
+}
+//////////////////////////////////////////////////////////////////////////////////
+
 void pk_mgr::peer_mgr_set(peer_mgr *peer_mgr_ptr)
 {
 	_peer_mgr_ptr = peer_mgr_ptr;
@@ -698,7 +786,19 @@ int pk_mgr::handle_pkt_in(int sock)
 
 
 
+	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY_UPDATE) {
+	//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
+		struct update_start_delay *update_start_delay_ptr = NULL;
+		update_start_delay_ptr = (update_start_delay *)chunk_ptr;
+		for(int k=0;k<sub_stream_num;k++){
+			(delay_table+k)->start_delay_struct.start_delay = (delay_table+k)->start_delay_struct.start_delay + update_start_delay_ptr->update_info[k]->start_delay_update;
 
+			unsigned long temp_manifest = 0;
+			temp_manifest = temp_manifest | (1<<k);
+
+			send_start_delay_update(sock, temp_manifest, update_start_delay_ptr->update_info[k]->start_delay_update);
+		}
+	//////////////////////////////////////////////////////////////////////////////////
 	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY) {
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
 
@@ -725,10 +825,28 @@ int pk_mgr::handle_pkt_in(int sock)
 
 			if((delay_table+request_sub_id)->start_delay_struct.init_flag == 1){
 				_log_ptr -> getTickTime(&((delay_table+request_sub_id)->start_delay_struct.end_clock));
+				//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
+				int renew_start_delay_flag=0;
+				long long old_start_delay = (delay_table+request_sub_id)->start_delay_struct.start_delay;
+				if((delay_table+request_sub_id)->start_delay_struct.start_delay != -1){
+					renew_start_delay_flag = 1;
+				}
+				//////////////////////////////////////////////////////////////////////////////////
 				(delay_table+request_sub_id)->start_delay_struct.start_delay = _log_ptr ->diffTime_ms((delay_table+request_sub_id)->start_delay_struct.start_clock,(delay_table+request_sub_id)->start_delay_struct.end_clock);
 				(delay_table+request_sub_id)->start_delay_struct.start_delay = parent_start_delay + ((delay_table+request_sub_id)->start_delay_struct.start_delay/2);
 				//(delay_table+request_sub_id)->start_delay_struct.init_flag = 1;
 				printf("start delay : %ld parent start delay : %ld\n",(delay_table+request_sub_id)->start_delay_struct.start_delay,parent_start_delay);
+				//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
+				if(renew_start_delay_flag == 1){
+					printf("start delay renew \n");
+					unsigned long temp_manifest = 0;
+					
+					int delay_differ = (delay_table+request_sub_id)->start_delay_struct.start_delay - old_start_delay;
+					temp_manifest = temp_manifest | (1<<request_sub_id);
+					send_start_delay_update(sock, temp_manifest, delay_differ);
+				}
+				//////////////////////////////////////////////////////////////////////////////////
+
 				//////////////////////////////////////////////////////////////////////////////////send capacity
 				peer_start_delay_count++;
 				if((peer_start_delay_count == sub_stream_num)&&(!peer_join_send)&&((delay_table+request_sub_id)->start_seq_num != 0)&&((delay_table+request_sub_id)->end_seq_num != 0)){
@@ -745,9 +863,9 @@ int pk_mgr::handle_pkt_in(int sock)
 
 
 // light | pid | level   | n*struct rescue_peer_info
-	} else if (chunk_ptr->header.cmd == CHNK_CMD_RESCUE_LIST) {
-		printf("CHNK_CMD_RESCUE_LIST\n");
-
+	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_RESCUE_LIST) {
+		printf("CHNK_CMD_PEER_RESCUE_LIST\n");
+		//system("pause");
 ////////////////////////////////////////////////
 //		clear_map_pid_peer_info();
 
@@ -782,6 +900,8 @@ int pk_mgr::handle_pkt_in(int sock)
 
 //			map_pid_peer_info[new_peer->pid] = new_peer;
 			map_pid_peer_info.insert(pair<unsigned long ,peer_info_t *>(new_peer->pid,new_peer));  
+
+			new_peer ->manifest = ((struct chunk_rescue_list*)chunk_ptr) ->manifest;
 
 		}
 
@@ -857,6 +977,7 @@ int pk_mgr::handle_pkt_in(int sock)
 
 //CHNK_CMD_PEER_PARENT_CHILDREN
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_PARENT_CHILDREN){
+		printf("cmd =recv CHNK_CMD_PEER_PARENT_CHILDREN\n");
 
 		if(chunk_ptr->header.rsv_1 == REQUEST){
 		
@@ -906,163 +1027,6 @@ void pk_mgr::handle_job_timer()
 
 }
 
-//will delete
-// hidden at 2013/01/15
-
-
-//will delete , send_rescue info to pk??
-void pk_mgr::send_rescue(unsigned long manifest)
-{
-	unsigned long i;
-	unsigned long inside_lane_rescue = 0;
-	
-	if(lane_member > 1) {
-		for (i = 0; i < lane_member; i++) {
-			if(level_msg_ptr->pid == level_msg_ptr->level_info[i]->pid) {
-				if(i == 1) {
-					inside_lane_rescue = 0;
-					outside_lane_rescue_num = parallel_rescue_num;
-					_manifest = manifest;
-					outside_rescue_list.clear();
-					send_rescue_to_pk();
-				} else {
-					i --;
-					if(level_msg_ptr->level <= inside_lane_rescue_num) {
-						inside_lane_rescue = level_msg_ptr->level - 1;
-					} else {
-						inside_lane_rescue = inside_lane_rescue_num;
-					}
-					
-					outside_lane_rescue_num = parallel_rescue_num - inside_lane_rescue;
-
-					if(outside_lane_rescue_num > 0) {
-						_manifest = manifest;
-						outside_rescue_list.clear();
-						send_rescue_to_pk();
-					}
-
-					while(inside_lane_rescue > 0) {
-						i --;
-						cout << "rescue_pid = " << level_msg_ptr->level_info[i]->pid << endl;
-//						_peer_mgr_ptr->send_rescue(level_msg_ptr->level_info[i]->pid, level_msg_ptr->pid, manifest);
-						inside_lane_rescue --;
-						_peer_mgr_ptr->add_rescue_fd(level_msg_ptr->level_info[i]->pid);
-					}
- 
-					break;
-				}
-			} 
-		}
-	}
-
-}
-
-
-//will be modify
-void pk_mgr::send_rescue_to_pk()
-{
-	int send_byte = 0;
-	char html_buf[8192];
-	struct chunk_rescue_list_t *rescue_list_ptr = NULL;
-	
-	_net_ptr->set_blocking(_sock);	// set to blocking
-	
-	rescue_list_ptr = new struct chunk_rescue_list_t;
-
-	memset(html_buf, 0x0, _html_size);
-	memset(rescue_list_ptr, 0x0, sizeof(struct chunk_rescue_list_t));
-	
-	rescue_list_ptr->header.cmd = CHNK_CMD_PEER_RSC_LIST;
-	rescue_list_ptr->header.length = sizeof(unsigned long) ;	//pkt_buf paylod length
-	rescue_list_ptr->header.rsv_1 = REQUEST;
-	rescue_list_ptr->pid = level_msg_ptr->pid;
-
-
-	memcpy(html_buf, rescue_list_ptr, sizeof(struct chunk_rescue_list_t));
-	
-	send_byte = _net_ptr->send(_sock, html_buf, sizeof(struct chunk_rescue_list_t), 0);
-
-	if( send_byte <= 0 ) {
-		data_close(_sock, "send rescue_ list cmd error");
-		_log_ptr->exit(0, "send rescue_ list cmd error");
-	} else {
-		if(rescue_list_ptr)
-			delete rescue_list_ptr;
-		_net_ptr->set_nonblocking(_sock);	// set to non-blocking
-	}
-
-}
-
-//hiddle at 2013/01/16
-/*
-void pk_mgr::send_rescue_to_upstream(unsigned long manifest)
-{
-	unsigned long i;
-	
-	if(lane_member > 1) {
-		for (i = 0; i < lane_member; i++) {
-			if(level_msg_ptr->pid == level_msg_ptr->level_info[i]->pid) {
-				//DBG_PRINTF("here\n");
-				i --;
-//				_peer_mgr_ptr->send_rescue(level_msg_ptr->level_info[i]->pid, level_msg_ptr->pid, manifest);
-				break;	
-			} 
-		}
-	}
-
-}
-
-*/
-
-//when a peer recv a rescue  packet from other peer how to handle ( only called by peer recv  cmd == CHNK_CMD_PEER_RSC)
-
-void pk_mgr::handle_rescue(unsigned long pid, unsigned long manifest)
-{
-	unsigned long i;
-	multimap <unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
-	map <unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
-	struct peer_info_t *rescue_peer = NULL;
-
-	pid_peer_info_iter = map_pid_peer_info.find(pid);
-	
-	if(pid_peer_info_iter != map_pid_peer_info.end()) {
-		for (i = 0; i < lane_member; i++) {
-			if(pid == level_msg_ptr->level_info[i]->pid) {
-				i --;
-				rescue_peer = pid_peer_info_iter->second;
-				if(level_msg_ptr->pid == level_msg_ptr->level_info[i]->pid) {
-					rescue_peer->manifest = (~manifest);
-					current_child_manifest = rescue_peer->manifest;
-//hidden at 2013/01/27	
-//                    _peer_mgr_ptr->clear_ouput_buffer(pid);
-                    cout << "down stream " << pid << " manifest=" << current_child_manifest << endl;
-					break;
-				} else {
-					rescue_peer->manifest = manifest;
-					_peer_mgr_ptr->rescue_reply(pid, manifest);
-//hidden at 2013/01/27 					
-//					_peer_mgr_ptr->add_rescue_downstream(pid);
-                    cout << "pid " << pid << " manifest=" << current_child_manifest << endl;
-					break;
-				} 
-			} 
-		}
-	} else {  //not find in map_pid_peer_info table
-		map_pid_rescue_peer_info_iter = map_pid_rescue_peer_info.find(pid);
-		if(map_pid_rescue_peer_info_iter != map_pid_rescue_peer_info.end()) {
-			rescue_peer = map_pid_rescue_peer_info_iter->second;
-			rescue_peer->manifest = manifest;
-			_peer_mgr_ptr->rescue_reply(pid, manifest);
-//hidden at 2013/01/27	
-//			_peer_mgr_ptr->add_rescue_downstream(pid);
-		}else{		//not find in map_pid_rescue_ peer_info
-
-
-		}
-		
-	}
-	
-}
 
 //send_request_sequence_number_to_pk   ,req_from   to   req_to
 void pk_mgr::send_request_sequence_number_to_pk(unsigned int req_from, unsigned int req_to)
@@ -1493,17 +1457,6 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 	substreamID= (chunk_ptr ->header.sequence_number) % sub_stream_num  ;
 	int X = stream_number * PARAMETER_X;								//測量參數X 和stream_number成正比
 
-//	static bool first=true;
-
-//
-//	if(first){
-
-//		printf("X= %d\n",X);
-		
-//		first=false;
-//	}
-//
-
 
 	if(! ( (ssDetect_ptr + substreamID) -> last_seq ) ){  //第一個封包做初始化
 	(ssDetect_ptr + substreamID) ->last_timestamp = chunk_ptr->header.timestamp;
@@ -1580,6 +1533,8 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 
 	(ssDetect_ptr + substreamID) ->last_seq = chunk_ptr->header.sequence_number;
 
+	}else{
+		printf("why here ?\n");
 	}
 
 	return ;

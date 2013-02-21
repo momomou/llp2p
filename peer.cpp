@@ -297,7 +297,19 @@ int peer::handle_pkt_in(int sock)
 //the main handle
 		_pk_mgr_ptr->handle_stream(chunk_ptr, sock);
 
+	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY_UPDATE) {
+	//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
+		struct update_start_delay *update_start_delay_ptr = NULL;
+		update_start_delay_ptr = (update_start_delay *)chunk_ptr;
+		for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
+			(_pk_mgr_ptr->delay_table+k)->start_delay_struct.start_delay = (_pk_mgr_ptr->delay_table+k)->start_delay_struct.start_delay + update_start_delay_ptr->update_info[k]->start_delay_update;
 
+			unsigned long temp_manifest = 0;
+			temp_manifest = temp_manifest | (1<<k);
+
+			_pk_mgr_ptr->send_start_delay_update(sock, temp_manifest, update_start_delay_ptr->update_info[k]->start_delay_update);
+		}
+	//////////////////////////////////////////////////////////////////////////////////
 	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY) {
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
 		printf("CHNK_CMD_PEER_START_DELAY peer\n");
@@ -321,10 +333,28 @@ int peer::handle_pkt_in(int sock)
 
 			if((_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.init_flag == 1){
 				_log_ptr -> getTickTime(&((_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.end_clock));
+				//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
+				int renew_start_delay_flag=0;
+				long long old_start_delay = (_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_delay;
+				if((_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_delay != -1){
+					renew_start_delay_flag = 1;
+				}
+				//////////////////////////////////////////////////////////////////////////////////
 				(_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_delay = _log_ptr ->diffTime_ms((_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_clock,(_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.end_clock);
 				(_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_delay = parent_start_delay + ((_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_delay/2);
 				//(_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.init_flag = 1;
 				printf("start delay : %ld\n",(_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_delay);
+				//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
+				if(renew_start_delay_flag == 1){
+					printf("start delay renew \n");
+					unsigned long temp_manifest = 0;
+
+					int delay_differ = (_pk_mgr_ptr->delay_table+request_sub_id)->start_delay_struct.start_delay - old_start_delay;
+					temp_manifest = temp_manifest | (1<<request_sub_id);
+					_pk_mgr_ptr->send_start_delay_update(sock, temp_manifest, delay_differ);
+				}
+				//////////////////////////////////////////////////////////////////////////////////
+
 				//////////////////////////////////////////////////////////////////////////////////send capacity
 				_pk_mgr_ptr->peer_start_delay_count++;
 				if((_pk_mgr_ptr->peer_start_delay_count == _pk_mgr_ptr->sub_stream_num)&&(!(_pk_mgr_ptr->peer_join_send))&&((_pk_mgr_ptr->delay_table+request_sub_id)->start_seq_num != 0)&&((_pk_mgr_ptr->delay_table+request_sub_id)->end_seq_num != 0)){
@@ -433,6 +463,13 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 
 						_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
 
+						//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
+							for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
+								if(peerDownInfoPtr->peerInfo.manifest & (1<<k)){
+									_pk_mgr_ptr->send_start_delay_measure_token(sock, k);
+								}
+							}
+						//////////////////////////////////////////////////////////////////////////////////
 
 						for(pid_peer_info_iter =_pk_mgr_ptr ->map_pid_peer_info.begin();pid_peer_info_iter!= _pk_mgr_ptr ->map_pid_peer_info.end();pid_peer_info_iter++){
 							peerInfoPtr = pid_peer_info_iter->second;
