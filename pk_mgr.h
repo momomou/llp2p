@@ -30,6 +30,9 @@ public:
 	list <int> streamID_list;
 	struct peer_connect_down_t *pkDownInfoPtr;
 
+	set< int > *childrenSet_ptr;
+	map<unsigned long ,set< int > *> map_streamID_childrenSet ;
+
 //	map<unsigned long, unsigned long> map_pid_manifest;
 
 	multimap <unsigned long, struct peer_info_t *> map_pid_peer_info; 	// <pid, struct peer_info_t *>
@@ -58,9 +61,7 @@ public:
 	unsigned long parallel_rescue_num;
 	unsigned long inside_lane_rescue_num;
 	unsigned long outside_lane_rescue_num;
-//	unsigned long count;
-//	unsigned long avg_bandwidth;
-//	unsigned long current_child_pid;
+
 	unsigned long current_child_manifest;
 	int _sock; 		//PK socket
 
@@ -126,7 +127,9 @@ public:
 	unsigned long manifestFactory(unsigned long manifestValue,unsigned int ssNumber);
 	void threadTimeout();
 	static void launchThread(void * arg);
-	unsigned int pk_mgr::rescueNumAccumulate();
+	unsigned int rescueNumAccumulate();
+	void handleAppenSelfdPid(struct chunk_t *chunk_ptr );
+	void storeChildrenToSet(struct chunk_t *chunk_ptr );
 
 //clear
 	void clear_map_pid_peer_info();

@@ -31,6 +31,7 @@ peer::peer(list<int> *fd_list)
 	_chunk_ptr = NULL;
 	first_reply_peer =true;
 	firstReplyPid=-1;
+	leastSeq_set_childrenPID =0;
 /*
 	for(unsigned long i = 0; i < BANDWIDTH_BUCKET; i++) {
 		bandwidth_bucket[i] = 0;
@@ -356,10 +357,7 @@ int peer::handle_pkt_in(int sock)
 		//cout << "CHNK_CMD_PEER_CUT" << endl;
 
 //hidden at 2013/01/27
-/*
-		memcpy(&pid, (char *)chunk_ptr + sizeof(struct chunk_t), sizeof(unsigned long));
-		_peer_mgr_ptr->cut_rescue_downstream(pid);
-*/	
+
 
 
 //cmd == CHNK_CMD_PEER_LATENCY
@@ -433,9 +431,6 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 
 
 
-
-
-
 						_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
 
 
@@ -468,11 +463,25 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 		printf("CHNK_CMD_PEER_SET_MANIFEST\n");
 		_peer_mgr_ptr ->handle_manifestSet((struct chunk_manifest_set_t *)chunk_ptr); 
 
-// should sent capacity to pk
+		_pk_mgr_ptr->send_capacity_to_pk(sock);
 		
 		map_fd_pid_iter= map_fd_pid.find(sock);
 		if(map_fd_pid_iter !=map_fd_pid.end())
 			_peer_mgr_ptr ->clear_ouput_buffer( map_fd_pid_iter->second);
+
+
+	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_PARENT_CHILDREN){
+
+		if(chunk_ptr->header.rsv_1 == REQUEST){
+		
+			_pk_mgr_ptr->handleAppenSelfdPid(chunk_ptr);
+		
+		}else if(chunk_ptr->header.rsv_1 == REPLY && ( leastSeq_set_childrenPID == chunk_ptr ->header.sequence_number )){
+		
+			_pk_mgr_ptr->storeChildrenToSet(chunk_ptr);
+		
+		}
+
 	
 	} else {
 		cout << "what's this?" << endl;
@@ -718,18 +727,5 @@ void peer::data_close(int cfd, const char *reason ,int type)
 
 	}
 */
-
-
-
-
-
-///2013/01/27 關閉所有rescue_pid_list
-
-
-//2013/01/27 關閉所有map_rescue_fd_count
-
-	
-//2013/01/27 關閉所有_map_fd_downstream
-
 
 }

@@ -45,6 +45,7 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 	 stream_number=1;
 	 _current_send_sequence_number = -1;
 	 pkDownInfoPtr =NULL ;
+	 childrenSet_ptr = NULL;
 	 
 	_prep->read_key("bucket_size", _bucket_size);
 
@@ -854,8 +855,21 @@ int pk_mgr::handle_pkt_in(int sock)
 
 		pkDownInfoPtr ->peerInfo.manifest = ((struct seed_notify *)chunk_ptr) ->manifest ;
 
-//other
-	}else{
+//CHNK_CMD_PEER_PARENT_CHILDREN
+	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_PARENT_CHILDREN){
+
+		if(chunk_ptr->header.rsv_1 == REQUEST){
+		
+			handleAppenSelfdPid(chunk_ptr);
+		
+		}else if(chunk_ptr->header.rsv_1 == REPLY && _peer_ptr->leastSeq_set_childrenPID == chunk_ptr ->header.sequence_number){
+		
+			 storeChildrenToSet(chunk_ptr);
+		
+		}
+
+//other 
+	}else {
 		printf("cmd =%d else\n", chunk_ptr->header.cmd);
 	}
 
@@ -894,25 +908,7 @@ void pk_mgr::handle_job_timer()
 
 //will delete
 // hidden at 2013/01/15
-/* 
-void pk_mgr::handle_bandwidth(unsigned long avg_bit_rate)
-{
-	unsigned long i;
-	
-	if(lane_member > 1) {
-		for (i = 0; i < lane_member; i++) {
-			if(level_msg_ptr->pid == level_msg_ptr->level_info[i]->pid) {
-				i++;
-					if( i != lane_member) {
-//						_peer_mgr_ptr->send_bandwidth(level_msg_ptr->level_info[i]->pid, avg_bit_rate);
-						break;
-					}
-			} 
-		}
-	}
 
-}
-*/
 
 //will delete , send_rescue info to pk??
 void pk_mgr::send_rescue(unsigned long manifest)
@@ -1209,7 +1205,10 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 
 /////////////////////////////////////////////測試版新功能///////////////////////////////////////////////////////////////////////
-///*
+//	if(pkDownInfoPtr ->peerInfo.manifest)
+
+
+
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
 	unsigned long temp_sub_id = (chunk_ptr ->header.sequence_number) % sub_stream_num;
 	//printf("%d %d\n",(delay_table+temp_sub_id)->start_delay_struct.init_flag,temp_sub_id);
@@ -1466,8 +1465,12 @@ void pk_mgr::init_rescue_detection()
 	memset( statsArryCount_ptr , 0x00 ,sizeof(int) * (sub_stream_num+1)  ); 
 
 //	_beginthread(threadTimeout(), 0,NULL );
-//	_beginthread(launchThread, 0,this );
+	_beginthread(launchThread, 0,this );
 
+	for(int i =0 ; i<sub_stream_num ;i++){
+	childrenSet_ptr  = new std::set<int>;
+	map_streamID_childrenSet[i]=childrenSet_ptr;
+	}
 
 }
 
@@ -1940,3 +1943,109 @@ unsigned long pk_mgr::manifestFactory(unsigned long manifestValue,unsigned int s
 	return totalRescueNum ;
   
   }
+
+//include sent functiom
+  void pk_mgr::handleAppenSelfdPid(struct chunk_t *chunk_ptr ){
+  
+	unsigned long pktlen =0;
+	unsigned long ploadlen =0;
+	struct chunk_t *chunk_delay_ptr=NULL;
+	int sock =-1;
+	map<unsigned long, int>::iterator map_pid_fd_iter;
+	map<unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
+	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
+	unsigned long tempManifest = 0;
+	unsigned long  subStreamID =0;
+	set<unsigned long>::iterator set_childrenPID_iter;
+
+	/* (unsigned long) = pid */
+	pktlen = sizeof(struct chunk_header_t) + chunk_ptr ->header.length + sizeof(unsigned long);
+	ploadlen = chunk_ptr ->header.length + sizeof(unsigned long) ;
+
+	_peer_ptr->leastSeq_set_childrenPID =chunk_ptr ->header.sequence_number;
+
+	memcpy(&tempManifest ,chunk_ptr +sizeof(struct chunk_header_t) ,sizeof(unsigned long));
+	for(subStreamID=0 ; subStreamID< sub_stream_num;subStreamID++){
+		if((1<<subStreamID) & tempManifest);
+		break;
+	}
+
+	childrenSet_ptr = map_streamID_childrenSet[subStreamID] ;
+	childrenSet_ptr ->clear();
+
+
+	chunk_delay_ptr = (struct chunk_t *)new unsigned char[pktlen];
+	memset(chunk_delay_ptr, 0x0, pktlen);
+	memcpy(chunk_delay_ptr ,chunk_ptr ,sizeof(struct chunk_header_t) + chunk_ptr ->header.length);
+
+	chunk_delay_ptr->header.cmd = CHNK_CMD_PEER_PARENT_CHILDREN;
+	chunk_delay_ptr->header.rsv_1 = REQUEST;
+	chunk_delay_ptr->header.length = ploadlen;
+	memcpy(chunk_delay_ptr+ sizeof(struct chunk_header_t) + chunk_ptr ->header.length , &(_peer_mgr_ptr->self_pid) ,sizeof(unsigned long)) ;
+
+
+	//不是最後一個且要同個subtreamID才送
+	if(map_pid_rescue_peer_info.size() != 0 ){
+
+		for(map_pid_rescue_peer_info_iter = map_pid_rescue_peer_info.begin();map_pid_rescue_peer_info_iter!= map_pid_rescue_peer_info.end();map_pid_rescue_peer_info_iter++){
+			map_pid_fd_iter = _peer_ptr->map_out_pid_fd.find(map_pid_rescue_peer_info_iter ->first);
+			if(map_pid_fd_iter != _peer_ptr->map_out_pid_fd.end() && map_pid_rescue_peer_info_iter->second->manifest | tempManifest){
+
+				_net_ptr->set_nonblocking(sock);
+	
+				_net_ptr ->send(sock , (char*)chunk_delay_ptr ,pktlen,0) ;
+			}
+		}
+
+		//為最後一個 須往回傳
+		}else if(map_pid_rescue_peer_info.size() == 0 ){
+	
+			chunk_delay_ptr->header.rsv_1 = REPLY;
+
+			for(pid_peerDown_info_iter = map_pid_peerDown_info.begin();pid_peerDown_info_iter!= map_pid_peerDown_info.end();pid_peerDown_info_iter++){
+				map_pid_fd_iter = _peer_ptr->map_in_pid_fd.find(map_pid_rescue_peer_info_iter ->first);
+				if(map_pid_fd_iter != _peer_ptr->map_in_pid_fd.end() && pid_peerDown_info_iter->second->peerInfo.manifest | tempManifest){
+					_net_ptr->set_nonblocking(sock);
+	
+					_net_ptr ->send(sock , (char*)chunk_delay_ptr ,pktlen,0) ;
+				}
+			}
+
+
+		}
+
+
+  }
+
+
+// | header | manifest | pif |pid  | ... 
+void pk_mgr::storeChildrenToSet(struct chunk_t *chunk_ptr )
+{
+
+	set<unsigned long>::iterator set_childrenPID_iter;
+	unsigned long * pidPtr =NULL;
+	int childrenNum = 0;
+	unsigned long subStreamID  = 0;
+	unsigned long tempManifest = 0;
+
+
+	childrenNum= ( (chunk_ptr->header.length)- sizeof(unsigned long) )/sizeof(unsigned long);
+	memcpy(&tempManifest ,chunk_ptr +sizeof(struct chunk_header_t) ,sizeof(unsigned long));
+
+	pidPtr=(unsigned long *)((char*)chunk_ptr +sizeof(chunk_header_t) + sizeof(unsigned long));
+
+	for(subStreamID=0 ; subStreamID< sub_stream_num;subStreamID++){
+		if((1<<subStreamID) & tempManifest);
+		break;
+	}
+
+
+	childrenSet_ptr = map_streamID_childrenSet[subStreamID] ;
+	for(int i =0; i< childrenNum ;i++){
+		childrenSet_ptr ->insert( *pidPtr) ;
+		pidPtr++;
+	}
+
+
+}
+

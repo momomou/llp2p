@@ -137,6 +137,7 @@ using std::bitset;
 #define CHNK_CMD_PEER_START_DELAY				0X1a
 //////////////////////////////////////////////////////////////////////////////////
 #define CHNK_CMD_PEER_SEED				0X1b
+#define CHNK_CMD_PEER_PARENT_CHILDREN	0x1c
 
 
 #define CHNK_CMD_PEER_UNKNOWN			0xFF	// 1 B cmd => 0xFF is reserved for unknown cmd
@@ -285,6 +286,7 @@ struct detectionInfo{
 	double			last_sourceBitrate;
 	double			last_localBitrate;
 	unsigned int	total_byte;
+//	unsigned int	virtual_test;	//用來測試rescue 的計數器
 };
 
 
@@ -576,7 +578,11 @@ struct chunk_rescue_list {
 	struct rescue_peer_info *rescue_peer_info[MAX_PEER_LIST];	
 };
 
-
+// header | pid | pid |
+struct chunk_ParentChildren_token {
+	struct chunk_header_t header;
+	unsigned int manifest;
+};
 
 
 #endif
