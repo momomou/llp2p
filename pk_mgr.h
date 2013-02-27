@@ -134,6 +134,11 @@ public:
 	unsigned int rescueNumAccumulate();
 	void handleAppenSelfdPid(struct chunk_t *chunk_ptr );
 	void storeChildrenToSet(struct chunk_t *chunk_ptr );
+	void send_rescueManifestToPKUpdate(unsigned long manifestValue);
+	void send_parentToPK(unsigned long manifestValue ,unsigned long oldPID);
+	//¥i¿W¥ßªºunitl
+	unsigned long manifestToSubstreamID(unsigned long  manifest );
+	unsigned long SubstreamIDToSubmanifest(unsigned long  SubstreamID );
 
 //clear
 	void clear_map_pid_peer_info();

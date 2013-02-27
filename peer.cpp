@@ -500,7 +500,7 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 		printf("CHNK_CMD_PEER_SET_MANIFEST\n");
 		_peer_mgr_ptr ->handle_manifestSet((struct chunk_manifest_set_t *)chunk_ptr); 
 
-		_pk_mgr_ptr->send_capacity_to_pk(sock);
+		_pk_mgr_ptr->send_capacity_to_pk(_pk_mgr_ptr->_sock);
 		
 		map_fd_pid_iter= map_fd_pid.find(sock);
 		if(map_fd_pid_iter !=map_fd_pid.end())
@@ -521,6 +521,8 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 
 	
 	} else {
+		printf ("%d   " , chunk_ptr->header.cmd);
+
 		cout << "what's this?" << endl;
 	}
 

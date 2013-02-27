@@ -134,11 +134,14 @@ using std::bitset;
 #define CHNK_CMD_PEER_TEST_DELAY		0x18	//test delay to select peer
 #define CHNK_CMD_PEER_SET_MANIFEST		0x19	//set manifest set to parent
 //////////////////////////////////////////////////////////////////////////////////measure start delay
-#define CHNK_CMD_PEER_START_DELAY				0X1a
+#define CHNK_CMD_PEER_START_DELAY				0X1A
 //////////////////////////////////////////////////////////////////////////////////
-#define CHNK_CMD_PEER_SEED				0X1b
-#define CHNK_CMD_PEER_PARENT_CHILDREN	0x1c
-#define CHNK_CMD_PEER_START_DELAY_UPDATE			0X1d
+#define CHNK_CMD_PEER_SEED				0X1B
+#define CHNK_CMD_PEER_START_DELAY_UPDATE			0X1C
+#define CHNK_CMD_PEER_PARENT_CHILDREN	0xF0	//暫時不用
+#define CHNK_CMD_PEER_PARENT			0x1e
+
+
 
 #define CHNK_CMD_PEER_UNKNOWN			0xFF	// 1 B cmd => 0xFF is reserved for unknown cmd
 
@@ -286,7 +289,9 @@ struct detectionInfo{
 	double			last_sourceBitrate;
 	double			last_localBitrate;
 	unsigned int	total_byte;
-//	unsigned int	virtual_test;	//用來測試rescue 的計數器
+	int				isTesting;
+	unsigned int	testing_count;	//用來測試rescue 的計數器
+	unsigned		previousParentPID;
 };
 
 
@@ -593,6 +598,22 @@ struct update_start_delay{
 	struct chunk_header_t header;
 	struct start_delay_update_info *update_info[0];
 };
+
+struct rescue_update_from_server{
+	struct chunk_header_t header;
+	unsigned long pid;
+	unsigned long manifest;
+};
+
+// header | self_pid | manifest | parentPID | parentPID |....
+struct parentList{
+	struct chunk_header_t header;
+	unsigned long self_pid;
+	unsigned long manifest;
+	unsigned long *parentPID ;
+};
+
+
 
 
 #endif

@@ -256,7 +256,6 @@ int main(int argc, char **argv)
 
 
 	fd_list.push_back(svc_fd_tcp);
-	pk_mgr_ptr->init();
 
 
 	while(!srv_shutdown) {
