@@ -46,6 +46,8 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 	 _current_send_sequence_number = -1;
 	 pkDownInfoPtr =NULL ;
 	 childrenSet_ptr = NULL;
+	 full_manifest =0 ;
+
 	 
 	_prep->read_key("bucket_size", _bucket_size);
 
@@ -994,10 +996,16 @@ int pk_mgr::handle_pkt_in(int sock)
 
 		pkDownInfoPtr ->peerInfo.manifest = ((struct seed_notify *)chunk_ptr) ->manifest ;
 
+		for(unsigned long substreamID =0 ; substreamID < sub_stream_num ;substreamID++)
+		{
+			send_parentToPK ( SubstreamIDToManifest(substreamID) , PK_PID+1 );
+		}
+
 //CHNK_CMD_PEER_PARENT_CHILDREN
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_PARENT_CHILDREN){
 		printf("cmd =recv CHNK_CMD_PEER_PARENT_CHILDREN\n");
 
+/*
 		if(chunk_ptr->header.rsv_1 == REQUEST){
 		
 			handleAppenSelfdPid(chunk_ptr);
@@ -1005,8 +1013,8 @@ int pk_mgr::handle_pkt_in(int sock)
 		}else if(chunk_ptr->header.rsv_1 == REPLY && _peer_ptr->leastSeq_set_childrenPID == chunk_ptr ->header.sequence_number){
 		
 			 storeChildrenToSet(chunk_ptr);
-		
 		}
+*/
 
 //other 
 	}else {
@@ -1203,7 +1211,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		//這邊只是暫時改變PK的substream 實際上還是有串流下來
 		pkDownInfoPtr->peerInfo.manifest &= ~(pkDownInfoPtr->peerInfo.manifest | parentPeerPtr ->peerInfo.manifest);  
 		//開始testing 送topology
-		send_parentToPK ( SubstreamIDToSubmanifest (temp_sub_id) , (ssDetect_ptr + temp_sub_id)->previousParentPID ); 
+		send_parentToPK ( SubstreamIDToManifest (temp_sub_id) , (ssDetect_ptr + temp_sub_id)->previousParentPID ); 
 	}
 
 	if((ssDetect_ptr + temp_sub_id) ->isTesting){
@@ -1213,10 +1221,10 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 			(ssDetect_ptr + temp_sub_id) ->isTesting =0 ;  //false
 			(ssDetect_ptr + temp_sub_id) ->testing_count =0 ;
 			//testing ok should cut this substream from pk
-			send_rescueManifestToPKUpdate ( pkDownInfoPtr->peerInfo.manifest | SubstreamIDToSubmanifest(temp_sub_id) );
+			send_rescueManifestToPKUpdate ( pkDownInfoPtr->peerInfo.manifest | SubstreamIDToManifest(temp_sub_id) );
 
 			//選擇selected peer 送topology
-			send_parentToPK(SubstreamIDToSubmanifest (temp_sub_id) ,PK_PID +1 );
+			send_parentToPK(SubstreamIDToManifest (temp_sub_id) ,PK_PID +1 );
 
 
 		}
@@ -1482,6 +1490,9 @@ int pk_mgr::get_sock()
 // call after register
 void pk_mgr::init_rescue_detection()
 {
+	for(int i =0 ; i<sub_stream_num ; i++ )
+		full_manifest |= ( 1<<i );
+
 	//Detect substream 的buff
 	ssDetect_ptr = (struct detectionInfo *)malloc(sizeof(struct detectionInfo) * sub_stream_num );
 	memset( ssDetect_ptr , 0x00 ,sizeof(struct detectionInfo) * sub_stream_num ); 
@@ -1721,7 +1732,7 @@ void pk_mgr::measure()
 			//找出所有正在測試的substream
 			for(int i =0  ; i < sub_stream_num;i++){
 				if ((ssDetect_ptr + i) ->isTesting ){
-					testingManifest |= SubstreamIDToSubmanifest(i);
+					testingManifest |= SubstreamIDToManifest(i);
 				}
 			}
 			//找出這個peer 所有正在testing 的substream ID
@@ -1749,19 +1760,19 @@ void pk_mgr::measure()
 					(ssDetect_ptr + testingSubStreamID) ->isTesting =0 ;  //false  
 
 					//should sent to PK select PK ,再把testing 取消偵測的 pk_manifest 設回來
-					pkDownInfoPtr ->peerInfo.manifest |=  SubstreamIDToSubmanifest (testingSubStreamID ) ;
-					send_parentToPK ( SubstreamIDToSubmanifest (testingSubStreamID ) ,PK_PID+1 ) ;
+					pkDownInfoPtr ->peerInfo.manifest |=  SubstreamIDToManifest (testingSubStreamID ) ;
+					send_parentToPK ( SubstreamIDToManifest (testingSubStreamID ) ,PK_PID+1 ) ;
 
 					//should sent to peer cut stream
-					connectPeerInfo ->peerInfo.manifest &= (~ SubstreamIDToSubmanifest (testingSubStreamID )) ;
+					connectPeerInfo ->peerInfo.manifest &= (~ SubstreamIDToManifest (testingSubStreamID )) ;
 					_peer_mgr_ptr -> send_manifest_to_parent(connectPeerInfo ->peerInfo.manifest ,connectPeerInfo ->peerInfo.pid);
 
-					testingManifest &= ( ~SubstreamIDToSubmanifest(testingSubStreamID) );
+					testingManifest &= ( ~SubstreamIDToManifest(testingSubStreamID) );
 
 					while(testingManifest){
 					testingSubStreamID = manifestToSubstreamID (testingManifest);
 					(ssDetect_ptr + testingSubStreamID) ->testing_count =0;
-					testingManifest &= ( ~SubstreamIDToSubmanifest(testingSubStreamID) );
+					testingManifest &= ( ~SubstreamIDToManifest(testingSubStreamID) );
 					}
 
 				//PID 是其他peer
@@ -1778,7 +1789,7 @@ void pk_mgr::measure()
 				while(tempManifest){
 					testingSubStreamID = manifestToSubstreamID (tempManifest);
 					(ssDetect_ptr + testingSubStreamID) ->previousParentPID = connectPeerInfo ->peerInfo.pid;
-					testingManifest &=  (~SubstreamIDToSubmanifest(testingSubStreamID) );
+					testingManifest &=  (~SubstreamIDToManifest(testingSubStreamID) );
 				}
 
 				}
@@ -2130,7 +2141,7 @@ unsigned long  pk_mgr::manifestToSubstreamID(unsigned long  manifest )
 
 
 //會回傳唯一manifest
-unsigned long  pk_mgr::SubstreamIDToSubmanifest(unsigned long  SubstreamID )
+unsigned long  pk_mgr::SubstreamIDToManifest(unsigned long  SubstreamID )
 {
 	unsigned long manifest =0;
 	manifest |=  1<<SubstreamID ;
@@ -2173,17 +2184,17 @@ void pk_mgr::send_rescueManifestToPKUpdate(unsigned long manifestValue)
 
 // 這邊的 manifestValue 只會有一個 sunstream ID
 // header | self_pid | manifest | pareentPID  | pareentPID | ... 
-// if (oldPID = PK_PID+1 )  have oldPID?  for testing stream
+// if (oldPID == PK_PID+1 )  沒有舊的parent  for testing stream
 void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){
 
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
-	struct parentList  *parentListPtr = NULL;
+	struct update_topology_info  *parentListPtr = NULL;
 	unsigned long  packetlen =0 ;
 	int  i=0 ;
 
 	unsigned long count =0 ;
 
-	if( oldPID = PK_PID+1 ){
+	if( oldPID != PK_PID+1 ){
 		count ++ ;
 	} 
 
@@ -2195,26 +2206,31 @@ void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){
 	}
 
 
-	packetlen = count * sizeof (unsigned long ) + -sizeof(struct parentList) ;
-	parentListPtr = (struct parentList *) new char [packetlen];
+	packetlen = count * sizeof (unsigned long ) + -sizeof(struct update_topology_info) ;
+	parentListPtr = (struct update_topology_info *) new char [packetlen];
 
 
-	memset(parentListPtr, 0x0, sizeof(struct parentList));
+	memset(parentListPtr, 0x0, sizeof(struct update_topology_info));
 	
-	parentListPtr->header.cmd = CHNK_CMD_PEER_PARENT ;
+	parentListPtr->header.cmd = CHNK_CMD_TOPO_INFO ;
 	parentListPtr->header.length = ( packetlen-sizeof(struct chunk_header_t)) ;	//pkt_buf paylod length
 	parentListPtr->header.rsv_1 = REQUEST ;
-	parentListPtr->self_pid = _peer_mgr_ptr ->self_pid ; 
+	parentListPtr->parent_num = count ; 
 	parentListPtr->manifest = manifestValue ;
+
+	if( oldPID != PK_PID+1 ){
+		parentListPtr ->parent_pid [i] = oldPID ;
+		i ++ ;
+	} 
+
 
 	for(pid_peerDown_info_iter =map_pid_peerDown_info.begin() ;pid_peerDown_info_iter != map_pid_peerDown_info.end() ;pid_peerDown_info_iter++ ){
 		//這個parent 有傳給自己
 		if(pid_peerDown_info_iter ->second ->peerInfo.manifest | manifestValue ){
 			 
-			parentListPtr ->parentPID [i] = pid_peerDown_info_iter ->first ;
+			parentListPtr ->parent_pid [i] = pid_peerDown_info_iter ->first ;
 			i++ ;
-			if(i == (count -1 ) )
-				break ;
+
 		}
 	}
 
@@ -2222,7 +2238,7 @@ void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){
 
 	_net_ptr->set_blocking(_sock);
 	
-	_net_ptr ->send(_sock , (char*)parentListPtr ,sizeof(struct parentList),0) ;
+	_net_ptr ->send(_sock , (char*)parentListPtr ,sizeof(struct update_topology_info),0) ;
 
 	_net_ptr->set_nonblocking(_sock);
 

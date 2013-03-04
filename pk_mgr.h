@@ -63,6 +63,7 @@ public:
 	unsigned long outside_lane_rescue_num;
 
 	unsigned long current_child_manifest;
+	unsigned long full_manifest;
 	int _sock; 		//PK socket
 
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
@@ -138,7 +139,7 @@ public:
 	void send_parentToPK(unsigned long manifestValue ,unsigned long oldPID);
 	//¥i¿W¥ßªºunitl
 	unsigned long manifestToSubstreamID(unsigned long  manifest );
-	unsigned long SubstreamIDToSubmanifest(unsigned long  SubstreamID );
+	unsigned long SubstreamIDToManifest(unsigned long  SubstreamID );
 
 //clear
 	void clear_map_pid_peer_info();

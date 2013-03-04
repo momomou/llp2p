@@ -452,24 +452,30 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 									pid_peerDown_info_iter ->second->peerInfo.manifest |= replyManifest;
 							
 								}
+
 								break;
 
 							}
 
 								pid_peer_info_iter++;
-							printf("test");
+
 						}
 
+
+						//要的是全部的串流且是第二個加入table的 (join) (第一個是PK) 則送拓墣
+						if((replyManifest == _pk_mgr_ptr ->full_manifest) && (_pk_mgr_ptr ->map_pid_peerDown_info.size() == 2) ){
+
+							for(unsigned long substreamID =0 ; substreamID < _pk_mgr_ptr->sub_stream_num ;substreamID++)
+							{
+								_pk_mgr_ptr ->send_parentToPK ( _pk_mgr_ptr ->SubstreamIDToManifest(substreamID) , PK_PID+1 );
+							}
+
+						}
 
 
 						_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
 
-						//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
-//						unsigned long tempManifest =0 ;
-//						for(tempManifest =0 ; tempManifest < sub_stream_num ;tempManifest++)
 
-
-//						if(replyManifest != ){
 							for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
 								if(peerDownInfoPtr->peerInfo.manifest & (1<<k)){
 									_pk_mgr_ptr->send_start_delay_measure_token(sock, k);
@@ -478,7 +484,6 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 							}
 //						}
 
-						//////////////////////////////////////////////////////////////////////////////////
 
 						for(pid_peer_info_iter =_pk_mgr_ptr ->map_pid_peer_info.begin();pid_peer_info_iter!= _pk_mgr_ptr ->map_pid_peer_info.end();pid_peer_info_iter++){
 							peerInfoPtr = pid_peer_info_iter->second;

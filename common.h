@@ -139,7 +139,7 @@ using std::bitset;
 #define CHNK_CMD_PEER_SEED				0X1B
 #define CHNK_CMD_PEER_START_DELAY_UPDATE			0X1C
 #define CHNK_CMD_PEER_PARENT_CHILDREN	0xF0	//¼È®É¤£¥Î
-#define CHNK_CMD_PEER_PARENT			0x1e
+#define CHNK_CMD_TOPO_INFO			0x1e
 
 
 
@@ -606,11 +606,11 @@ struct rescue_update_from_server{
 };
 
 // header | self_pid | manifest | parentPID | parentPID |....
-struct parentList{
+struct update_topology_info{
 	struct chunk_header_t header;
-	unsigned long self_pid;
-	unsigned long manifest;
-	unsigned long *parentPID ;
+	unsigned int manifest;
+	unsigned long parent_num;
+	unsigned long parent_pid[0];
 };
 
 
