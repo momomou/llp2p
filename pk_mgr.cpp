@@ -154,6 +154,7 @@ void pk_mgr::send_start_delay_measure_token(int sock,unsigned long sub_id){
 		fd_queue_iter = _peer_ptr->map_fd_out_ctrl.find(sock);
 		if(fd_queue_iter == _peer_ptr->map_fd_out_ctrl.end()){
 			printf("can not find out ctrl queue error send_start_delay_measure_token\n");
+			PAUSE
 			exit(1);
 		}
 
@@ -193,12 +194,14 @@ void pk_mgr::send_back_start_delay_measure_token(int sock,long long peer_start_d
 	temp_map_fd_pid_iter = _peer_ptr->map_fd_pid.find(sock);
 	if(temp_map_fd_pid_iter == _peer_ptr->map_fd_pid.end()){
 		printf("can not find fd error send_back_start_delay_measure_token\n");
+		PAUSE
 		exit(1);
 	}
 	else{
 		fd_queue_iter = _peer_ptr->map_fd_out_ctrl.find(sock);
 		if(fd_queue_iter == _peer_ptr->map_fd_out_ctrl.end()){
 			printf("can not find out ctrl queue error send_back_start_delay_measure_token\n");
+			PAUSE
 			exit(1);
 		}
 
@@ -256,6 +259,7 @@ void pk_mgr::send_capacity_to_pk(int sock){
 	for(int i=0;i<sub_stream_num;i++){
 		if((delay_table+i)->start_delay_struct.init_flag == 0){
 			printf("send capacity error start delay have to init\n");
+			PAUSE
 			exit(1);
 		}
 		else{
@@ -264,10 +268,12 @@ void pk_mgr::send_capacity_to_pk(int sock){
 			(delay_table+i)->source_delay_time = _log_ptr ->diffTime_ms((delay_table+i)->client_start_time,client_end_clock);
 			if((delay_table+i)->end_seq_num == 0){
 				printf("start delay end seq error in send_capacity_to_pk\n");
+				PAUSE
 				exit(1);
 			}
 			else if(((delay_table+i)->end_seq_num)< ((delay_table+i)->start_seq_num)){
 				printf("start delay end seq < start seq error in send_capacity_to_pk\n");
+				PAUSE
 				exit(1);
 			}
 			else if(((delay_table+i)->end_seq_num) == ((delay_table+i)->start_seq_num)){
@@ -412,12 +418,14 @@ void pk_mgr::send_start_delay_update(int sock, unsigned long start_delay_manifes
 		temp_map_pid_fd_iter = _peer_ptr->map_out_pid_fd.find(temp_map_pid_rescue_peer_info->first);
 		if(temp_map_pid_fd_iter == _peer_ptr->map_out_pid_fd.end()){
 			printf("can not find output pid in map_out_pid_fd (send_start_delay_update)\n");
+			PAUSE
 			exit(1);
 		}
 		else{
 			fd_out_ctrl_iter = _peer_ptr->map_fd_out_ctrl.find(temp_map_pid_fd_iter->second);
 			if(fd_out_ctrl_iter == _peer_ptr->map_fd_out_ctrl.end()){
 				printf("can not find output ctrl queue in map_fd_out_ctrl (send_start_delay_update)\n");
+				PAUSE
 				exit(1);
 			}
 			queue_out_ctrl_ptr = fd_out_ctrl_iter->second;
@@ -1190,7 +1198,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	}
 
 	//if rescue testing stream
-	if( parentPeerPtr ->peerInfo.manifest | pkDownInfoPtr->peerInfo.manifest  && parentPid != PK_PID){
+	if( parentPeerPtr ->peerInfo.manifest & pkDownInfoPtr->peerInfo.manifest  && parentPid != PK_PID){
 		(ssDetect_ptr + temp_sub_id) ->isTesting =1 ;	//ture
 		//這邊只是暫時改變PK的substream 實際上還是有串流下來
 		pkDownInfoPtr->peerInfo.manifest &= ~(pkDownInfoPtr->peerInfo.manifest | parentPeerPtr ->peerInfo.manifest);  

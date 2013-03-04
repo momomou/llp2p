@@ -418,6 +418,7 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 
 			printf("CHNK_CMD_PEER_TEST_DELAY  REPLY\n");
 
+
 			unsigned long replyManifest =chunk_ptr->header.sequence_number;
 			//第一個回覆的peer 放入peer_connect_down_t加入測量 並關閉其他連線和清除所有相關table
 			if(first_reply_peer){
@@ -464,11 +465,19 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 						_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
 
 						//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
+//						unsigned long tempManifest =0 ;
+//						for(tempManifest =0 ; tempManifest < sub_stream_num ;tempManifest++)
+
+
+//						if(replyManifest != ){
 							for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
 								if(peerDownInfoPtr->peerInfo.manifest & (1<<k)){
 									_pk_mgr_ptr->send_start_delay_measure_token(sock, k);
+									((_pk_mgr_ptr->delay_table)+k)->start_delay_struct.init_flag = 1 ;
 								}
 							}
+//						}
+
 						//////////////////////////////////////////////////////////////////////////////////
 
 						for(pid_peer_info_iter =_pk_mgr_ptr ->map_pid_peer_info.begin();pid_peer_info_iter!= _pk_mgr_ptr ->map_pid_peer_info.end();pid_peer_info_iter++){
@@ -768,3 +777,5 @@ void peer::data_close(int cfd, const char *reason ,int type)
 */
 
 }
+
+
