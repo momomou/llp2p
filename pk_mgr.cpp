@@ -1205,7 +1205,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	if( parentPeerPtr ->peerInfo.manifest & pkDownInfoPtr->peerInfo.manifest  && parentPid != PK_PID){
 		(ssDetect_ptr + temp_sub_id) ->isTesting =1 ;	//ture
 		//這邊只是暫時改變PK的substream 實際上還是有串流下來
-		pkDownInfoPtr->peerInfo.manifest &= ~(pkDownInfoPtr->peerInfo.manifest | parentPeerPtr ->peerInfo.manifest);  
+		pkDownInfoPtr->peerInfo.manifest &= ~(pkDownInfoPtr->peerInfo.manifest & parentPeerPtr ->peerInfo.manifest);  
 		//開始testing 送topology
 		send_parentToPK ( SubstreamIDToManifest (temp_sub_id) , (ssDetect_ptr + temp_sub_id)->previousParentPID ); 
 	}
@@ -1217,7 +1217,8 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 			(ssDetect_ptr + temp_sub_id) ->isTesting =0 ;  //false
 			(ssDetect_ptr + temp_sub_id) ->testing_count =0 ;
 			//testing ok should cut this substream from pk
-			send_rescueManifestToPKUpdate ( pkDownInfoPtr->peerInfo.manifest | SubstreamIDToManifest(temp_sub_id) );
+			pkDownInfoPtr->peerInfo.manifest  &=  ~SubstreamIDToManifest(temp_sub_id) ;
+			send_rescueManifestToPKUpdate ( pkDownInfoPtr->peerInfo.manifest);
 
 			//選擇selected peer 送topology
 			send_parentToPK(SubstreamIDToManifest (temp_sub_id) ,PK_PID +1 );
@@ -2131,7 +2132,7 @@ unsigned long  pk_mgr::manifestToSubstreamID(unsigned long  manifest )
 {
 	unsigned long  SubstreamID =0;
 	for(int i=0 ; i < sub_stream_num;i++){
-		if(1<< i  | manifest ){
+		if( (1<< i)  & manifest ){
 			SubstreamID = i;
 			return SubstreamID;
 		}
@@ -2145,7 +2146,7 @@ unsigned long  pk_mgr::manifestToSubstreamID(unsigned long  manifest )
 unsigned long  pk_mgr::SubstreamIDToManifest(unsigned long  SubstreamID )
 {
 	unsigned long manifest =0;
-	manifest |=  1<<SubstreamID ;
+	manifest |=  (1<<SubstreamID) ;
 		return manifest;
 }
 
@@ -2201,7 +2202,7 @@ void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){
 
 	for(pid_peerDown_info_iter =map_pid_peerDown_info.begin() ;pid_peerDown_info_iter != map_pid_peerDown_info.end() ;pid_peerDown_info_iter++ ){
 		//這個parent 有傳給自己
-		if(pid_peerDown_info_iter ->second ->peerInfo.manifest | manifestValue ){
+		if(pid_peerDown_info_iter ->second ->peerInfo.manifest & manifestValue ){
 			count ++;
 		}
 	}
@@ -2227,7 +2228,7 @@ void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){
 
 	for(pid_peerDown_info_iter =map_pid_peerDown_info.begin() ;pid_peerDown_info_iter != map_pid_peerDown_info.end() ;pid_peerDown_info_iter++ ){
 		//這個parent 有傳給自己
-		if(pid_peerDown_info_iter ->second ->peerInfo.manifest | manifestValue ){
+		if(pid_peerDown_info_iter ->second ->peerInfo.manifest & manifestValue ){
 			 
 			parentListPtr ->parent_pid [i] = pid_peerDown_info_iter ->first ;
 
