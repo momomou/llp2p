@@ -44,7 +44,7 @@ void peer_mgr::peer_mgr_set(network *net_ptr , logger *log_ptr , configuration *
 //只有註冊時收到peer list 才會呼叫
 void peer_mgr::connect_peer(struct chunk_level_msg_t *level_msg_ptr, unsigned long pid)
 {
-    set_up_public_ip(level_msg_ptr);
+    
 
 	for(unsigned long i = 0; i < _pk_mgr_ptr->lane_member; i++) {
 		if((level_msg_ptr->level_info[i])->pid != level_msg_ptr->pid) {
@@ -106,6 +106,7 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 	struct sockaddr_in peer_saddr;
 	int ret;
 	struct in_addr ip;
+//	struct in_addr selfip;
 
 //若在map_pid_peerDown_info 則不再次建立連線
 	pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(level_info_ptr ->pid);
@@ -128,16 +129,22 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 	memset((struct sockaddr_in*)&peer_saddr, 0x0, sizeof(struct sockaddr_in));
 	
 //在同個NAT 底下
-    if(self_public_ip == level_info_ptr->public_ip)
+    if(self_public_ip == level_info_ptr->public_ip){
 	    peer_saddr.sin_addr.s_addr = level_info_ptr->private_ip;
-    else
+		ip.s_addr = level_info_ptr->private_ip;
+		printf("connect to private_ip %s port= %d \n" ,inet_ntoa (ip),level_info_ptr->tcp_port );
+	}else{
         peer_saddr.sin_addr.s_addr = level_info_ptr->public_ip;
-	
+		ip.s_addr = level_info_ptr->public_ip;
+//		selfip.s_addr = self_public_ip ;
+//		printf("connect to public %s  port= %d \n", inet_ntoa(ip),level_info_ptr->tcp_port);	
+	}
+
 	peer_saddr.sin_port = htons(level_info_ptr->tcp_port);
 	peer_saddr.sin_family = AF_INET;
 
 	ip.s_addr = level_info_ptr->public_ip;
-	printf("connect to %s\n", inet_ntoa(ip));	
+	printf("connect to %s  port= %d \n", inet_ntoa(ip),level_info_ptr->tcp_port);	
 	
 	if(connect(_sock, (struct sockaddr*)&peer_saddr, sizeof(peer_saddr)) < 0) {
 		cout << "build_ connection failure" << endl;
@@ -798,15 +805,12 @@ void peer_mgr::clear_ouput_buffer(unsigned long pid)
 	} 
 }
 
-void peer_mgr::set_up_public_ip(struct chunk_level_msg_t *level_msg_ptr)
+void peer_mgr::set_up_public_ip(unsigned long public_ip)
 {
     if(self_public_ip == 0){
-        for(unsigned long i = 0; i < _pk_mgr_ptr->lane_member; i++) {
-		    if((level_msg_ptr->level_info[i])->pid == level_msg_ptr->pid) {
-			    self_public_ip = level_msg_ptr->level_info[i]->public_ip;
-                //printf("self public ip set to %d\n", self_public_ip);
-		    }
-	    }
+
+			    self_public_ip = public_ip;
+
     }
 }
 

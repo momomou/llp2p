@@ -406,7 +406,7 @@ struct chunk_register_reply_t {
 	unsigned long level;
 	unsigned long bit_rate;
 	unsigned long sub_stream_num;
-	unsigned long parallel_rescue_num;
+	unsigned long public_ip;
 	unsigned long inside_lane_rescue_num;
 	struct level_info_t *level_info[0];	
 };

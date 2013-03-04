@@ -31,7 +31,7 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 //	_recv_byte_count = 0;
 	 bit_rate = 0;
 	 sub_stream_num = 0;
-	 parallel_rescue_num = 0;
+	 public_ip = 0;
 	 inside_lane_rescue_num = 0;
 	 outside_lane_rescue_num = 0;
 //	 peer_list_member = 0;
@@ -726,7 +726,7 @@ int pk_mgr::handle_pkt_in(int sock)
 	offset = 0;
 
 //handle CHNK_CMD_PEER_ REG, expect recv  chunk_register_reply_t    from  PK
-//ligh |  pid |  level |   bit_rate|   sub_stream_num |  parallel_rescue_num |  inside_lane_rescue_num | n*struct level_info_t
+//ligh |  pid |  level |   bit_rate|   sub_stream_num |  public_ip |  inside_lane_rescue_num | n*struct level_info_t
 //這邊應該包含整條lane 的peer_info 包含自己
 
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_REG  ) {
@@ -743,18 +743,21 @@ int pk_mgr::handle_pkt_in(int sock)
 		
 		memcpy(&bit_rate, (char *)chunk_ptr + offset, sizeof(unsigned long));
 		memcpy(&sub_stream_num, ((char *)chunk_ptr + offset + sizeof(unsigned long)), sizeof(unsigned long));
-		memcpy(&parallel_rescue_num, ((char *)chunk_ptr + offset + 2 * sizeof(unsigned long)), sizeof(unsigned long));
+		memcpy(&public_ip, ((char *)chunk_ptr + offset + 2 * sizeof(unsigned long)), sizeof(unsigned long));
 		memcpy(&inside_lane_rescue_num, ((char *)chunk_ptr + offset + 3 * sizeof(unsigned long)), sizeof(unsigned long));
 		
 
+		_peer_mgr_ptr ->set_up_public_ip(public_ip);
+
+
 		cout<< "bit_rate = " <<  bit_rate << endl;
 		cout<< "sub_stream_num = " <<  sub_stream_num << endl;
-		cout<< "parallel_rescue_num = " <<  parallel_rescue_num << endl;
+		cout<< "public_ip = " <<  public_ip << endl;
 		cout<< "inside_lane_rescue_num = " <<  inside_lane_rescue_num << endl;
 
 		offset += sizeof(unsigned long) * 4;
 
-	//將收到的封包放進  去除掉bit_rate .sub_stream_num .parallel_rescue_num . inside_lane_rescue_num  ,後放進  chunk_level_msg_t
+	//將收到的封包放進  去除掉bit_rate .sub_stream_num .public_ip . inside_lane_rescue_num  ,後放進  chunk_level_msg_t
 
 		//註冊時要的manifest是要全部的substream
 		unsigned long tempManifes=0;
@@ -827,6 +830,7 @@ int pk_mgr::handle_pkt_in(int sock)
 		if(chunk_ptr->header.rsv_1 == REQUEST){
 
 			printf(" not go here!!!!!!!!!!!!!!!!!!!CHNK_CMD_PEER_START_DELAY pk mgr request\n");
+			PAUSE
 /*			unsigned long temp_start_delay;
 			unsigned long request_sub_id;
 
@@ -2206,14 +2210,14 @@ void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){
 	}
 
 
-	packetlen = count * sizeof (unsigned long ) + -sizeof(struct update_topology_info) ;
+	packetlen = count * sizeof (unsigned long ) + sizeof(struct update_topology_info) ;
 	parentListPtr = (struct update_topology_info *) new char [packetlen];
 
 
 	memset(parentListPtr, 0x0, sizeof(struct update_topology_info));
 	
 	parentListPtr->header.cmd = CHNK_CMD_TOPO_INFO ;
-	parentListPtr->header.length = ( packetlen-sizeof(struct chunk_header_t)) ;	//pkt_buf paylod length
+	parentListPtr->header.length = ( packetlen-sizeof(struct chunk_header_t)) ;	//pkt_buf = payload length
 	parentListPtr->header.rsv_1 = REQUEST ;
 	parentListPtr->parent_num = count ; 
 	parentListPtr->manifest = manifestValue ;
@@ -2229,16 +2233,15 @@ void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){
 		if(pid_peerDown_info_iter ->second ->peerInfo.manifest | manifestValue ){
 			 
 			parentListPtr ->parent_pid [i] = pid_peerDown_info_iter ->first ;
+
 			i++ ;
 
 		}
 	}
 
-
-
 	_net_ptr->set_blocking(_sock);
 	
-	_net_ptr ->send(_sock , (char*)parentListPtr ,sizeof(struct update_topology_info),0) ;
+	_net_ptr ->send(_sock , (char*)parentListPtr ,packetlen ,0) ;
 
 	_net_ptr->set_nonblocking(_sock);
 

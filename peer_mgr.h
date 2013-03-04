@@ -42,7 +42,7 @@ public:
 	void cut_rescue_peer(int sock);
 	void del_rescue_downstream();
 	void cut_rescue_downstream(unsigned long pid);
-    void set_up_public_ip(struct chunk_level_msg_t *level_msg_ptr);
+    void set_up_public_ip(unsigned long public_ip);
     void clear_ouput_buffer(unsigned long pid);
 	
 	virtual int handle_pkt_in(int sock);

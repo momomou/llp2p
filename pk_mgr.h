@@ -58,7 +58,7 @@ public:
 	unsigned long bit_rate;
 	unsigned long sub_stream_num;
 
-	unsigned long parallel_rescue_num;
+	unsigned long public_ip;
 	unsigned long inside_lane_rescue_num;
 	unsigned long outside_lane_rescue_num;
 
