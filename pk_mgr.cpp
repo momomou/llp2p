@@ -93,7 +93,7 @@ void pk_mgr::delay_table_init()
 	for(int i=0;i<sub_stream_num;i++){
 		(delay_table+i)->start_delay_struct.init_flag = 0;
 		(delay_table+i)->start_delay_struct.sub_stream_id = i;
-		(delay_table+i)->start_delay_struct.start_delay = -1;
+		(delay_table+i)->start_delay_struct.start_delay = 0;
 		(delay_table+i)->start_delay_struct.end_clock;
 		(delay_table+i)->start_delay_struct.start_clock;
 		(delay_table+i)->client_start_time;
@@ -107,7 +107,7 @@ void pk_mgr::delay_table_init()
 	printf("%d %d %d\n",(delay_table+2)->start_seq_num,sizeof(struct source_delay),sub_stream_num);
 	printf("====================================================================\n");
 }
-
+/*
 void pk_mgr::send_start_delay_measure_token(int sock,unsigned long sub_id){
 	map<unsigned long, int>::iterator pid_fd_iter;
 	map<int, queue<struct chunk_t *> *>::iterator fd_queue_iter;
@@ -217,7 +217,7 @@ void pk_mgr::send_back_start_delay_measure_token(int sock,long long peer_start_d
 			_net_ptr->epoll_control(fd_queue_iter->first, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
 		} 
 	}
-}
+}*/
 //////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////send capacity
@@ -230,7 +230,7 @@ void pk_mgr::send_back_start_delay_measure_token(int sock,long long peer_start_d
 	*/
 void pk_mgr::send_capacity_init(){
 	peer_start_delay_count = 0;
-	peer_join_send = 0;
+	//peer_join_send = 0;
 }
 
 void pk_mgr::send_capacity_to_pk(int sock){
@@ -349,16 +349,14 @@ void pk_mgr::send_capacity_to_pk(int sock){
 //////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////2/20 start delay update
-void pk_mgr::send_start_delay_update(int sock, unsigned long start_delay_manifest, int start_delay_differ){
+/*void pk_mgr::send_start_delay_update(int sock, unsigned long start_delay_manifest, int start_delay_differ){
 	
 	struct update_start_delay *update_start_delay_ptr = NULL;
 	struct chunk_t * chunk_ptr = NULL;
 	unsigned long msg_size;
 	unsigned long reply_size;
 	unsigned long offset = 0;
-	/*
-	initial an output structure
-	*/
+	
 	msg_size = sizeof(struct chunk_header_t) + sub_stream_num * sizeof(struct start_delay_update_info *);
 	reply_size = msg_size - sub_stream_num * sizeof(struct start_delay_update_info *) + sub_stream_num * sizeof(struct start_delay_update_info);
 
@@ -408,9 +406,7 @@ void pk_mgr::send_start_delay_update(int sock, unsigned long start_delay_manifes
 	
 	if(update_start_delay_ptr)
 		delete update_start_delay_ptr;
-	/*
-	push it to the output ctrl buffer
-	*/
+	
 	map<unsigned long, struct peer_info_t *>::iterator temp_map_pid_rescue_peer_info;	
 	map<unsigned long, int>::iterator temp_map_pid_fd_iter;
 	map<int, queue<struct chunk_t *> *>::iterator fd_out_ctrl_iter;
@@ -435,7 +431,7 @@ void pk_mgr::send_start_delay_update(int sock, unsigned long start_delay_manifes
 			_net_ptr->epoll_control(temp_map_pid_fd_iter->second, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
 		}
 	}
-}
+}*/
 //////////////////////////////////////////////////////////////////////////////////
 
 void pk_mgr::peer_mgr_set(peer_mgr *peer_mgr_ptr)
@@ -811,8 +807,10 @@ int pk_mgr::handle_pkt_in(int sock)
 
 
 	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY_UPDATE) {
+		printf("CHNK_CMD_PEER_START_DELAY_UPDATE pk mgr\n");
+		exit(1);
 	//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
-		struct update_start_delay *update_start_delay_ptr = NULL;
+		/*struct update_start_delay *update_start_delay_ptr = NULL;
 		update_start_delay_ptr = (update_start_delay *)chunk_ptr;
 		for(int k=0;k<sub_stream_num;k++){
 			(delay_table+k)->start_delay_struct.start_delay = (delay_table+k)->start_delay_struct.start_delay + update_start_delay_ptr->update_info[k]->start_delay_update;
@@ -821,24 +819,18 @@ int pk_mgr::handle_pkt_in(int sock)
 			temp_manifest = temp_manifest | (1<<k);
 
 			send_start_delay_update(sock, temp_manifest, update_start_delay_ptr->update_info[k]->start_delay_update);
-		}
+		}*/
 	//////////////////////////////////////////////////////////////////////////////////
 	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY) {
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
 
 		printf("CHNK_CMD_PEER_START_DELAY pk mgr\n");
+		exit(1);
+		/*
 		if(chunk_ptr->header.rsv_1 == REQUEST){
 
 			printf(" not go here!!!!!!!!!!!!!!!!!!!CHNK_CMD_PEER_START_DELAY pk mgr request\n");
 			PAUSE
-/*			unsigned long temp_start_delay;
-			unsigned long request_sub_id;
-
-			memcpy(&request_sub_id, (char *)chunk_ptr + sizeof(struct chunk_header_t) + sizeof(unsigned long), sizeof(unsigned long));
-
-			temp_start_delay = (delay_table+request_sub_id)->start_delay_struct.start_delay;
-			send_back_start_delay_measure_token(sock, temp_start_delay, request_sub_id);
-*/
 		}
 		else{
 			printf("CHNK_CMD_PEER_START_DELAY pk mgr reply\n");
@@ -883,7 +875,7 @@ int pk_mgr::handle_pkt_in(int sock)
 			else{
 				printf("start_delay update error\n");
 			}
-		}
+		}*/
 	//////////////////////////////////////////////////////////////////////////////////
 
 
@@ -1238,19 +1230,24 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
 
-	//printf("%d %d\n",(delay_table+temp_sub_id)->start_delay_struct.init_flag,temp_sub_id);
-	if(!((delay_table+temp_sub_id)->start_delay_struct.init_flag)){
-		printf("start measure start delay\n");
-		send_start_delay_measure_token(sockfd, temp_sub_id);
-		(delay_table+temp_sub_id)->start_seq_num = chunk_ptr ->header.sequence_number;
-		(delay_table+temp_sub_id)->start_seq_abs_time = chunk_ptr->header.timestamp;
-		(delay_table+temp_sub_id)->start_delay_struct.init_flag = 1;
-		source_delay_init(temp_sub_id);
-	}
 	//////////////////////////////////////////////////////////////////////////////////send capacity
 	(delay_table+temp_sub_id)->end_seq_num = chunk_ptr ->header.sequence_number;
 	(delay_table+temp_sub_id)->end_seq_abs_time = chunk_ptr ->header.timestamp;
 	//////////////////////////////////////////////////////////////////////////////////
+
+	//printf("%d %d\n",(delay_table+temp_sub_id)->start_delay_struct.init_flag,temp_sub_id);
+	if(!((delay_table+temp_sub_id)->start_delay_struct.init_flag)){
+		/*printf("start measure start delay\n");
+		send_start_delay_measure_token(sockfd, temp_sub_id);*/
+		(delay_table+temp_sub_id)->start_seq_num = chunk_ptr ->header.sequence_number;
+		(delay_table+temp_sub_id)->start_seq_abs_time = chunk_ptr->header.timestamp;
+		(delay_table+temp_sub_id)->start_delay_struct.init_flag = 1;
+		source_delay_init(temp_sub_id);
+		peer_start_delay_count++;
+		if(peer_start_delay_count == sub_stream_num){
+			send_capacity_to_pk(_sock);
+		}
+	}
 	
 	//////////////////////////////////////////////////////////////////////////////////
 //send down stream(UPLOAD) to other peer if SSID match and in map_pid_rescue_peer_info

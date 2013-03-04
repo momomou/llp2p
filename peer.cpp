@@ -298,8 +298,10 @@ int peer::handle_pkt_in(int sock)
 		_pk_mgr_ptr->handle_stream(chunk_ptr, sock);
 
 	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY_UPDATE) {
+		printf("CHNK_CMD_PEER_START_DELAY_UPDATE peer\n");
+		exit(1);
 	//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
-		struct update_start_delay *update_start_delay_ptr = NULL;
+		/*struct update_start_delay *update_start_delay_ptr = NULL;
 		update_start_delay_ptr = (update_start_delay *)chunk_ptr;
 		for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
 			(_pk_mgr_ptr->delay_table+k)->start_delay_struct.start_delay = (_pk_mgr_ptr->delay_table+k)->start_delay_struct.start_delay + update_start_delay_ptr->update_info[k]->start_delay_update;
@@ -308,12 +310,13 @@ int peer::handle_pkt_in(int sock)
 			temp_manifest = temp_manifest | (1<<k);
 
 			_pk_mgr_ptr->send_start_delay_update(sock, temp_manifest, update_start_delay_ptr->update_info[k]->start_delay_update);
-		}
+		}*/
 	//////////////////////////////////////////////////////////////////////////////////
 	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY) {
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
 		printf("CHNK_CMD_PEER_START_DELAY peer\n");
-		if(chunk_ptr->header.rsv_1 == REQUEST){
+		exit(1);
+		/*if(chunk_ptr->header.rsv_1 == REQUEST){
 			printf("CHNK_CMD_PEER_START_DELAY peer request\n");
 			unsigned long temp_start_delay;
 			unsigned long request_sub_id;
@@ -366,7 +369,7 @@ int peer::handle_pkt_in(int sock)
 			else{
 				printf("start_delay error\n");
 			}
-		}
+		}*/
 	//////////////////////////////////////////////////////////////////////////////////
 
 //cmd =CHNK_CMD_PEER_BWN
@@ -476,12 +479,12 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 						_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
 
 
-							for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
+							/*for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
 								if(peerDownInfoPtr->peerInfo.manifest & (1<<k)){
 									_pk_mgr_ptr->send_start_delay_measure_token(sock, k);
 									((_pk_mgr_ptr->delay_table)+k)->start_delay_struct.init_flag = 1 ;
 								}
-							}
+							}*/
 //						}
 
 

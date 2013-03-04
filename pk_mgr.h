@@ -70,17 +70,17 @@ public:
 	struct source_delay *delay_table;
 	void delay_table_init();
 	void source_delay_init(unsigned long init_ssid);
-	void send_start_delay_measure_token(int sock,unsigned long sub_id);
-	void send_back_start_delay_measure_token(int sock,long long peer_start_delay,unsigned long sub_id);
+	//void send_start_delay_measure_token(int sock,unsigned long sub_id);
+	//void send_back_start_delay_measure_token(int sock,long long peer_start_delay,unsigned long sub_id);
 	//////////////////////////////////////////////////////////////////////////////////
 	
 	//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
-	void send_start_delay_update(int sock, unsigned long start_delay_manifest, int start_delay_differ);
+	//void send_start_delay_update(int sock, unsigned long start_delay_manifest, int start_delay_differ);
 	//////////////////////////////////////////////////////////////////////////////////
 
 	//////////////////////////////////////////////////////////////////////////////////send capacity
 	int peer_start_delay_count;
-	int peer_join_send;
+	//int peer_join_send;
 	void send_capacity_init();
 	void send_capacity_to_pk(int sock);
 	//////////////////////////////////////////////////////////////////////////////////
