@@ -994,7 +994,8 @@ int pk_mgr::handle_pkt_in(int sock)
 
 		for(unsigned long substreamID =0 ; substreamID < sub_stream_num ;substreamID++)
 		{
-			send_parentToPK ( SubstreamIDToManifest(substreamID) , PK_PID+1 );
+			if( pkDownInfoPtr ->peerInfo.manifest &  SubstreamIDToManifest(substreamID))
+				send_parentToPK ( SubstreamIDToManifest(substreamID) , PK_PID+1 );
 		}
 
 //CHNK_CMD_PEER_PARENT_CHILDREN
@@ -1871,8 +1872,13 @@ void pk_mgr::clear_map_pid_peer_info(unsigned long manifest){
 		peerInfoPtr=pid_peer_info_iter ->second;
 
 		if(peerInfoPtr ->manifest == manifest){
+			delete peerInfoPtr;
+
 			map_pid_peer_info.erase(pid_peer_info_iter);
-		delete peerInfoPtr;
+			pid_peer_info_iter =map_pid_peer_info.begin() ;
+			if(pid_peer_info_iter == map_pid_peer_info.end())
+				break;
+
 		}
 	}
 

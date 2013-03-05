@@ -493,16 +493,23 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 
 							if (peerInfoPtr->manifest == replyManifest){
 							//若是自己或是先前已經建立過連線的parent 則不close (會關到正常連線)
-							if(pid_peer_info_iter ->first == _peer_mgr_ptr ->self_pid){
-								continue;
-							}else if(_pk_mgr_ptr ->map_pid_peerDown_info.find(pid_peer_info_iter ->first) != _pk_mgr_ptr ->map_pid_peerDown_info.end()){
-								continue;
-							}
+								if(pid_peer_info_iter ->first == _peer_mgr_ptr ->self_pid){
+									continue;
+								}else if(_pk_mgr_ptr ->map_pid_peerDown_info.find(pid_peer_info_iter ->first) != _pk_mgr_ptr ->map_pid_peerDown_info.end()){
+									continue;
+								}
 
-							data_close(map_in_pid_fd[peerInfoPtr->pid ],"close by firstReplyPid",CLOSE_PARENT);
+								if(map_in_pid_fd.find( peerInfoPtr->pid ) != map_in_pid_fd.end()){
+									data_close(map_in_pid_fd[peerInfoPtr->pid ],"close by firstReplyPid",CLOSE_PARENT);
+									pid_peer_info_iter  = _pk_mgr_ptr ->map_pid_peer_info.begin() ;
+									//刪掉最後一個  離開
+									if(pid_peer_info_iter == _pk_mgr_ptr ->map_pid_peer_info.end())
+										break;
+								}
+
 							}
-							_pk_mgr_ptr ->clear_map_pid_peer_info(replyManifest);
 						}
+						_pk_mgr_ptr ->clear_map_pid_peer_info(replyManifest);
 					}
 				}
 
@@ -511,7 +518,7 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 
 
 
-		}
+		} // END ...  else if(chunk_ptr->header.rsv_1 ==REPLY){
 
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_SET_MANIFEST){
 		printf("CHNK_CMD_PEER_SET_MANIFEST\n");
