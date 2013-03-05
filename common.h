@@ -4,7 +4,7 @@
 
 #define FD_SETSIZE		2048
 ////resuce PARAMETER////
-#define PARAMETER_X		10
+#define PARAMETER_X		20
 #define PK_PID			999999
 
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue

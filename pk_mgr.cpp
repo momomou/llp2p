@@ -1202,11 +1202,13 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 	}
 
-	//if rescue testing stream
-	if( parentPeerPtr ->peerInfo.manifest & pkDownInfoPtr->peerInfo.manifest  && parentPid != PK_PID){
+	//如果這個chunk的substream 從pk和這個peer都有來(if rescue testing stream)
+	if ( (SubstreamIDToManifest (temp_sub_id) & parentPeerPtr ->peerInfo.manifest)  &&  (SubstreamIDToManifest (temp_sub_id) & pkDownInfoPtr->peerInfo.manifes) && parentPid != PK_PID){
+
 		(ssDetect_ptr + temp_sub_id) ->isTesting =1 ;	//ture
+		printf("SSID = %d start testing stream\n");
 		//這邊只是暫時改變PK的substream 實際上還是有串流下來
-		pkDownInfoPtr->peerInfo.manifest &= ~(pkDownInfoPtr->peerInfo.manifest & parentPeerPtr ->peerInfo.manifest);  
+		pkDownInfoPtr->peerInfo.manifest &= (~SubstreamIDToManifest (temp_sub_id));  
 		//開始testing 送topology
 		send_parentToPK ( SubstreamIDToManifest (temp_sub_id) , (ssDetect_ptr + temp_sub_id)->previousParentPID ); 
 	}
@@ -1220,7 +1222,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 			//testing ok should cut this substream from pk
 			pkDownInfoPtr->peerInfo.manifest  &=  ~SubstreamIDToManifest(temp_sub_id) ;
 			send_rescueManifestToPKUpdate ( pkDownInfoPtr->peerInfo.manifest);
-
+			printf("testing ok sent new topology \n");
 			//選擇selected peer 送topology
 			send_parentToPK(SubstreamIDToManifest (temp_sub_id) ,PK_PID +1 );
 
@@ -1315,7 +1317,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 			//下一個還沒到 ,不做處理等待並return
 			if((*(_chunk_bitstream + (_current_send_sequence_number % _bucket_size))).header.sequence_number != _current_send_sequence_number){
-				printf("wait packet,seq= %d  SSID =%d\n",_current_send_sequence_number,_current_send_sequence_number%sub_stream_num);
+//				printf("wait packet,seq= %d  SSID =%d\n",_current_send_sequence_number,_current_send_sequence_number%sub_stream_num);
 //				_current_send_sequence_number = seq_ready_to_send;
 //	_log_ptr->write_log_format("s u s u s u s u\n","seq_ready_to_send",seq_ready_to_send,"_least_sequence_number",_least_sequence_number);
 //				PAUSE
@@ -1607,8 +1609,10 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 
 	(ssDetect_ptr + substreamID) ->last_seq = chunk_ptr->header.sequence_number;
 
+	}else if (  ((ssDetect_ptr + substreamID) ->last_seq ) == (chunk_ptr->header.sequence_number)){
+	//doing nothing
 	}else{
-		printf("why here old packet here??\n");
+			printf("why here old packet here??\n");
 	}
 
 	return ;
@@ -1673,7 +1677,7 @@ void pk_mgr::measure()
 			}
 		}
 
-		printf("totalSourceBitrate=%.5f   totalLocalBitrate=%.5f\n",totalSourceBitrate,totalLocalBitrate);
+//		printf("totalSourceBitrate=%.5f   totalLocalBitrate=%.5f\n",totalSourceBitrate,totalLocalBitrate);
 
 		//設定最近偵測的狀態到rescueStatsArry
 		for(int i=0 ; i<= perPeerSS_num ;i++){
@@ -1687,7 +1691,7 @@ void pk_mgr::measure()
 			connectPeerInfo ->rescueStatsArry[( (ssDetect_ptr + peerHighestSSID)->measure_N -1)% PARAMETER_M ] =0;
 		}
 
-		printf("****************   PID=%d   *******************\n",connectPeerInfo ->peerInfo.pid);
+//		printf("****************   PID=%d   *******************\n",connectPeerInfo ->peerInfo.pid);
 
 		//根據rescueStatsArry 來決定要不要觸發rescue
 		for(int i=0 ; i<PARAMETER_M ;i++){
@@ -1697,15 +1701,13 @@ void pk_mgr::measure()
 
 			if(connectPeerInfo ->rescueStatsArry[i] >0){
 			count_N++;
-//			totalStats+=( pid_peer_info_iter->second ) ->rescueStatsArry[i] ;
-//			rescueSS= (totalStats/count_N) +1 ;
 			}
 
 
 			
-			printf("%d  ",connectPeerInfo ->rescueStatsArry[i]);
+//			printf("%d  ",connectPeerInfo ->rescueStatsArry[i]);
 		}
-		printf("\n");
+//		printf("\n");
 
 			//近PARAMETER_P次 發生 P次
 			for(int j=0 ; j<PARAMETER_P ;j++){
@@ -1716,12 +1718,12 @@ void pk_mgr::measure()
 
 
 		for(int k=0 ; k<( (ssDetect_ptr + peerHighestSSID)->measure_N -1)% PARAMETER_M ;k++)
-		printf("   ");
-		printf("↑\n");
+//		printf("   ");
+//		printf("↑\n");
 
 		//找出統計最多的值
 		for(int k=0 ;k< (sub_stream_num+1) ;k++){
-		printf("substream%d = %d   \n",k,*(statsArryCount_ptr+ k) );
+//		printf("substream%d = %d   \n",k,*(statsArryCount_ptr+ k) );
 
 		if( k != 0 && tempMax < (*(statsArryCount_ptr+ k)) ){
 				tempMax =(*(statsArryCount_ptr+ k)) ;
@@ -2229,6 +2231,7 @@ void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){
 
 	if( oldPID != PK_PID+1 ){
 		parentListPtr ->parent_pid [i] = oldPID ;
+		printf("SSID =%d my old parent = %d  ",manifestToSubstreamID(manifestValue),oldPID);
 		i ++ ;
 	} 
 
@@ -2238,7 +2241,7 @@ void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){
 		if(pid_peerDown_info_iter ->second ->peerInfo.manifest & manifestValue ){
 			 
 			parentListPtr ->parent_pid [i] = pid_peerDown_info_iter ->first ;
-
+			printf("SSID =%d  my new parent = %d  \n",manifestToSubstreamID(manifestValue),pid_peerDown_info_iter ->first );
 			i++ ;
 
 		}

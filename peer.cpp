@@ -465,7 +465,7 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 						}
 
 
-						//要的是全部的串流且是第二個加入table的 (join) (第一個是PK) 則送拓墣
+						//要的是全部的串流且是第二個加入table的 (join且 自己不是seed) (第一個是PK ) 則送拓墣
 						if((replyManifest == _pk_mgr_ptr ->full_manifest) && (_pk_mgr_ptr ->map_pid_peerDown_info.size() == 2) ){
 
 							for(unsigned long substreamID =0 ; substreamID < _pk_mgr_ptr->sub_stream_num ;substreamID++)
