@@ -791,10 +791,12 @@ int pk_mgr::handle_pkt_in(int sock)
 		send_capacity_init();
 		//////////////////////////////////////////////////////////////////////////////////
 	//和lane 每個peer 先建立好連線 
-		if(lane_member >= 1)
+		if(lane_member >= 1){
 			_peer_mgr_ptr->connect_peer(level_msg_ptr, level_msg_ptr->pid);
 
-		_peer_mgr_ptr->handle_test_delay(tempManifes);
+			_peer_mgr_ptr->handle_test_delay(tempManifes);
+		}
+
 
 		for (i = 0; i < lane_member; i++) {
 			if(level_msg_ptr->level_info[i])
@@ -882,7 +884,7 @@ int pk_mgr::handle_pkt_in(int sock)
 // light | pid | level   | n*struct rescue_peer_info
 	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_RESCUE_LIST) {
 		printf("CHNK_CMD_PEER_RESCUE_LIST\n");
-		//system("pause");
+
 ////////////////////////////////////////////////
 //		clear_map_pid_peer_info();
 
@@ -895,7 +897,7 @@ int pk_mgr::handle_pkt_in(int sock)
 		
 		offset += (level_msg_size - lane_member * sizeof(struct level_info_t *));
 
-
+printf("list peer num %d",lane_member);
 		for (i = 0; i < lane_member; i++) {
 			level_msg_ptr->level_info[i] = new struct level_info_t;
 			new_peer = new struct peer_info_t;
@@ -916,11 +918,13 @@ int pk_mgr::handle_pkt_in(int sock)
 
 
 //			map_pid_peer_info[new_peer->pid] = new_peer;
+printf( "  pid = %d   ",new_peer->pid);
 			map_pid_peer_info.insert(pair<unsigned long ,peer_info_t *>(new_peer->pid,new_peer));  
 
 			new_peer ->manifest = ((struct chunk_rescue_list*)chunk_ptr) ->manifest;
 
 		}
+printf("\n");
 
 
 //////////////////////////////////
@@ -930,11 +934,11 @@ int pk_mgr::handle_pkt_in(int sock)
 
 //和lane 每個peer 先建立好連線	
 //
-		if(lane_member >= 1)
+		if(lane_member >= 1){
 			_peer_mgr_ptr->connect_peer(level_msg_ptr, level_msg_ptr->pid);
 
-		_peer_mgr_ptr->handle_test_delay( ((struct chunk_rescue_list*)chunk_ptr) ->manifest);
-
+			_peer_mgr_ptr->handle_test_delay( ((struct chunk_rescue_list*)chunk_ptr) ->manifest);
+		}
 
 		for (i = 0; i < lane_member; i++) {
 			if(level_msg_ptr->level_info[i])
@@ -1173,7 +1177,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		
 	} else if((*(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number == chunk_ptr->header.sequence_number){
 		chunk_ptr->header.length = 0;
-		printf("duplicate sequence number in the buffer  seq=%u\n",chunk_ptr->header.sequence_number);
+//printf("duplicate sequence number in the buffer  seq=%u\n",chunk_ptr->header.sequence_number);
 		return;
 	} else {
 		chunk_ptr->header.length = 0;
@@ -1203,10 +1207,10 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	}
 
 	//如果這個chunk的substream 從pk和這個peer都有來(if rescue testing stream)
-	if ( (SubstreamIDToManifest (temp_sub_id) & parentPeerPtr ->peerInfo.manifest)  &&  (SubstreamIDToManifest (temp_sub_id) & pkDownInfoPtr->peerInfo.manifes) && parentPid != PK_PID){
+	if ( (SubstreamIDToManifest (temp_sub_id) & parentPeerPtr ->peerInfo.manifest)  &&  (SubstreamIDToManifest (temp_sub_id) & pkDownInfoPtr->peerInfo.manifest) && parentPid != PK_PID){
 
 		(ssDetect_ptr + temp_sub_id) ->isTesting =1 ;	//ture
-		printf("SSID = %d start testing stream\n");
+		printf("SSID = %d start testing stream\n",temp_sub_id);
 		//這邊只是暫時改變PK的substream 實際上還是有串流下來
 		pkDownInfoPtr->peerInfo.manifest &= (~SubstreamIDToManifest (temp_sub_id));  
 		//開始testing 送topology
@@ -1216,7 +1220,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	if((ssDetect_ptr + temp_sub_id) ->isTesting){
 		(ssDetect_ptr + temp_sub_id) ->testing_count++ ;
 		//測試次數填滿整個狀態  也就是測量了PARAMETER_M 次都沒問題
-		if((ssDetect_ptr + temp_sub_id) ->testing_count % (stream_number * PARAMETER_X)  >= PARAMETER_M ){
+		if(((ssDetect_ptr + temp_sub_id) ->testing_count / (stream_number * PARAMETER_X) )  >= PARAMETER_M ){
 			(ssDetect_ptr + temp_sub_id) ->isTesting =0 ;  //false
 			(ssDetect_ptr + temp_sub_id) ->testing_count =0 ;
 			//testing ok should cut this substream from pk
@@ -1785,7 +1789,7 @@ void pk_mgr::measure()
 				afterManifest = manifestFactory (connectPeerInfo ->peerInfo.manifest , rescueSS);
 				pkDownInfoPtr ->peerInfo.manifest |=(connectPeerInfo ->peerInfo.manifest &(~afterManifest) );
 				send_rescueManifestToPK(pkDownInfoPtr ->peerInfo.manifest );
-				printf("rescue manifest %d after manifest %d  PK=%d",connectPeerInfo ->peerInfo.manifest,afterManifest,pkDownInfoPtr ->peerInfo.manifest );
+				printf("rescue manifest %d after manifest %d  PK=%d \n",connectPeerInfo ->peerInfo.manifest,afterManifest,pkDownInfoPtr ->peerInfo.manifest );
 				connectPeerInfo ->peerInfo.manifest = afterManifest ;
 				_peer_mgr_ptr->send_manifest_to_parent(afterManifest ,connectPeerInfo ->peerInfo.pid);
 
