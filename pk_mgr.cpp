@@ -1608,7 +1608,7 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 	(ssDetect_ptr + substreamID) ->last_seq = chunk_ptr->header.sequence_number;
 
 	}else{
-		printf("why here ?\n");
+		printf("why here old packet here??\n");
 	}
 
 	return ;
@@ -1789,10 +1789,11 @@ void pk_mgr::measure()
 
 				tempManifest =pkDownInfoPtr ->peerInfo.manifest ;
 
+				//把先前的連接的PID存起來
 				while(tempManifest){
 					testingSubStreamID = manifestToSubstreamID (tempManifest);
 					(ssDetect_ptr + testingSubStreamID) ->previousParentPID = connectPeerInfo ->peerInfo.pid;
-					testingManifest &=  (~SubstreamIDToManifest(testingSubStreamID) );
+					tempManifest &=  (~SubstreamIDToManifest(testingSubStreamID) );
 				}
 
 				}

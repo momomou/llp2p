@@ -112,7 +112,7 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 	pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(level_info_ptr ->pid);
 	if(pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_peerDown_info.end()){
 	printf("pid =%d already in connect find in map_pid_peerDown_info",level_info_ptr ->pid);
-		return 0;
+		return 1;
 	}
 
 
