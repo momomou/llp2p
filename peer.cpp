@@ -295,6 +295,7 @@ int peer::handle_pkt_in(int sock)
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_DATA) {
 
 //the main handle
+
 		_pk_mgr_ptr->handle_stream(chunk_ptr, sock);
 
 	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY_UPDATE) {
@@ -408,10 +409,10 @@ int peer::handle_pkt_in(int sock)
 //	just send return
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_TEST_DELAY ){
 
-printf("CHNK_CMD_PEER_TEST_DELAY\n");
 
 		if(chunk_ptr->header.rsv_1 == REQUEST){
 
+printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 			chunk_ptr->header.rsv_1 =REPLY;
 			_net_ptr->set_blocking(sock);
 			_net_ptr ->send (sock,(char*)chunk_ptr,sizeof(struct chunk_header_t) + chunk_ptr->header.length,0) ;
@@ -477,7 +478,9 @@ printf("CHNK_CMD_PEER_TEST_DELAY\n");
 
 
 						_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
+						_pk_mgr_ptr->reSet_detectionInfo();
 
+						printf("sent to parent manifest = %d\n",peerDownInfoPtr ->peerInfo.manifest);
 
 							/*for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
 								if(peerDownInfoPtr->peerInfo.manifest & (1<<k)){
@@ -591,8 +594,11 @@ int peer::handle_pkt_out(int sock)
 #else
 			if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
 #endif
-				return RET_SOCK_ERROR;
+//				printf ("chunk_ptr ->header.cmd =%d \n", chunk_ptr ->header.cmd) ; 
+//				PAUSE
+//				return RET_SOCK_ERROR;
 			} else {
+
 				data_close(sock, "error occured in send queue_out_ctrl",DONT_CARE);
 				return RET_SOCK_ERROR;
 			}

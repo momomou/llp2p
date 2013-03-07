@@ -844,6 +844,9 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 	
 	send_byte = _net_ptr->send(sock, html_buf, sizeof(html_buf), 0);
 
+
+	printf("sent test delay OK !!\n");
+
 	if( send_byte <= 0 ) {
 		data_close(sock, "send send_test_ delay cmd error");
 		_log_ptr->exit(0, "send send_test_ delay cmd error");
