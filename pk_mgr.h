@@ -140,6 +140,7 @@ public:
 	//¥i¿W¥ßªºunitl
 	unsigned long manifestToSubstreamID(unsigned long  manifest );
 	unsigned long SubstreamIDToManifest(unsigned long  SubstreamID );
+	void reSet_detectionInfo();
 
 //clear
 	void clear_map_pid_peer_info();
