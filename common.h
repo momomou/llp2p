@@ -272,7 +272,7 @@ struct chunk_header_t {
 };
 
 
-//detection Info for each substream
+//detection Info
 struct detectionInfo{
 	LARGE_INTEGER	lastAlarm;
 	LARGE_INTEGER	firstAlarm;
@@ -362,7 +362,6 @@ struct peer_connect_down_t {
 	int rescueStatsArry[PARAMETER_M];
 	volatile unsigned int timeOutLastSeq;
 	volatile unsigned int timeOutNewSeq;
-	volatile unsigned int lastTriggerCount;
 	
 };
 
