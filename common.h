@@ -134,15 +134,18 @@ using std::bitset;
 #define CHNK_CMD_PEER_RESCUE_LIST      	0x17
 #define CHNK_CMD_PEER_TEST_DELAY		0x18	//test delay to select peer
 #define CHNK_CMD_PEER_SET_MANIFEST		0x19	//set manifest set to parent
-//////////////////////////////////////////////////////////////////////////////////measure start delay
-#define CHNK_CMD_PEER_START_DELAY				0X1A
+//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+#define CHNK_CMD_PEER_SYN				0X1A
 //////////////////////////////////////////////////////////////////////////////////
 #define CHNK_CMD_PEER_SEED				0X1B
-#define CHNK_CMD_PEER_START_DELAY_UPDATE			0X1C
+//#define CHNK_CMD_PEER_START_DELAY_UPDATE			0X1C
 #define CHNK_CMD_PEER_PARENT_CHILDREN	0xF0	//¼È®É¤£¥Î
 #define CHNK_CMD_TOPO_INFO			0x1e
 
-
+//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+#define MAX_DELAY 2000
+#define SOURCE_DELAY_CONTINUOUS 5
+//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 #define CHNK_CMD_PEER_UNKNOWN			0xFF	// 1 B cmd => 0xFF is reserved for unknown cmd
 
@@ -530,37 +533,47 @@ struct peer_latency_measure {
 };
 
 //////////////////////////////////////////////////////////////////////////////////measure start delay
-struct substream_start_delay {
+//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+/*struct substream_start_delay {
 	int sub_stream_id;
 	int init_flag;
 	long long start_delay;
 	LARGE_INTEGER start_clock;
 	LARGE_INTEGER end_clock;
+};*/
+struct syn_struct{
+	int init_flag; // 0 not init 1 send 2 init complete
+	long long client_abs_start_time;
+	unsigned long start_seq;
+	LARGE_INTEGER start_clock;
+	LARGE_INTEGER end_clock;
 };
-
+//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 struct source_delay {
-	struct substream_start_delay start_delay_struct;
+	//struct substream_start_delay start_delay_struct;
 	long long source_delay_time;
-	LARGE_INTEGER client_start_time;
+	/*LARGE_INTEGER client_start_time;
 	unsigned long start_seq_num;
-	unsigned int start_seq_abs_time;
+	unsigned int start_seq_abs_time;*/
+	LARGE_INTEGER client_end_time;
 	unsigned long end_seq_num;
 	unsigned int end_seq_abs_time;
-	int source_delay_init;
+	int first_pkt_recv;
+	int rescue_state;	//0 normal 1 rescue trigger
+	int delay_beyond_count;
+	//int source_delay_init;
+};
+//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+struct syn_token_send{
+	struct chunk_header_t header;
 };
 
-struct start_delay_measure_send{
+struct syn_token_receive{
 	struct chunk_header_t header;
-	unsigned long pid;
-	unsigned long ssid; 
+	unsigned long seq_now;
+	long long pk_time;
 };
-
-struct start_delay_measure_receive{
-	struct chunk_header_t header;
-	unsigned long pid;
-	unsigned long ssid;
-	long long source_delay_recev;
-};
+//////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////send capacity

@@ -232,6 +232,12 @@ int peer_mgr::handle_pkt_in(int sock)
 			}
 			
 		}
+		else if(recv_byte == 0){
+			printf("sock closed\n");
+			peer_ptr->data_close(sock, "recv error in peer::handle_pkt_in",DONT_CARE);
+				//PAUSE
+			return RET_SOCK_ERROR;
+		}
 		expect_len -= recv_byte;
 		offset += recv_byte;
 		
@@ -276,6 +282,12 @@ int peer_mgr::handle_pkt_in(int sock)
 				//_log_ptr->exit(0, "recv error in peer_mgr::handle_pkt_in");
 			}
 		}
+		else if(recv_byte == 0){
+			printf("sock closed\n");
+			peer_ptr->data_close(sock, "recv error in peer::handle_pkt_in",DONT_CARE);
+				//PAUSE
+			return RET_SOCK_ERROR;
+		}
 		expect_len -= recv_byte;
 		offset += recv_byte;
 		if (expect_len == 0)
@@ -292,16 +304,18 @@ int peer_mgr::handle_pkt_in(int sock)
 		cout << "CHNK_CMD_PEER_CON" << endl;
 		peer_ptr->handle_connect(new_fd, chunk_ptr,_cin);
 
-	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY_UPDATE) {
+	/*} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY_UPDATE) {
 	//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
 	printf("CHNK_CMD_PEER_START_DELAY_UPDATE not here\n");
-	PAUSE
+	PAUSE*/
 	//////////////////////////////////////////////////////////////////////////////////
-	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY) {
+	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SYN) {
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
-	printf("CHNK_CMD_PEER_START_DELAY not here\n");
+	printf("CHNK_CMD_PEER_SYN not here peer_mgr\n");
 	PAUSE
 	//////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 	} 
 
 	if(chunk_ptr)
@@ -876,7 +890,7 @@ void peer_mgr::handle_test_delay(unsigned long manifest)
 			map_pid_fd_iter = peer_ptr ->map_in_pid_fd.find(pid);
 			if(map_pid_fd_iter != peer_ptr ->map_in_pid_fd.end() ){
 				sock =peer_ptr ->map_in_pid_fd [pid] ;
-
+				printf("pid : %d sock : %d iter : %d\n",pid,sock,map_pid_fd_iter->second);
 				send_test_delay (sock,manifest);
 			}
 		}

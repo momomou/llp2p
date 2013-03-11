@@ -29,7 +29,7 @@ peer::peer(list<int> *fd_list)
     parent_manifest = 0;
 	fd_list_ptr = fd_list;
 	_chunk_ptr = NULL;
-	first_reply_peer =true;
+	//first_reply_peer =true;
 	firstReplyPid=-1;
 	leastSeq_set_childrenPID =0;
 /*
@@ -237,13 +237,18 @@ int peer::handle_pkt_in(int sock)
 				return RET_SOCK_ERROR;
 			}
 		}
+		else if(recv_byte == 0){
+			printf("sock closed\n");
+			data_close(sock, "recv error in peer::handle_pkt_in",DONT_CARE);
+				//PAUSE
+			return RET_SOCK_ERROR;
+		}
 		expect_len -= recv_byte;
 		offset += recv_byte;
 		
 		if (!expect_len)
 			break;
 	}
-	
 	expect_len = chunk_header_ptr->length;
 	//cout << "sequence_number = " << chunk_header_ptr->sequence_number << endl;
 	buf_len = sizeof(struct chunk_header_t) + expect_len;
@@ -279,7 +284,12 @@ int peer::handle_pkt_in(int sock)
 				return RET_SOCK_ERROR;
 			}
 		}
-
+		else if(recv_byte == 0){
+			printf("sock closed\n");
+			data_close(sock, "recv error in peer::handle_pkt_in",DONT_CARE);
+				//PAUSE
+			return RET_SOCK_ERROR;
+		}
 		expect_len -= recv_byte;
 		offset += recv_byte;
 		if (expect_len == 0)
@@ -289,7 +299,6 @@ int peer::handle_pkt_in(int sock)
 	offset = 0;
 
 //recv ok  
-
 	
 //CHNK_CMD_PEER_DATA
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_DATA) {
@@ -298,9 +307,9 @@ int peer::handle_pkt_in(int sock)
 
 		_pk_mgr_ptr->handle_stream(chunk_ptr, sock);
 
-	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY_UPDATE) {
+	/*} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY_UPDATE) {
 		printf("CHNK_CMD_PEER_START_DELAY_UPDATE peer\n");
-		exit(1);
+		exit(1);*/
 	//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
 		/*struct update_start_delay *update_start_delay_ptr = NULL;
 		update_start_delay_ptr = (update_start_delay *)chunk_ptr;
@@ -313,9 +322,10 @@ int peer::handle_pkt_in(int sock)
 			_pk_mgr_ptr->send_start_delay_update(sock, temp_manifest, update_start_delay_ptr->update_info[k]->start_delay_update);
 		}*/
 	//////////////////////////////////////////////////////////////////////////////////
-	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_START_DELAY) {
+	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SYN) {	
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
-		printf("CHNK_CMD_PEER_START_DELAY peer\n");
+		printf("CHNK_CMD_PEER_SYN  not here peer\n");
 		exit(1);
 		/*if(chunk_ptr->header.rsv_1 == REQUEST){
 			printf("CHNK_CMD_PEER_START_DELAY peer request\n");
@@ -372,6 +382,7 @@ int peer::handle_pkt_in(int sock)
 			}
 		}*/
 	//////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 //cmd =CHNK_CMD_PEER_BWN
 	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_BWN) {
@@ -422,10 +433,27 @@ printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 
 			printf("CHNK_CMD_PEER_TEST_DELAY  REPLY\n");
 
-
 			unsigned long replyManifest =chunk_ptr->header.sequence_number;
+			printf("REPLY  manifest =%d \n",replyManifest);
 			//第一個回覆的peer 放入peer_connect_down_t加入測量 並關閉其他連線和清除所有相關table
-			if(first_reply_peer){
+			unsigned long subid_replyManifest = 0;
+			for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
+				if(replyManifest&(1<<k)){
+					subid_replyManifest = k;
+				}
+			}
+			substream_first_reply_peer_iter = substream_first_reply_peer.find(subid_replyManifest);
+			if(substream_first_reply_peer_iter == substream_first_reply_peer.end()){
+				substream_first_reply_peer[subid_replyManifest] = true;
+			}
+
+			substream_first_reply_peer_iter = substream_first_reply_peer.find(subid_replyManifest);
+			if(substream_first_reply_peer_iter == substream_first_reply_peer.end()){
+				printf("error : can not find subid_replyManifest in CHNK_CMD_PEER_TEST_DELAY  REPLY\n");
+				exit(1);
+			}
+			printf("REPLY  subid_replyManifest =%d \n",subid_replyManifest);
+			if(substream_first_reply_peer_iter->second){
 
 				map_fd_pid_iter = map_fd_pid.find(sock);
 				if(map_fd_pid_iter != map_fd_pid.end()){
@@ -516,7 +544,7 @@ printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 					}
 				}
 
-				first_reply_peer =false;
+				substream_first_reply_peer_iter->second =false;
 			}
 
 
@@ -556,7 +584,6 @@ printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 
 	if (chunk_ptr)
 		delete [] (unsigned char*)chunk_ptr;
-
 
 
 	return RET_OK;

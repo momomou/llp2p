@@ -15,7 +15,8 @@ class peer:public basic_class {
 public:
 
 
-	bool first_reply_peer;
+	map<unsigned long, bool> substream_first_reply_peer;
+	map<unsigned long, bool>::iterator substream_first_reply_peer_iter;
 	unsigned long firstReplyPid;
 	unsigned int leastSeq_set_childrenPID;
 

@@ -66,14 +66,25 @@ public:
 	unsigned long full_manifest;
 	int _sock; 		//PK socket
 
+	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+	long long syn_round_time;
+	struct syn_struct syn_table;
+	void syn_table_init(int pk_sock);
+	void send_syn_token_to_pk(int pk_sock);
+	void syn_recv_handler(struct syn_token_receive* syn_struct_back_token);
+	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
-	struct source_delay *delay_table;
+	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+	map<unsigned long, struct source_delay *> delay_table;
 	void delay_table_init();
-	void source_delay_init(unsigned long init_ssid);
+	void source_delay_detection(int sock, unsigned long sub_id, unsigned int seq_now);
+	//void source_delay_init(unsigned long init_ssid);
 	//void send_start_delay_measure_token(int sock,unsigned long sub_id);
 	//void send_back_start_delay_measure_token(int sock,long long peer_start_delay,unsigned long sub_id);
 	//////////////////////////////////////////////////////////////////////////////////
-	
+	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+
 	//////////////////////////////////////////////////////////////////////////////////2/20 start delay update
 	//void send_start_delay_update(int sock, unsigned long start_delay_manifest, int start_delay_differ);
 	//////////////////////////////////////////////////////////////////////////////////
