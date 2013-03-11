@@ -2089,6 +2089,19 @@ unsigned long  pk_mgr::SubstreamIDToManifest(unsigned long  SubstreamID )
 
 
 
+unsigned long  pk_mgr::manifestToSubstreamNum(unsigned long  manifest )
+{
+	unsigned long substreamNum = 0 ;
+
+	for(int i = 0 ;i< sub_stream_num ;i++){
+		if(manifest & 1<<i){
+			substreamNum ++ ;
+		}
+	}
+	
+	return substreamNum ;
+
+}
 
 void pk_mgr::send_rescueManifestToPKUpdate(unsigned long manifestValue)
 {

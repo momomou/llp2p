@@ -963,11 +963,22 @@ void peer_mgr::handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr)
 	if(map_pid_rescue_peer_info_iter !=  _pk_mgr_ptr->map_pid_rescue_peer_info.end()){
 	rescuePeerInfoPtr = map_pid_rescue_peer_info_iter ->second;
 
+	//只有在給的串流變少的時候才Clean
+	if(_pk_mgr_ptr->manifestToSubstreamNum (chunk_ptr ->manifest) < _pk_mgr_ptr->manifestToSubstreamNum(rescuePeerInfoPtr ->manifest))
+		clear_ouput_buffer( chunk_ptr ->pid);
+
 	rescuePeerInfoPtr ->manifest = chunk_ptr ->manifest ;
 
 	printf("children pid= %u set manifest=%d\n",rescuePeerInfoPtr ->pid,rescuePeerInfoPtr ->manifest);
 
+	}else{
+	printf("handle_manifestSet what happen\n");
+	PAUSE
 	}
+	
+
+	if(_pk_mgr_ptr->manifestToSubstreamNum (chunk_ptr ->manifest) < _pk_mgr_ptr->manifestToSubstreamNum(rescuePeerInfoPtr ->manifest))
+	clear_ouput_buffer( chunk_ptr ->pid);
 
 
 

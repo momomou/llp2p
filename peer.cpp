@@ -483,11 +483,7 @@ printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 		_peer_mgr_ptr ->handle_manifestSet((struct chunk_manifest_set_t *)chunk_ptr); 
 
 		_pk_mgr_ptr->send_capacity_to_pk(_pk_mgr_ptr->_sock);
-		
-		map_fd_pid_iter= map_fd_pid.find(sock);
-		if(map_fd_pid_iter !=map_fd_pid.end())
-			_peer_mgr_ptr ->clear_ouput_buffer( map_fd_pid_iter->second);
-
+	
 
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_PARENT_CHILDREN){
 
@@ -518,6 +514,7 @@ printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 
  
 //送queue_out_ctrl_ptr 和queue_out_data_ptr出去
+//0311 這邊改成如果阻塞了  就會blocking 住直到送出去為止
 int peer::handle_pkt_out(int sock)
 {
 	struct chunk_t *chunk_ptr;
@@ -526,80 +523,88 @@ int peer::handle_pkt_out(int sock)
 	map<int, queue<struct chunk_t *> *>::iterator fd_out_data_iter;
 
 	fd_out_ctrl_iter = map_fd_out_ctrl.find(sock);
-	
 	if(fd_out_ctrl_iter != map_fd_out_ctrl.end()) {
 		queue_out_ctrl_ptr = fd_out_ctrl_iter->second;
 	}
 	
 	fd_out_data_iter = map_fd_out_data.find(sock);
-
 	if(fd_out_data_iter != map_fd_out_data.end()) {
 		queue_out_data_ptr = fd_out_data_iter->second;
 	}
 	
-	if(queue_out_ctrl_ptr->size() != 0 && _chunk_ptr == NULL) {
-		chunk_ptr = queue_out_ctrl_ptr->front();
-		_expect_len = chunk_ptr->header.length + sizeof(struct chunk_header_t);
-		_expect_len = _expect_len - _offset;
-		_send_byte = send(sock, (char *)chunk_ptr+_offset, _expect_len, 0);
-		if(_send_byte < 0) {
-#ifdef _WIN32 
-			if (WSAGetLastError() == WSAEWOULDBLOCK) {
-#else
-			if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-#endif
-//				printf ("chunk_ptr ->header.cmd =%d \n", chunk_ptr ->header.cmd) ; 
-//
-//0307				PAUSE
-//				return RET_SOCK_ERROR;
-			} else {
+	while(queue_out_ctrl_ptr->size() != 0 || queue_out_data_ptr->size() != 0){
 
-				data_close(sock, "error occured in send queue_out_ctrl",DONT_CARE);
-				return RET_SOCK_ERROR;
-			}
-		} else {
-			_offset += _send_byte;
-			_expect_len = _expect_len - _send_byte;
-			if(_expect_len == 0) {
-				queue_out_ctrl_ptr->pop();
-				_offset = 0;
-				if(chunk_ptr)
-					delete chunk_ptr;
-			}
-		}
-		
-	} else if(queue_out_data_ptr->size() != 0) {
-        //cout << "data buffer size =" << queue_out_data_ptr->size() <<endl;
-		chunk_ptr = queue_out_data_ptr->front();
-		_chunk_ptr = chunk_ptr;
-		_expect_len = chunk_ptr->header.length + sizeof(struct chunk_header_t);
-		_expect_len = _expect_len - _offset;
-		_send_byte = send(sock, (char *)chunk_ptr+_offset, _expect_len, 0);
-		if(_send_byte < 0) {
+		if(queue_out_ctrl_ptr->size() != 0 && _chunk_ptr == NULL) {
+			chunk_ptr = queue_out_ctrl_ptr->front();
+			_expect_len = chunk_ptr->header.length + sizeof(struct chunk_header_t);
+			_expect_len = _expect_len - _offset;
+			_send_byte = send(sock, (char *)chunk_ptr+_offset, _expect_len, 0);
+			if(_send_byte < 0) {
 #ifdef _WIN32 
-			if (WSAGetLastError() == WSAEWOULDBLOCK) {
+				if (WSAGetLastError() == WSAEWOULDBLOCK) {
 #else
-			if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+				if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
 #endif
-//0307
-//				return RET_SOCK_ERROR;
+					printf ("==============WSAEWOULDBLOCK ===========\n\n", chunk_ptr ->header.cmd) ; 
+	//
+	//0307				
+					Sleep(1);
+					continue ;
+	//				PAUSE
+	//				return RET_SOCK_ERROR;
+				} else {
+
+					data_close(sock, "error occured in send queue_out_ctrl",DONT_CARE);
+					return RET_SOCK_ERROR;
+				}
 			} else {
-				data_close(sock, "error occured in send queue_out_data",DONT_CARE);
-				//PAUSE
-				return RET_SOCK_ERROR;
+				_offset += _send_byte;
+				_expect_len = _expect_len - _send_byte;
+				if(_expect_len == 0) {
+					queue_out_ctrl_ptr->pop();
+					_offset = 0;
+					if(chunk_ptr)
+						delete chunk_ptr;
+				}
 			}
-		} else {
-			_offset += _send_byte;
-			_expect_len = _expect_len - _send_byte;
-			if(_expect_len == 0) {
-				queue_out_data_ptr->pop();
-				_offset = 0;
-				_chunk_ptr = NULL;
+		
+		} else if(queue_out_data_ptr->size() != 0) {
+			//cout << "data buffer size =" << queue_out_data_ptr->size() <<endl;
+			chunk_ptr = queue_out_data_ptr->front();
+			_chunk_ptr = chunk_ptr;
+			_expect_len = chunk_ptr->header.length + sizeof(struct chunk_header_t);
+			_expect_len = _expect_len - _offset;
+			_send_byte = send(sock, (char *)chunk_ptr+_offset, _expect_len, 0);
+			if(_send_byte < 0) {
+	#ifdef _WIN32 
+				if (WSAGetLastError() == WSAEWOULDBLOCK) {
+	#else
+				if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+	#endif
+	//0307			
+					Sleep(1);
+					printf ("==============WSAEWOULDBLOCK ===========\n\n", chunk_ptr ->header.cmd) ; 
+					continue ;
+//					PAUSE
+//				return RET_SOCK_ERROR;
+				} else {
+					data_close(sock, "error occured in send queue_out_data",DONT_CARE);
+					//PAUSE
+					return RET_SOCK_ERROR;
+				}
+			} else {
+				_offset += _send_byte;
+				_expect_len = _expect_len - _send_byte;
+				if(_expect_len == 0) {
+					queue_out_data_ptr->pop();
+					_offset = 0;
+					_chunk_ptr = NULL;
+				}
 			}
-		}
 	
-	} else {
-		_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN);
+		} else {
+			_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN);
+		}
 	}
 
 	return RET_OK;

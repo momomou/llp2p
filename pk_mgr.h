@@ -151,6 +151,7 @@ public:
 	//¥i¿W¥ßªºunitl
 	unsigned long manifestToSubstreamID(unsigned long  manifest );
 	unsigned long SubstreamIDToManifest(unsigned long  SubstreamID );
+	unsigned long manifestToSubstreamNum(unsigned long  manifest );
 	void reSet_detectionInfo();
 
 //clear
