@@ -79,6 +79,7 @@ public:
 	map<unsigned long, struct source_delay *> delay_table;
 	void delay_table_init();
 	void source_delay_detection(int sock, unsigned long sub_id, unsigned int seq_now);
+	void reset_source_delay_detection(unsigned long sub_id);
 	//void source_delay_init(unsigned long init_ssid);
 	//void send_start_delay_measure_token(int sock,unsigned long sub_id);
 	//void send_back_start_delay_measure_token(int sock,long long peer_start_delay,unsigned long sub_id);

@@ -4,9 +4,9 @@
 
 #define FD_SETSIZE		2048
 ////resuce PARAMETER////
-#define PARAMETER_X		8
+#define PARAMETER_X		20
 #define PK_PID			999999
-#define BIG_CHUNK	8192
+#define BIG_CHUNK	512
 
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
 #define PARAMETER_M		8

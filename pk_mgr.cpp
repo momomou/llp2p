@@ -141,7 +141,7 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 		exit(1);
 	}
 
-	detect_source_delay_time = (long long)(_log_ptr ->diffTime_us(syn_table.start_clock,delay_table_iter->second->client_end_time));
+	detect_source_delay_time = (long long)(_log_ptr ->diffTime_ms(syn_table.start_clock,delay_table_iter->second->client_end_time));
 	if(delay_table_iter->second->end_seq_num == 0){
 		printf("start delay end seq error in source_delay_detection\n");
 		PAUSE
@@ -150,14 +150,14 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 	else{
 			long long temp;
 			long long diff_temp;
-			temp = (long long)(delay_table_iter->second->end_seq_abs_time) - (long long)(syn_table.client_abs_start_time/1000);
-			diff_temp = (long long)(detect_source_delay_time/1000) - (long long)temp;
+			temp = (long long)(delay_table_iter->second->end_seq_abs_time) - (long long)(syn_table.client_abs_start_time);
+			diff_temp = (long long)(detect_source_delay_time) - (long long)temp;
 			if(diff_temp < 0){
 				printf("diff error in source_delay_detection\n");
 				printf("differ : %lld ",(long long)diff_temp);
 				printf("syn_round : %lld\n",(long long)syn_round_time);
 				printf("syn_table.client_abs_start_time : %lld\n",(long long)syn_table.client_abs_start_time);
-				syn_table.client_abs_start_time = syn_table.client_abs_start_time + (abs(diff_temp)*1000);
+				syn_table.client_abs_start_time = syn_table.client_abs_start_time + abs(diff_temp);
 				printf("syn_table.client_abs_start_time : %lld\n",(long long)syn_table.client_abs_start_time);
 				//PAUSE
 				//exit(1);
@@ -232,7 +232,7 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 				}
 			}
 			else{
-				printf("differ : %lld source_delay_detection\n",(long long)diff_temp);
+				//printf("differ : %lld source_delay_detection sub id : %d\n",(long long)diff_temp,sub_id);
 			}
 	}
 	}
@@ -275,7 +275,7 @@ void pk_mgr::send_capacity_to_pk(int sock){
 				printf("error : can not find source struct in table in send_capacity_to_pk\n");
 				exit(1);
 			}
-			delay_table_iter->second->source_delay_time = (long long)(_log_ptr ->diffTime_us(syn_table.start_clock,delay_table_iter->second->client_end_time));
+			delay_table_iter->second->source_delay_time = (long long)(_log_ptr ->diffTime_ms(syn_table.start_clock,delay_table_iter->second->client_end_time));
 			if(delay_table_iter->second->end_seq_num == 0){
 				printf("start delay end seq error in send_capacity_to_pk\n");
 				PAUSE
@@ -294,21 +294,21 @@ void pk_mgr::send_capacity_to_pk(int sock){
 			else{
 				long long temp;
 				long long diff_temp;
-				temp = (long long)(delay_table_iter->second->end_seq_abs_time) - (long long)(syn_table.client_abs_start_time/1000);
-				diff_temp = (long long)(delay_table_iter->second->source_delay_time/1000) - (long long)temp;
+				temp = (long long)(delay_table_iter->second->end_seq_abs_time) - (long long)(syn_table.client_abs_start_time);
+				diff_temp = (long long)(delay_table_iter->second->source_delay_time) - (long long)temp;
 				//printf("source_delay_time : %ld",(delay_table+i)->source_delay_time);
 				//printf(" time : %d\n",temp);
 				printf("abs differ : %lld\n",(long long)temp);
-				printf("abs start : %lld\n",(long long)(syn_table.client_abs_start_time/1000));
+				printf("abs start : %lld\n",(long long)(syn_table.client_abs_start_time));
 				printf("abs end : %lld\n",(long long)(delay_table_iter->second->end_seq_abs_time));
-				printf("relate differ : %lld\n",(long long)(delay_table_iter->second->source_delay_time/1000));
+				printf("relate differ : %lld\n",(long long)(delay_table_iter->second->source_delay_time));
 				printf("differ : %lld\n",(long long)diff_temp);
 				if(diff_temp < 0){
 					printf("diff error in send_capacity_to_pk\n");
 					printf("differ : %lld\n",(long long)diff_temp);
 					delay_table_iter->second->source_delay_time = 0;
 					printf("syn_table.client_abs_start_time : %lld\n",(long long)syn_table.client_abs_start_time);
-					syn_table.client_abs_start_time = syn_table.client_abs_start_time + (abs(diff_temp)*1000);
+					syn_table.client_abs_start_time = syn_table.client_abs_start_time + abs(diff_temp);
 					printf("syn_table.client_abs_start_time : %lld\n",(long long)syn_table.client_abs_start_time);
 					//PAUSE
 					//exit(1);
@@ -751,7 +751,7 @@ int pk_mgr::handle_pkt_in(int sock)
 			PAUSE
 		}
 		else{
-			printf("CHNK_CMD_PEER_START_DELAY pk mgr reply\n");
+			printf("CHNK_CMD_PEER_SYN pk mgr reply\n");
 			struct syn_token_receive* syn_token_receive_ptr;
 			syn_token_receive_ptr = (struct syn_token_receive*)chunk_ptr;
 			syn_recv_handler(syn_token_receive_ptr);
@@ -1048,6 +1048,38 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 	temp_sub_id = (chunk_ptr ->header.sequence_number) % sub_stream_num;
 
+	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+	map<unsigned long, struct source_delay *>::iterator delay_table_iter;
+	delay_table_iter = delay_table.find(temp_sub_id);
+	if(delay_table_iter == delay_table.end()){
+		printf("error : can not find source struct in table in send_capacity_to_pk\n");
+		exit(1);
+	}
+	delay_table_iter->second->end_seq_num = chunk_ptr ->header.sequence_number;
+	delay_table_iter->second->end_seq_abs_time = chunk_ptr ->header.timestamp;
+	//printf("%d %d\n",delay_table_iter->second->first_pkt_recv,syn_table.init_flag);
+	_log_ptr -> getTickTime(&(delay_table_iter->second->client_end_time));
+	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+
+	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+	//printf("%d %d\n",(delay_table+temp_sub_id)->start_delay_struct.init_flag,temp_sub_id);
+	if((!(delay_table_iter->second->first_pkt_recv))&&(syn_table.init_flag == 2)){
+		/*printf("start measure start delay\n");
+		send_start_delay_measure_token(sockfd, temp_sub_id);*/
+		//(delay_table+temp_sub_id)->start_seq_num = chunk_ptr ->header.sequence_number;
+		//(delay_table+temp_sub_id)->start_seq_abs_time = chunk_ptr->header.timestamp;
+		//(delay_table+temp_sub_id)->start_delay_struct.init_flag = 1;
+		//source_delay_init(temp_sub_id);
+		if(chunk_ptr ->header.sequence_number > syn_table.start_seq){
+			peer_start_delay_count++;
+			delay_table_iter->second->first_pkt_recv = 1;
+			if(peer_start_delay_count == sub_stream_num){
+				send_capacity_to_pk(_sock);
+			}
+		}
+	}
+
+	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 	if(chunk_ptr->header.sequence_number > _least_sequence_number){
 		_least_sequence_number = chunk_ptr->header.sequence_number;
@@ -1087,6 +1119,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 		//testing function
 		reSet_detectionInfo();
+		reset_source_delay_detection(temp_sub_id);
 	}
 
 	//如果這個substream正在測試中 且不是從PK來 ( 從peer 來)
@@ -1096,7 +1129,11 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 		//下面會濾掉慢到的封包 所以在此進入偵測
 		rescue_detecion(chunk_ptr);
-
+		//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+		if(peer_start_delay_count == sub_stream_num){
+			source_delay_detection(sockfd,temp_sub_id,chunk_ptr ->header.sequence_number);
+		}
+		//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 		//測試次數填滿兩次整個狀態  也就是測量了PARAMETER_M  次都沒問題 ( 其中有PARAMETER_M 次計算不會連續觸發)
 		if(((ssDetect_ptr + temp_sub_id) ->testing_count / (stream_number * PARAMETER_M )  )  >= (PARAMETER_X *2) ){
 			(ssDetect_ptr + temp_sub_id) ->isTesting =0 ;  //false
@@ -1144,6 +1181,11 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	}else{
 	//丟給rescue_detecion一定是有方向性的
 		rescue_detecion(chunk_ptr);
+		//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+		if(peer_start_delay_count == sub_stream_num){
+			source_delay_detection(sockfd,temp_sub_id,chunk_ptr ->header.sequence_number);
+		}
+		//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 	}
 
 
@@ -1170,44 +1212,6 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	}
 
 
-
-
-
-	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
-	map<unsigned long, struct source_delay *>::iterator delay_table_iter;
-	delay_table_iter = delay_table.find(temp_sub_id);
-	if(delay_table_iter == delay_table.end()){
-		printf("error : can not find source struct in table in send_capacity_to_pk\n");
-		exit(1);
-	}
-	delay_table_iter->second->end_seq_num = chunk_ptr ->header.sequence_number;
-	delay_table_iter->second->end_seq_abs_time = chunk_ptr ->header.timestamp;
-	//printf("%d %d\n",delay_table_iter->second->first_pkt_recv,syn_table.init_flag);
-	_log_ptr -> getTickTime(&(delay_table_iter->second->client_end_time));
-	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
-
-	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
-	//printf("%d %d\n",(delay_table+temp_sub_id)->start_delay_struct.init_flag,temp_sub_id);
-	if((!(delay_table_iter->second->first_pkt_recv))&&(syn_table.init_flag == 2)){
-		/*printf("start measure start delay\n");
-		send_start_delay_measure_token(sockfd, temp_sub_id);*/
-		//(delay_table+temp_sub_id)->start_seq_num = chunk_ptr ->header.sequence_number;
-		//(delay_table+temp_sub_id)->start_seq_abs_time = chunk_ptr->header.timestamp;
-		//(delay_table+temp_sub_id)->start_delay_struct.init_flag = 1;
-		//source_delay_init(temp_sub_id);
-		if(chunk_ptr ->header.sequence_number > syn_table.start_seq){
-			peer_start_delay_count++;
-			delay_table_iter->second->first_pkt_recv = 1;
-			if(peer_start_delay_count == sub_stream_num){
-				send_capacity_to_pk(_sock);
-			}
-		}
-	}
-
-	if(peer_start_delay_count == sub_stream_num){
-//		source_delay_detection(sockfd,temp_sub_id,chunk_ptr ->header.sequence_number);
-	}
-	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 
 
@@ -1279,6 +1283,17 @@ printf("here1 leastCurrDiff =%d  _current= %d SSID =%d\n",leastCurrDiff ,_curren
 }
 
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+void pk_mgr::reset_source_delay_detection(unsigned long sub_id){
+	map<unsigned long, struct source_delay *>::iterator delay_table_iter;
+	delay_table_iter = delay_table.find(sub_id);
+	if(delay_table_iter == delay_table.end()){
+		printf("error : can not find source struct in table in send_capacity_to_pk\n");
+		exit(1);
+	}
+
+	delay_table_iter->second->rescue_state = 0;
+}
+
 void pk_mgr::syn_recv_handler(struct syn_token_receive* syn_struct_back_token){
 	if(syn_table.init_flag==0){
 		printf("error in syn_recv_handler syn not send\n");
@@ -1287,7 +1302,7 @@ void pk_mgr::syn_recv_handler(struct syn_token_receive* syn_struct_back_token){
 	else if(syn_table.init_flag==1){
 		syn_round_time = 0;
 		_log_ptr -> getTickTime(&(syn_table.end_clock));
-		syn_round_time = _log_ptr ->diffTime_us(syn_table.start_clock,syn_table.end_clock);
+		syn_round_time = _log_ptr ->diffTime_ms(syn_table.start_clock,syn_table.end_clock);
 		syn_table.client_abs_start_time = (long long)syn_struct_back_token->pk_time - (long long)(syn_round_time/2);
 		if(syn_table.client_abs_start_time < 0){
 			printf("warning syn error\n");
