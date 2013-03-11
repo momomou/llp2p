@@ -14,7 +14,7 @@
 #define PARAMETER_P		2
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
-#define BUFF_SIZE		200
+#define BUFF_SIZE		100
 
 
 #include "configuration.h"
