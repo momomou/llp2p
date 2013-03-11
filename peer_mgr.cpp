@@ -818,7 +818,7 @@ void peer_mgr::set_up_public_ip(unsigned long public_ip)
 void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 {
 	int send_byte = 0;
-	char html_buf[8192];
+	char html_buf[BIG_CHUNK];
 	struct chunk_delay_test_t *chunk_delay_ptr =NULL;
 	struct timeval detail_time;
 
@@ -831,7 +831,7 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 	memset(chunk_delay_ptr, 0x0, sizeof(struct chunk_delay_test_t));
 	
 	chunk_delay_ptr->header.cmd = CHNK_CMD_PEER_TEST_DELAY ;
-	chunk_delay_ptr->header.length = (8192 -sizeof(chunk_delay_test_t)) ;	//pkt_buf paylod length
+	chunk_delay_ptr->header.length = (sizeof(html_buf) -sizeof(chunk_delay_test_t)) ;	//pkt_buf paylod length
 	chunk_delay_ptr->header.rsv_1 = REQUEST ;
 	chunk_delay_ptr->header.timestamp = _log_ptr->gettimeofday_ms(&detail_time);
 	//in this test, sequence_number is empty so use sent manifest

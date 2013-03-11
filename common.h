@@ -6,6 +6,7 @@
 ////resuce PARAMETER////
 #define PARAMETER_X		8
 #define PK_PID			999999
+#define BIG_CHUNK	8192
 
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
 #define PARAMETER_M		8

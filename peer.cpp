@@ -595,7 +595,8 @@ int peer::handle_pkt_out(int sock)
 			if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
 #endif
 //				printf ("chunk_ptr ->header.cmd =%d \n", chunk_ptr ->header.cmd) ; 
-//				PAUSE
+//
+//0307				PAUSE
 //				return RET_SOCK_ERROR;
 			} else {
 
@@ -626,7 +627,8 @@ int peer::handle_pkt_out(int sock)
 #else
 			if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
 #endif
-				return RET_SOCK_ERROR;
+//0307
+//				return RET_SOCK_ERROR;
 			} else {
 				data_close(sock, "error occured in send queue_out_data",DONT_CARE);
 				//PAUSE

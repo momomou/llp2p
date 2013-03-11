@@ -952,6 +952,7 @@ printf("\n");
 //cmd == CHNK_CMD_PEER_DATA			
 	} else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_DATA) {
 		//printf("%s, CHNK_CMD_PEER_DATA\n", __FUNCTION__);
+//		printf("from PK %d \n", (chunk_ptr ->header.sequence_number));
 		handle_stream(chunk_ptr, sock);	
 
 //cmd == CHNK_CMD_PEER_RSC_LIST	
@@ -1151,6 +1152,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 //	_log_ptr->write_log_format("s =>s u s u s u s u\n", __FUNCTION__,"stream ID=" ,chunk_ptr->header .stream_id,"recieve pkt seqnum", chunk_ptr->header.sequence_number,"bytes=" ,chunk_ptr ->header.length,"timestamp=",chunk_ptr->header.timestamp);
 
+
 	//還沒註冊拿到substream num
 	if(sub_stream_num == 0)
 		return;
@@ -1189,7 +1191,6 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 
 
-
 /////////////////////////////////////////////測試版新功能///////////////////////////////////////////////////////////////////////
 	//更新最後的seq 用來做time out
 	fd_pid_iter = _peer_ptr->map_fd_pid.find(sockfd);
@@ -1206,8 +1207,11 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 	}
 
-	if(parentPid !=PK_PID){
-//	printf("PK rescue %d \n", (chunk_ptr ->header.sequence_number));
+
+	if(parentPid ==PK_PID && (chunk_ptr ->header.sequence_number %4)==0){
+//	printf("from PK %d \n", (chunk_ptr ->header.sequence_number));
+	}else{
+//	printf("from peer %d \n", (chunk_ptr ->header.sequence_number));
 	}
 
 
@@ -1221,21 +1225,25 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		pkDownInfoPtr->peerInfo.manifest &= (~SubstreamIDToManifest (temp_sub_id));  
 		//開始testing 送topology
 		send_parentToPK ( SubstreamIDToManifest (temp_sub_id) , (ssDetect_ptr + temp_sub_id)->previousParentPID ); 
+
+		//test
+		reSet_detectionInfo();
 	}
 
 	if((ssDetect_ptr + temp_sub_id) ->isTesting && parentPid != PK_PID){
 		(ssDetect_ptr + temp_sub_id) ->testing_count++ ;
 		//測試次數填滿兩次整個狀態  也就是測量了PARAMETER_M * 2 次都沒問題 ( 其中有PARAMETER_M 次計算不會連續觸發)
-		if(((ssDetect_ptr + temp_sub_id) ->testing_count / (stream_number * PARAMETER_X )  )  >= (PARAMETER_M *2 ) ){
+		if(((ssDetect_ptr + temp_sub_id) ->testing_count / (stream_number * PARAMETER_X )  )  >= (2 ) ){
 			(ssDetect_ptr + temp_sub_id) ->isTesting =0 ;  //false
 			(ssDetect_ptr + temp_sub_id) ->testing_count =0 ;
 			//testing ok should cut this substream from pk
 			pkDownInfoPtr->peerInfo.manifest  &=  ~SubstreamIDToManifest(temp_sub_id) ;
 			send_rescueManifestToPKUpdate ( pkDownInfoPtr->peerInfo.manifest);
-			printf("testing ok  cut pk substream= %d  %dsent new topology \n",temp_sub_id,pkDownInfoPtr->peerInfo.manifest);
+			printf("testing ok  cut pk substream= %d  manifest=%d sent new topology \n",temp_sub_id,pkDownInfoPtr->peerInfo.manifest);
 			//選擇selected peer 送topology
 			send_parentToPK(SubstreamIDToManifest (temp_sub_id) ,PK_PID +1 );
 
+			//test
 			reSet_detectionInfo();
 
 		}
@@ -1354,6 +1362,8 @@ printf("here1 leastCurrDiff =%d  _current= %d SSID =%d\n",leastCurrDiff ,_curren
 				}else{
 					//丟給rescue_detecion一定是有方向性的
 					rescue_detecion(chunk_ptr);
+//					if(chunk_ptr ->header.sequence_number % 4 == 0  && parentPid ==PK_PID)
+//					printf("seq = %d \n",chunk_ptr ->header.sequence_number);
 				}
 
 
