@@ -532,7 +532,7 @@ int peer::handle_pkt_out(int sock)
 		queue_out_data_ptr = fd_out_data_iter->second;
 	}
 	
-	while(queue_out_ctrl_ptr->size() != 0 || queue_out_data_ptr->size() != 0){
+	while(queue_out_ctrl_ptr->size() != 0  ||  queue_out_data_ptr->size() != 0){
 
 		if(queue_out_ctrl_ptr->size() != 0 && _chunk_ptr == NULL) {
 			chunk_ptr = queue_out_ctrl_ptr->front();
@@ -545,7 +545,7 @@ int peer::handle_pkt_out(int sock)
 #else
 				if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
 #endif
-					printf ("==============WSAEWOULDBLOCK ===========\n\n", chunk_ptr ->header.cmd) ; 
+//					printf ("==============WSAEWOULDBLOCK ===========\n\n", chunk_ptr ->header.cmd) ; 
 	//
 	//0307				
 					Sleep(1);
@@ -583,7 +583,7 @@ int peer::handle_pkt_out(int sock)
 	#endif
 	//0307			
 					Sleep(1);
-					printf ("==============WSAEWOULDBLOCK ===========\n\n", chunk_ptr ->header.cmd) ; 
+//					printf ("==============WSAEWOULDBLOCK ===========\n\n", chunk_ptr ->header.cmd) ; 
 					continue ;
 //					PAUSE
 //				return RET_SOCK_ERROR;
