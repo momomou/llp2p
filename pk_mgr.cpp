@@ -142,24 +142,24 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 		exit(1);
 	}
 
-	detect_source_delay_time = (long long)(_log_ptr ->diffTime_ms(syn_table.start_clock,delay_table_iter->second->client_end_time));
+	detect_source_delay_time = (long long)(_log_ptr ->diffgetTime_ms(syn_table.start_clock,delay_table_iter->second->client_end_time));
 	if(delay_table_iter->second->end_seq_num == 0){
 		printf("start delay end seq error in source_delay_detection\n");
 		PAUSE
 		exit(1);
 	}
 	else{
-			long long temp;
+			unsigned long temp;
 			long long diff_temp;
-			temp = (long long)(delay_table_iter->second->end_seq_abs_time) - (long long)(syn_table.client_abs_start_time);
+			temp = (delay_table_iter->second->end_seq_abs_time) - (syn_table.client_abs_start_time);
 			diff_temp = (long long)(detect_source_delay_time) - (long long)temp;
 			if(diff_temp < 0){
 				printf("diff error in source_delay_detection\n");
 				printf("differ : %lld ",(long long)diff_temp);
-				printf("syn_round : %lld\n",(long long)syn_round_time);
-				printf("syn_table.client_abs_start_time : %lld\n",(long long)syn_table.client_abs_start_time);
+				printf("syn_round : %ld\n",syn_round_time);
+				printf("syn_table.client_abs_start_time : %ld\n",syn_table.client_abs_start_time);
 				syn_table.client_abs_start_time = syn_table.client_abs_start_time + abs(diff_temp);
-				printf("syn_table.client_abs_start_time : %lld\n",(long long)syn_table.client_abs_start_time);
+				printf("syn_table.client_abs_start_time : %ld\n",syn_table.client_abs_start_time);
 				//PAUSE
 				//exit(1);
 			}
@@ -233,7 +233,7 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 				}
 			}
 			else{
-				//printf("differ : %lld source_delay_detection sub id : %d\n",(long long)diff_temp,sub_id);
+//				printf("differ : %lld source_delay_detection sub id : %d\n",(long long)diff_temp,sub_id);
 			}
 	}
 	}
@@ -276,7 +276,7 @@ void pk_mgr::send_capacity_to_pk(int sock){
 				printf("error : can not find source struct in table in send_capacity_to_pk\n");
 				exit(1);
 			}
-			delay_table_iter->second->source_delay_time = (long long)(_log_ptr ->diffTime_ms(syn_table.start_clock,delay_table_iter->second->client_end_time));
+			delay_table_iter->second->source_delay_time = (long long)(_log_ptr ->diffgetTime_ms(syn_table.start_clock,delay_table_iter->second->client_end_time));
 			if(delay_table_iter->second->end_seq_num == 0){
 				printf("start delay end seq error in send_capacity_to_pk\n");
 				PAUSE
@@ -293,24 +293,24 @@ void pk_mgr::send_capacity_to_pk(int sock){
 				exit(1);
 			}*/
 			else{
-				long long temp;
+				unsigned long temp;
 				long long diff_temp;
-				temp = (long long)(delay_table_iter->second->end_seq_abs_time) - (long long)(syn_table.client_abs_start_time);
+				temp = (delay_table_iter->second->end_seq_abs_time) - (syn_table.client_abs_start_time);
 				diff_temp = (long long)(delay_table_iter->second->source_delay_time) - (long long)temp;
 				//printf("source_delay_time : %ld",(delay_table+i)->source_delay_time);
 				//printf(" time : %d\n",temp);
-				printf("abs differ : %lld\n",(long long)temp);
-				printf("abs start : %lld\n",(long long)(syn_table.client_abs_start_time));
-				printf("abs end : %lld\n",(long long)(delay_table_iter->second->end_seq_abs_time));
+				printf("abs differ : %ld\n",temp);
+				printf("abs start : %ld\n",(syn_table.client_abs_start_time));
+				printf("abs end : %ld\n",(delay_table_iter->second->end_seq_abs_time));
 				printf("relate differ : %lld\n",(long long)(delay_table_iter->second->source_delay_time));
 				printf("differ : %lld\n",(long long)diff_temp);
 				if(diff_temp < 0){
 					printf("diff error in send_capacity_to_pk\n");
 					printf("differ : %lld\n",(long long)diff_temp);
 					delay_table_iter->second->source_delay_time = 0;
-					printf("syn_table.client_abs_start_time : %lld\n",(long long)syn_table.client_abs_start_time);
+					printf("syn_table.client_abs_start_time : %ld\n",syn_table.client_abs_start_time);
 					syn_table.client_abs_start_time = syn_table.client_abs_start_time + abs(diff_temp);
-					printf("syn_table.client_abs_start_time : %lld\n",(long long)syn_table.client_abs_start_time);
+					printf("syn_table.client_abs_start_time : %ld\n",syn_table.client_abs_start_time);
 					//PAUSE
 					//exit(1);
 				}
@@ -808,15 +808,16 @@ printf("\n");
 
 
 //////////////////////////////////
-		unsigned long subid_replyManifest = 0;
-		for(int k=0;k<sub_stream_num;k++){
+//		unsigned long subid_replyManifest = 0;
+/*		for(int k=0;k<sub_stream_num;k++){
 			if((((struct chunk_rescue_list*)chunk_ptr)->manifest)&(1<<k)){
 				subid_replyManifest = k;
 			}
 		}
-		_peer_ptr->substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer.find(subid_replyManifest);
+*/
+		_peer_ptr->substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer.find(((struct chunk_rescue_list*)chunk_ptr) ->manifest);
 		if(_peer_ptr->substream_first_reply_peer_iter == _peer_ptr->substream_first_reply_peer.end()){
-			_peer_ptr->substream_first_reply_peer[subid_replyManifest] = true;
+			_peer_ptr->substream_first_reply_peer[((struct chunk_rescue_list*)chunk_ptr) ->manifest] = true;
 		}
 		else{
 			_peer_ptr->substream_first_reply_peer_iter->second =true;
@@ -1068,7 +1069,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	delay_table_iter->second->end_seq_num = chunk_ptr ->header.sequence_number;
 	delay_table_iter->second->end_seq_abs_time = chunk_ptr ->header.timestamp;
 	//printf("%d %d\n",delay_table_iter->second->first_pkt_recv,syn_table.init_flag);
-	_log_ptr -> getTickTime(&(delay_table_iter->second->client_end_time));
+	delay_table_iter->second->client_end_time = _log_ptr -> getTime();
 	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
@@ -1144,8 +1145,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		if(((ssDetect_ptr + temp_sub_id) ->testing_count / (stream_number * PARAMETER_M )  )  >= (PARAMETER_X *2) ){
 			(ssDetect_ptr + temp_sub_id) ->isTesting =0 ;  //false
 			(ssDetect_ptr + temp_sub_id) ->testing_count =0 ;
-			//testing ok should cut this substream from pk
-			pkDownInfoPtr->peerInfo.manifest  &=  ~SubstreamIDToManifest(temp_sub_id) ;
+
 
 			//找出所有正在測試的substream
 			for(int i =0  ; i < sub_stream_num;i++){
@@ -1153,6 +1153,9 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 					testingManifest |= SubstreamIDToManifest(i);
 				}
 			}
+
+			//testing ok should cut this substream from pk
+			testingManifest  &=  ~SubstreamIDToManifest(temp_sub_id) ;
 
 
 			send_rescueManifestToPKUpdate ( pkDownInfoPtr->peerInfo.manifest | testingManifest);
@@ -1239,7 +1242,12 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 					//代表有封包還沒到.略過
 					if((*(_chunk_bitstream + (_current_send_sequence_number % _bucket_size))).header.sequence_number != _current_send_sequence_number){
 
-printf("here1 leastCurrDiff =%d  _current= %d SSID =%d\n",leastCurrDiff ,_current_send_sequence_number,_current_send_sequence_number%sub_stream_num);
+printf("here1 leastCurrDiff =%d  _current= %d SSID =%d\n ",leastCurrDiff ,_current_send_sequence_number,_current_send_sequence_number%sub_stream_num);
+
+for(pid_peerDown_info_iter = map_pid_peerDown_info.begin() ;pid_peerDown_info_iter != map_pid_peerDown_info.end();pid_peerDown_info_iter++){
+	if(pid_peerDown_info_iter ->second ->peerInfo.manifest & SubstreamIDToManifest ((_current_send_sequence_number%sub_stream_num)))
+		printf("should from %d \n",pid_peerDown_info_iter ->first);
+}
 
 //					PAUSE
 					continue;
@@ -1252,9 +1260,12 @@ printf("here1 leastCurrDiff =%d  _current= %d SSID =%d\n",leastCurrDiff ,_curren
 					}
 			}
 		printf("here3 least CurrDiff =%d\n",leastCurrDiff);
+
 		static int tempcount=0 ;
-		if(tempcount==10)
+		tempcount ++ ;
+		if(tempcount  == 20 )
 		PAUSE
+
 		//可能某個subtream 追過_bucket_size,直接跳到最後一個 (應該不會發生)
 		}else if (leastCurrDiff > _bucket_size) {
 
@@ -1318,22 +1329,22 @@ void pk_mgr::syn_recv_handler(struct syn_token_receive* syn_struct_back_token){
 	}
 	else if(syn_table.init_flag==1){
 		syn_round_time = 0;
-		_log_ptr -> getTickTime(&(syn_table.end_clock));
-		syn_round_time = _log_ptr ->diffTime_ms(syn_table.start_clock,syn_table.end_clock);
-		syn_table.client_abs_start_time = (long long)syn_struct_back_token->pk_time - (long long)(syn_round_time/2);
+		syn_table.end_clock  = _log_ptr -> getTime();
+		syn_round_time = _log_ptr ->diffgetTime_ms(syn_table.start_clock,syn_table.end_clock);
+		syn_table.client_abs_start_time = syn_struct_back_token->pk_time - (syn_round_time/2);
 		if(syn_table.client_abs_start_time < 0){
 			printf("warning syn error\n");
-			printf("client_abs_start_time : %lld\n",(long long)syn_table.client_abs_start_time);
-			printf("pk_time : %lld\n",(long long)syn_struct_back_token->pk_time);
-			printf("(syn_round_time/2) : %lld\n",(long long)(syn_round_time/2));
-			printf("syn_round_time : %lld\n",(long long)syn_round_time);
+			printf("client_abs_start_time : %ld\n",syn_table.client_abs_start_time);
+			printf("pk_time : %ld\n",syn_struct_back_token->pk_time);
+			printf("(syn_round_time/2) : %ld\n",(syn_round_time/2));
+			printf("syn_round_time : %ld\n",syn_round_time);
 			exit(1);
 		}
 		else{
-			printf("client_abs_start_time : %lld\n",(long long)syn_table.client_abs_start_time);
-			printf("pk_time : %lld\n",(long long)syn_struct_back_token->pk_time);
-			printf("(syn_round_time/2) : %lld\n",(long long)(syn_round_time/2));
-			printf("syn_round_time : %lld\n",(long long)syn_round_time);
+			printf("client_abs_start_time : %ld\n",syn_table.client_abs_start_time);
+			printf("pk_time : %ld\n",syn_struct_back_token->pk_time);
+			printf("(syn_round_time/2) : %ld\n",(syn_round_time/2));
+			printf("syn_round_time : %ld\n",syn_round_time);
 		}
 		syn_table.init_flag = 2;
 		syn_table.start_seq = syn_struct_back_token->seq_now;
@@ -1366,7 +1377,7 @@ void pk_mgr::send_syn_token_to_pk(int pk_sock){
 	memset(send_buf, 0x0, sizeof(struct syn_token_send));
 	memcpy(send_buf, syn_token_send_ptr, expect_len);
 	
-	_log_ptr -> getTickTime(&(syn_table.start_clock));
+	syn_table.start_clock = _log_ptr -> getTime();
 	send_byte = _net_ptr->send(pk_sock, send_buf, expect_len, 0);
 	if( send_byte <= 0 ) {
 		data_close(pk_sock, "send pkt error");
@@ -1459,7 +1470,7 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 {
 
 	int substreamID;
-	LARGE_INTEGER	newAlarm; 
+	DWORD	newAlarm; 
 	unsigned long sourceTimeDiffOne;
 	unsigned long localTimeDiffOne;
 	unsigned long sourceTimeDiffTwo;
@@ -1476,14 +1487,14 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 	(ssDetect_ptr + substreamID) ->last_timestamp = chunk_ptr->header.timestamp;
 	(ssDetect_ptr + substreamID) ->last_seq = chunk_ptr->header.sequence_number;
 	(ssDetect_ptr + substreamID) ->first_timestamp = chunk_ptr->header.timestamp;
-	_log_ptr -> getTickTime(&((ssDetect_ptr + substreamID) ->lastAlarm));
-	_log_ptr -> getTickTime(&((ssDetect_ptr + substreamID) ->firstAlarm));
+	(ssDetect_ptr + substreamID) ->lastAlarm = _log_ptr -> getTime();
+	(ssDetect_ptr + substreamID) ->firstAlarm =_log_ptr -> getTime();
 
 	}
 	//開始計算偵測
 	//只有是 比上次記錄新的sequence_number 才做處理
 	else if(  ((ssDetect_ptr + substreamID) ->last_seq ) < (chunk_ptr->header.sequence_number) ){
-	_log_ptr -> getTickTime(&newAlarm);
+	newAlarm = _log_ptr -> getTime();
 
 //////////////////////////////////////利用頻寬判斷(測量方法一)////////////////////////////////////////////
 	((ssDetect_ptr + substreamID) ->  count_X ) ++;
@@ -1494,7 +1505,7 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 		(ssDetect_ptr + substreamID) ->first_timestamp = chunk_ptr->header.timestamp;
 
 	if( (ssDetect_ptr + substreamID) ->  count_X   == (X -1) )
-		_log_ptr -> getTickTime(&((ssDetect_ptr + substreamID) ->previousAlarm));
+		(ssDetect_ptr + substreamID) ->previousAlarm = _log_ptr -> getTime();
 
 //累積X個封包後做判斷
 	if(  (ssDetect_ptr + substreamID) ->  count_X  == X ){
@@ -1502,7 +1513,7 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 		( (ssDetect_ptr + substreamID) ->measure_N )++;  //從1開始計
 
 		sourceTimeDiffOne =  (chunk_ptr->header.timestamp) - (ssDetect_ptr + substreamID) ->first_timestamp;
-		localTimeDiffOne=	_log_ptr ->diffTime_ms((ssDetect_ptr + substreamID) ->firstAlarm ,newAlarm);
+		localTimeDiffOne=	_log_ptr ->diffgetTime_ms((ssDetect_ptr + substreamID) ->firstAlarm ,newAlarm);
 
 		sourceBitrate = ( ( double)((ssDetect_ptr + substreamID) ->total_byte ) /(double)sourceTimeDiffOne )*8*1000 ;
 		localBitrate  = ( ( double)((ssDetect_ptr + substreamID) ->total_byte ) /(double)localTimeDiffOne  )*8*1000 ;
@@ -1527,7 +1538,7 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 
 ////////////////////////////////////單看兩個連續封包的delay取max (測量方法二)///////////////////////////////////
 	sourceTimeDiffTwo =  (chunk_ptr->header.timestamp) - (ssDetect_ptr + substreamID) ->last_timestamp;
-	localTimeDiffTwo=	_log_ptr ->diffTime_ms((ssDetect_ptr + substreamID) ->lastAlarm ,newAlarm);
+	localTimeDiffTwo=	_log_ptr ->diffgetTime_ms((ssDetect_ptr + substreamID) ->lastAlarm ,newAlarm);
 
 	if( localTimeDiffTwo > sourceTimeDiffTwo ){ 
 			
@@ -1727,21 +1738,21 @@ void pk_mgr::measure()
 
 					//若有多個正在測試中一次只選擇一個substream cut(最右邊的)  並且重設全部記數器的count
 
-					peerTestingManifest = manifestToSubstreamID (peerTestingManifest);
+					testingSubStreamID = manifestToSubstreamID (peerTestingManifest);
 
 					(ssDetect_ptr + testingSubStreamID) ->isTesting =0 ;  //false  
 
 					//should sent to PK select PK ,再把testing 取消偵測的 pk_manifest 設回來
-					pkDownInfoPtr ->peerInfo.manifest |=  SubstreamIDToManifest (peerTestingManifest ) ;
+					pkDownInfoPtr ->peerInfo.manifest |=  SubstreamIDToManifest (testingSubStreamID ) ;
 
 
 					//should sent to peer cut stream
-					connectPeerInfo ->peerInfo.manifest &= (~ SubstreamIDToManifest (peerTestingManifest )) ;
+					connectPeerInfo ->peerInfo.manifest &= (~ SubstreamIDToManifest (testingSubStreamID )) ;
 					_peer_mgr_ptr -> send_manifest_to_parent(connectPeerInfo ->peerInfo.manifest ,connectPeerInfo ->peerInfo.pid);
 
-					send_parentToPK ( SubstreamIDToManifest (peerTestingManifest ) ,PK_PID+1 ) ;
+					send_parentToPK ( SubstreamIDToManifest (testingSubStreamID ) ,PK_PID+1 ) ;
 
-					peerTestingManifest &= ( ~SubstreamIDToManifest(peerTestingManifest) );
+					peerTestingManifest &= ( ~SubstreamIDToManifest(testingSubStreamID) );
 
 					while(peerTestingManifest){
 					testingSubStreamID = manifestToSubstreamID (peerTestingManifest);

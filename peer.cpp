@@ -350,7 +350,7 @@ int peer::handle_pkt_in(int sock)
 
 		if(chunk_ptr->header.rsv_1 == REQUEST){
 
-printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
+			printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 			chunk_ptr->header.rsv_1 =REPLY;
 			_net_ptr->set_blocking(sock);
 			_net_ptr ->send (sock,(char*)chunk_ptr,sizeof(struct chunk_header_t) + chunk_ptr->header.length,0) ;
@@ -363,23 +363,24 @@ printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 			unsigned long replyManifest =chunk_ptr->header.sequence_number;
 			printf("REPLY  manifest =%d \n",replyManifest);
 			//第一個回覆的peer 放入peer_connect_down_t加入測量 並關閉其他連線和清除所有相關table
-			unsigned long subid_replyManifest = 0;
-			for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
+//			unsigned long subid_replyManifest = 0;
+/*			for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
 				if(replyManifest&(1<<k)){
 					subid_replyManifest = k;
 				}
 			}
-			substream_first_reply_peer_iter = substream_first_reply_peer.find(subid_replyManifest);
+*/
+			substream_first_reply_peer_iter = substream_first_reply_peer.find(replyManifest);
 			if(substream_first_reply_peer_iter == substream_first_reply_peer.end()){
-				substream_first_reply_peer[subid_replyManifest] = true;
+				substream_first_reply_peer[replyManifest] = true;
 			}
 
-			substream_first_reply_peer_iter = substream_first_reply_peer.find(subid_replyManifest);
+			substream_first_reply_peer_iter = substream_first_reply_peer.find(replyManifest);
 			if(substream_first_reply_peer_iter == substream_first_reply_peer.end()){
 				printf("error : can not find subid_replyManifest in CHNK_CMD_PEER_TEST_DELAY  REPLY\n");
 				exit(1);
 			}
-			printf("REPLY  subid_replyManifest =%d \n",subid_replyManifest);
+//			printf("REPLY  subid_replyManifest =%d \n",subid_replyManifest);
 			if(substream_first_reply_peer_iter->second){
 
 				map_fd_pid_iter = map_fd_pid.find(sock);
@@ -407,9 +408,10 @@ printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 									memcpy(peerDownInfoPtr ,peerInfoPtr,sizeof(struct peer_info_t));
 									delete peerInfoPtr;
 									_pk_mgr_ptr ->map_pid_peerDown_info[firstReplyPid] =peerDownInfoPtr ;
+									peerDownInfoPtr->peerInfo.manifest |= replyManifest;
 								}else{
 									peerDownInfoPtr = pid_peerDown_info_iter->second;
-									pid_peerDown_info_iter ->second->peerInfo.manifest |= replyManifest;
+									peerDownInfoPtr->peerInfo.manifest |= replyManifest;
 							
 								}
 
@@ -461,7 +463,7 @@ printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 								}
 
 								if(map_in_pid_fd.find( peerInfoPtr->pid ) != map_in_pid_fd.end()){
-									data_close(map_in_pid_fd[peerInfoPtr->pid ],"close by firstReplyPid",CLOSE_PARENT);
+									data_close(map_in_pid_fd[peerInfoPtr->pid ],"close by firstReplyPid ",CLOSE_PARENT);
 									pid_peer_info_iter  = _pk_mgr_ptr ->map_pid_peer_info.begin() ;
 									//刪掉最後一個  離開
 									if(pid_peer_info_iter == _pk_mgr_ptr ->map_pid_peer_info.end())
@@ -476,8 +478,6 @@ printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 
 				substream_first_reply_peer_iter->second =false;
 			}
-
-
 
 		} // END ...  else if(chunk_ptr->header.rsv_1 ==REPLY){
 
@@ -658,12 +658,22 @@ void peer::data_close(int cfd, const char *reason ,int type)
 //	list<unsigned long>::iterator rescue_pid_iter;
 //	list<unsigned long>::iterator rescue_pid_list_iter;
 //	unsigned long manifest = 0;	
-
+	unsigned long  testingManifest=0;
+	unsigned long  peerTestingManifest=0;
 
 	_log_ptr->write_log_format("s => s (s)\n", (char*)__PRETTY_FUNCTION__, "pk", reason);
 	cout << "pk Client " << cfd << " exit by " << reason << ".." << endl;
 //	_net_ptr->epoll_control(cfd, EPOLL_CTL_DEL, 0);
 	_net_ptr->close(cfd);
+
+
+	for(unsigned long i =0  ; i < _pk_mgr_ptr ->sub_stream_num;i++){
+		if(  ((_pk_mgr_ptr->ssDetect_ptr) + i) ->isTesting ){
+			testingManifest |= _pk_mgr_ptr ->SubstreamIDToManifest(i);
+		}
+	}
+
+
 	
 	for(fd_iter = fd_list_ptr->begin(); fd_iter != fd_list_ptr->end(); fd_iter++) {
 		if(*fd_iter == cfd) {
@@ -693,6 +703,20 @@ void peer::data_close(int cfd, const char *reason ,int type)
 
 		pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(pid) ;
 		if (pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_peerDown_info.end() ){
+			
+			//防止peer離開 狀態卡在testing
+			if(peerDownInfoPtr->peerInfo.manifest & testingManifest){
+				peerTestingManifest = peerDownInfoPtr->peerInfo.manifest & testingManifest;
+
+				for(int i=0 ; i<  _pk_mgr_ptr->sub_stream_num ; i++){
+					if( peerTestingManifest & i<<1){
+						 (_pk_mgr_ptr->ssDetect_ptr +i) ->isTesting =false ;
+						 (_pk_mgr_ptr->ssDetect_ptr +i) ->previousParentPID = PK_PID +1 ;
+					}
+				}
+			}
+			_pk_mgr_ptr ->reSet_detectionInfo();
+
 			peerDownInfoPtr = pid_peerDown_info_iter ->second ;
 			delete peerDownInfoPtr;
 			_pk_mgr_ptr ->map_pid_peerDown_info.erase(pid_peerDown_info_iter);
@@ -726,6 +750,20 @@ void peer::data_close(int cfd, const char *reason ,int type)
 	
 		pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(pid) ;
 		if (pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_peerDown_info.end() ){
+
+			//防止peer離開 狀態卡在testing
+			if(peerDownInfoPtr->peerInfo.manifest & testingManifest){
+				peerTestingManifest = peerDownInfoPtr->peerInfo.manifest & testingManifest;
+
+				for(int i=0 ; i<  _pk_mgr_ptr->sub_stream_num ; i++){
+					if( peerTestingManifest & i<<1){
+						 (_pk_mgr_ptr->ssDetect_ptr +i) ->isTesting =false ;
+						 (_pk_mgr_ptr->ssDetect_ptr +i) ->previousParentPID = PK_PID +1 ;
+					}
+				}
+			}
+			_pk_mgr_ptr ->reSet_detectionInfo();
+
 			peerDownInfoPtr = pid_peerDown_info_iter ->second ;
 			delete peerDownInfoPtr;
 			_pk_mgr_ptr ->map_pid_peerDown_info.erase(pid_peerDown_info_iter);

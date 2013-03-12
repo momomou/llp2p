@@ -913,7 +913,7 @@ void peer_mgr::send_manifest_to_parent(unsigned long manifestValue,unsigned long
 	map<unsigned long, int>::iterator map_pid_fd_iter;
 	map<int, queue<struct chunk_t *> *>::iterator fd_queue_iter;
 
-	
+
 	map_pid_fd_iter = peer_ptr ->map_in_pid_fd.find(parentPid);
 	if(map_pid_fd_iter !=  peer_ptr ->map_in_pid_fd.end()){
 		parentSock =map_pid_fd_iter ->second;

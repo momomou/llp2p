@@ -67,7 +67,7 @@ public:
 	int _sock; 		//PK socket
 
 	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
-	long long syn_round_time;
+	unsigned long syn_round_time;
 	struct syn_struct syn_table;
 	void syn_table_init(int pk_sock);
 	void send_syn_token_to_pk(int pk_sock);

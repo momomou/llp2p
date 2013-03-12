@@ -49,6 +49,8 @@ public:
 	LONGLONG diffTime_us(LARGE_INTEGER startTime,LARGE_INTEGER endTime);
 	unsigned int diffTime_ms(LARGE_INTEGER startTime,LARGE_INTEGER endTime);
 	
+	DWORD getTime();
+	DWORD diffgetTime_ms(DWORD startTime,DWORD endTime);
 
 #ifdef WIN32
     int gettimeofday(struct timeval *tp, void *tzp);

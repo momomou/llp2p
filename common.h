@@ -278,9 +278,9 @@ struct chunk_header_t {
 
 //detection Info for each substream
 struct detectionInfo{
-	LARGE_INTEGER	lastAlarm;
-	LARGE_INTEGER	firstAlarm;
-	LARGE_INTEGER	previousAlarm;
+	DWORD	lastAlarm;
+	DWORD	firstAlarm;
+	DWORD	previousAlarm;
 
 	unsigned int	last_timestamp;
 	unsigned int	first_timestamp;
@@ -537,16 +537,16 @@ struct peer_latency_measure {
 
 struct syn_struct{
 	int init_flag; // 0 not init 1 send 2 init complete
-	long long client_abs_start_time;
+	unsigned long client_abs_start_time;
 	unsigned long start_seq;
-	LARGE_INTEGER start_clock;
-	LARGE_INTEGER end_clock;
+	DWORD start_clock;
+	DWORD end_clock;
 };
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 struct source_delay {
 
 	long long source_delay_time;
-	LARGE_INTEGER client_end_time;
+	DWORD client_end_time;
 	unsigned long end_seq_num;
 	unsigned int end_seq_abs_time;
 	int first_pkt_recv;
@@ -562,7 +562,7 @@ struct syn_token_send{
 struct syn_token_receive{
 	struct chunk_header_t header;
 	unsigned long seq_now;
-	long long pk_time;
+	unsigned long pk_time;
 };
 //////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
