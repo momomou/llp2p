@@ -408,6 +408,7 @@ printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 									delete peerInfoPtr;
 									_pk_mgr_ptr ->map_pid_peerDown_info[firstReplyPid] =peerDownInfoPtr ;
 								}else{
+									peerDownInfoPtr = pid_peerDown_info_iter->second;
 									pid_peerDown_info_iter ->second->peerInfo.manifest |= replyManifest;
 							
 								}
@@ -450,10 +451,12 @@ printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 							peerInfoPtr = pid_peer_info_iter->second;
 
 							if (peerInfoPtr->manifest == replyManifest){
-							//若是自己或是先前已經建立過連線的parent 則不close (會關到正常連線)
+							//若是自己或是先前已經建立過連線的parent 則不close (會關到正常連線)  還有children (mesh會有問題)
 								if(pid_peer_info_iter ->first == _peer_mgr_ptr ->self_pid){
 									continue;
 								}else if(_pk_mgr_ptr ->map_pid_peerDown_info.find(pid_peer_info_iter ->first) != _pk_mgr_ptr ->map_pid_peerDown_info.end()){
+									continue;
+								}else if (_pk_mgr_ptr ->map_pid_rescue_peer_info.find(pid_peer_info_iter ->first) !=_pk_mgr_ptr ->map_pid_rescue_peer_info.end()){
 									continue;
 								}
 

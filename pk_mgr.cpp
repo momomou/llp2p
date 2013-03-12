@@ -1252,6 +1252,8 @@ printf("here1 leastCurrDiff =%d  _current= %d SSID =%d\n",leastCurrDiff ,_curren
 					}
 			}
 		printf("here3 least CurrDiff =%d\n",leastCurrDiff);
+		static int tempcount=0 ;
+		if(tempcount==10)
 		PAUSE
 		//可能某個subtream 追過_bucket_size,直接跳到最後一個 (應該不會發生)
 		}else if (leastCurrDiff > _bucket_size) {

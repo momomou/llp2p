@@ -982,7 +982,7 @@ void peer_mgr::handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr)
 	
 	//如果Substream 的數量是變少的話
 	if(_pk_mgr_ptr->manifestToSubstreamNum (chunk_ptr ->manifest) < _pk_mgr_ptr->manifestToSubstreamNum(rescuePeerInfoPtr ->manifest)){
-	clear_ouput_buffer( chunk_ptr ->pid);
+	//clear_ouput_buffer( chunk_ptr ->pid);
 
 	}
 
