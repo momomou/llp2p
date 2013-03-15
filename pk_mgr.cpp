@@ -1310,7 +1310,7 @@ _log_ptr->write_log_format("s =>u s u u\n", __FUNCTION__,__LINE__,"sequence numb
 		// do nothing
 	}else{
 	//丟給rescue_detecion一定是有方向性的
-		rescue_detecion(chunk_ptr);
+//		rescue_detecion(chunk_ptr);
 		//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 		if(peer_start_delay_count == sub_stream_num){
 //			source_delay_detection(sockfd,temp_sub_id,chunk_ptr ->header.sequence_number);

@@ -478,7 +478,7 @@ int peer::handle_pkt_in(int sock)
 
 								if(map_in_pid_fd.find( peerInfoPtr->pid ) != map_in_pid_fd.end()){
 									data_close(map_in_pid_fd[peerInfoPtr->pid ],"close by firstReplyPid ",CLOSE_PARENT);
-									_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"socket close by firstReplyPid close pid =",peerInfoPtr->pid,"socket = ",map_in_pid_fd[peerInfoPtr->pid ]);
+//									_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"socket close by firstReplyPid close pid =",peerInfoPtr->pid,"socket = ",map_in_pid_fd[peerInfoPtr->pid ]);
 
 									pid_peer_info_iter  = _pk_mgr_ptr ->map_pid_peer_info.begin() ;
 									//刪掉最後一個  離開
@@ -487,11 +487,13 @@ int peer::handle_pkt_in(int sock)
 								}
 
 							}
+//						_pk_mgr_ptr ->clear_map_pid_peer_info(replyManifest);  //重看一下
 						}
 						_pk_mgr_ptr ->clear_map_pid_peer_info(replyManifest);
-					}else
+					}else{
 						printf("what !?");
 						PAUSE
+					}
 				}
 
 				substream_first_reply_peer_iter->second =false;

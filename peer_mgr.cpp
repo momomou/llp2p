@@ -457,7 +457,7 @@ void peer_mgr::handle_test_delay(unsigned long manifest)
 			if(map_pid_fd_iter != peer_ptr ->map_in_pid_fd.end() ){
 				sock =peer_ptr ->map_in_pid_fd [pid] ;
 				printf("pid : %d sock : %d iter : %d\n",pid,sock,map_pid_fd_iter->second);
-				_log_ptr->write_log_format("s =>u s u s u s u \n", __FUNCTION__,__LINE__,"pid",pid,"sock",sock,map_pid_fd_iter->second,"manifest",manifest);
+//				_log_ptr->write_log_format("s =>u s u s d s u \n", __FUNCTION__,__LINE__,"pid",pid,"sock",sock,map_pid_fd_iter->second,"manifest",manifest);
 
 				send_test_delay (sock,manifest);
 			}
