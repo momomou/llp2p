@@ -28,20 +28,19 @@ public:
 	//void pk_mgr_set(pk_mgr * pk_mgr_ptr);
 	
 	void connect_peer(struct chunk_level_msg_t *level_msg_ptr, unsigned long pid);
-	
 	int build_connection(struct level_info_t *level_info_ptr, unsigned long pid);
 
 //	void send_bandwidth(unsigned long pid, unsigned long avg_bit_rate);
 //	void send_rescue(unsigned long pid, unsigned long self_pid, unsigned long manifest);
-	void handle_cut_peer(unsigned long pid, int sock);
-	void send_cut_peer(unsigned long pid, int sock);
-	void rescue_reply(unsigned long pid, unsigned long manifest);
-	void add_downstream(unsigned long pid, struct chunk_t *chunk_ptr);
+//	void handle_cut_peer(unsigned long pid, int sock);
+//	void send_cut_peer(unsigned long pid, int sock);
+//	void rescue_reply(unsigned long pid, unsigned long manifest);
+//	void add_downstream(unsigned long pid, struct chunk_t *chunk_ptr);
 //	void add_rescue_downstream(unsigned long pid);
-	void add_rescue_fd(unsigned long pid);
-	void cut_rescue_peer(int sock);
-	void del_rescue_downstream();
-	void cut_rescue_downstream(unsigned long pid);
+//	void add_rescue_fd(unsigned long pid);
+//	void cut_rescue_peer(int sock);
+//	void del_rescue_downstream();
+//	void cut_rescue_downstream(unsigned long pid);
     void set_up_public_ip(unsigned long public_ip);
     void clear_ouput_buffer(unsigned long pid);
 	

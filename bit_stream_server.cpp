@@ -39,7 +39,7 @@ void bit_stream_server::init(int stream_id, unsigned short bitStreamServerPort)
 	_stream_id = stream_id;
 
 
-	DBG_PRINTF("bitStreamServerPort = %hu\n", bitStreamServerPort);
+	printf("bitStreamServerPort = %hu\n", bitStreamServerPort);
 	_sock_tcp = socket(AF_INET, SOCK_STREAM, 0);
 	if(_sock_tcp < 0)
 		throw "create tcp srv socket fail";

@@ -317,7 +317,7 @@ void network::peer_set(peer *peer_ptr)
 //shutdown socket and close socket
 int network::close(int sock) 
 {
-	DBG_PRINTF("here\n");
+//	DBG_PRINTF("here\n");
 
 	_map_fd_bc_tbl_iter = _map_fd_bc_tbl.find(sock);
 	
@@ -330,7 +330,7 @@ int network::close(int sock)
 	}
 	
 	epoll_control(sock, EPOLL_CTL_DEL, 0);
-	cout << "fd_size = " << _map_fd_bc_tbl.size() << endl;
+	cout << "sock close fd_size = " << _map_fd_bc_tbl.size() << endl;
 	
 	::shutdown(sock, SHUT_RDWR);
 #ifdef _WIN32

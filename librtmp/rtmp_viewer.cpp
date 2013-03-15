@@ -145,13 +145,13 @@ int rtmp_viewer::ServeInvoke(STREAMING_SERVER *server, RTMP * r, RTMPPacket *pac
 
 		//_rtmp_client->inchuck_size_get(&(r->m_outChunkSize));
 		//r->m_outChunkSize = crtmp.m_inChunkSize;
-        iter = _pk_mgr_ptr->map_rtmp_chunk_size.find(get_stream_pk_id());
-	    if(iter != _pk_mgr_ptr->map_rtmp_chunk_size.end() && iter->second > 0){   
-		    r->m_outChunkSize = iter->second;
-	    }
-        else{
-		    r->m_outChunkSize = 1024; //RTMP_DEFAULT_CHUNKSIZE
-        }
+ //       iter = _pk_mgr_ptr->map_rtmp_chunk_size.find(get_stream_pk_id());
+//	    if(iter != _pk_mgr_ptr->map_rtmp_chunk_size.end() && iter->second > 0){   
+//		    r->m_outChunkSize = iter->second;
+//	    }
+//        else{
+//		    r->m_outChunkSize = 1024; //RTMP_DEFAULT_CHUNKSIZE
+//       }
         printf("set rtmp chunk size %d\n", r->m_outChunkSize);
 
 		_rtmp_supplement_ptr->SendChangeChunkSize(r);

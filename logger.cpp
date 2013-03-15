@@ -75,7 +75,7 @@ void logger::write_log_format(const char* fmt, ...)
 	unsigned long long int llu;
 	struct in_addr pip;
 
-	fprintf(_fp, "[%s] ", get_now_time());
+	fprintf(_fp,"[%s] ", get_now_time());
 
 	for(va_start(ap, fmt); *fmt; fmt++) {
 		switch(*fmt) {

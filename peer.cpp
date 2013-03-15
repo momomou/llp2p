@@ -127,6 +127,7 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 		rescue_peer->udp_port = chunk_request_ptr->info.udp_port;
 		_pk_mgr_ptr->map_pid_rescue_peer_info[rescue_peer->pid] = rescue_peer;
 		printf("rescue_peer->pid = %d",rescue_peer->pid);
+		_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"rescue_peer->pid =",rescue_peer->pid);
 	}
 //	}																			//2013/01/24
 	
@@ -307,25 +308,26 @@ int peer::handle_pkt_in(int sock)
 	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SYN) {	
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
 		printf("CHNK_CMD_PEER_SYN  not here peer\n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_PEER_SYN  not here peer");
 		PAUSE
 		exit(1);
 	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 //cmd =CHNK_CMD_PEER_BWN
-	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_BWN) {
+//	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_BWN) {
 
 
 
 
 //cmd = CHNK_CMD_ PEER_RSC
-	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_RSC) {
+//	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_RSC) {
 //hidden at 2013/01/13
 
 
 
 
 //cmd == CHNK_CMD_PEER_CUT
-	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_CUT) {
+//	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_CUT) {
 		//cout << "CHNK_CMD_PEER_CUT" << endl;
 
 //hidden at 2013/01/27
@@ -333,13 +335,13 @@ int peer::handle_pkt_in(int sock)
 
 
 //cmd == CHNK_CMD_PEER_LATENCY
-	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_LATENCY){
+//	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_LATENCY){
 //hidden at 2013/01/16
 
 
 
 //cmd == CHNK_CMD_RT_NLM
-    } else if(chunk_ptr->header.cmd == CHNK_CMD_RT_NLM) {	//--!! 0128
+//    } else if(chunk_ptr->header.cmd == CHNK_CMD_RT_NLM) {	//--!! 0128
 
 //hidden at 2013/01/16
 
@@ -351,6 +353,9 @@ int peer::handle_pkt_in(int sock)
 		if(chunk_ptr->header.rsv_1 == REQUEST){
 
 			printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_PEER_TEST_DELAY REQUEST");
+
+
 			chunk_ptr->header.rsv_1 =REPLY;
 			_net_ptr->set_blocking(sock);
 			_net_ptr ->send (sock,(char*)chunk_ptr,sizeof(struct chunk_header_t) + chunk_ptr->header.length,0) ;
@@ -359,9 +364,12 @@ int peer::handle_pkt_in(int sock)
 		}else if(chunk_ptr->header.rsv_1 ==REPLY){
 
 			printf("CHNK_CMD_PEER_TEST_DELAY  REPLY\n");
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_PEER_TEST_DELAY  REPLY");
 
 			unsigned long replyManifest =chunk_ptr->header.sequence_number;
 			printf("REPLY  manifest =%d \n",replyManifest);
+			_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"REPLY  manifest =",replyManifest);
+
 			//第一個回覆的peer 放入peer_connect_down_t加入測量 並關閉其他連線和清除所有相關table
 //			unsigned long subid_replyManifest = 0;
 /*			for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
@@ -378,9 +386,10 @@ int peer::handle_pkt_in(int sock)
 			substream_first_reply_peer_iter = substream_first_reply_peer.find(replyManifest);
 			if(substream_first_reply_peer_iter == substream_first_reply_peer.end()){
 				printf("error : can not find subid_replyManifest in CHNK_CMD_PEER_TEST_DELAY  REPLY\n");
+				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"error : can not find subid_replyManifest in CHNK_CMD_PEER_TEST_DELAY  REPLY");
 				exit(1);
 			}
-//			printf("REPLY  subid_replyManifest =%d \n",subid_replyManifest);
+
 			if(substream_first_reply_peer_iter->second){
 
 				map_fd_pid_iter = map_fd_pid.find(sock);
@@ -389,6 +398,7 @@ int peer::handle_pkt_in(int sock)
 
 					//在這裡面sequence_number 裡面塞的是manifest
 					printf("first_reply_peer=%d  manifest =%d \n",firstReplyPid,replyManifest);
+					_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"first_reply_peer=",replyManifest,"manifest",replyManifest);
 
 					pid_peer_info_iter = _pk_mgr_ptr ->map_pid_peer_info.find(firstReplyPid);
 
@@ -436,9 +446,10 @@ int peer::handle_pkt_in(int sock)
 
 
 						_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
-						_pk_mgr_ptr->reSet_detectionInfo();
+//						_pk_mgr_ptr->reSet_detectionInfo();
 
 						printf("sent to parent manifest = %d\n",peerDownInfoPtr ->peerInfo.manifest);
+						_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"first_reply_peer=",firstReplyPid,"manifest",peerDownInfoPtr ->peerInfo.manifest);
 
 							/*for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
 								if(peerDownInfoPtr->peerInfo.manifest & (1<<k)){
@@ -453,17 +464,21 @@ int peer::handle_pkt_in(int sock)
 							peerInfoPtr = pid_peer_info_iter->second;
 
 							if (peerInfoPtr->manifest == replyManifest){
-							//若是自己或是先前已經建立過連線的parent 則不close (會關到正常連線)  還有children (mesh會有問題)
+							//若是自己或是先前已經建立過連線的parent 則不close (會關到正常連線)  還有children (mesh會有問題!?)
 								if(pid_peer_info_iter ->first == _peer_mgr_ptr ->self_pid){
 									continue;
 								}else if(_pk_mgr_ptr ->map_pid_peerDown_info.find(pid_peer_info_iter ->first) != _pk_mgr_ptr ->map_pid_peerDown_info.end()){
 									continue;
-								}else if (_pk_mgr_ptr ->map_pid_rescue_peer_info.find(pid_peer_info_iter ->first) !=_pk_mgr_ptr ->map_pid_rescue_peer_info.end()){
-									continue;
 								}
+
+								/*else if (_pk_mgr_ptr ->map_pid_rescue_peer_info.find(pid_peer_info_iter ->first) !=_pk_mgr_ptr ->map_pid_rescue_peer_info.end()){
+									continue;
+								}*/
 
 								if(map_in_pid_fd.find( peerInfoPtr->pid ) != map_in_pid_fd.end()){
 									data_close(map_in_pid_fd[peerInfoPtr->pid ],"close by firstReplyPid ",CLOSE_PARENT);
+									_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"socket close by firstReplyPid close pid =",peerInfoPtr->pid,"socket = ",map_in_pid_fd[peerInfoPtr->pid ]);
+
 									pid_peer_info_iter  = _pk_mgr_ptr ->map_pid_peer_info.begin() ;
 									//刪掉最後一個  離開
 									if(pid_peer_info_iter == _pk_mgr_ptr ->map_pid_peer_info.end())
@@ -473,7 +488,9 @@ int peer::handle_pkt_in(int sock)
 							}
 						}
 						_pk_mgr_ptr ->clear_map_pid_peer_info(replyManifest);
-					}
+					}else
+						printf("what !?");
+						PAUSE
 				}
 
 				substream_first_reply_peer_iter->second =false;
@@ -483,13 +500,15 @@ int peer::handle_pkt_in(int sock)
 
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_SET_MANIFEST){
 		printf("CHNK_CMD_PEER_SET_MANIFEST\n");
+		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"CHNK_CMD_PEER_SET_MANIFEST");
+
 		_peer_mgr_ptr ->handle_manifestSet((struct chunk_manifest_set_t *)chunk_ptr); 
 
 		_pk_mgr_ptr->send_capacity_to_pk(_pk_mgr_ptr->_sock);
 	
 
-	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_PARENT_CHILDREN){
-
+//	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_PARENT_CHILDREN){
+/*
 		if(chunk_ptr->header.rsv_1 == REQUEST){
 		
 			_pk_mgr_ptr->handleAppenSelfdPid(chunk_ptr);
@@ -499,12 +518,13 @@ int peer::handle_pkt_in(int sock)
 			_pk_mgr_ptr->storeChildrenToSet(chunk_ptr);
 		
 		}
-
+*/
 	
 	} else {
 		printf ("%d   " , chunk_ptr->header.cmd);
 
 		cout << "what's this?" << endl;
+		PAUSE
 	}
 
 
@@ -549,8 +569,8 @@ int peer::handle_pkt_out(int sock)
 				if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
 #endif
 //					printf ("==============WSAEWOULDBLOCK ===========\n\n", chunk_ptr ->header.cmd) ; 
-	//
-	//0307				
+					_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"==============WSAEWOULDBLOCK ===========");
+
 					Sleep(1);
 					continue ;
 	//				PAUSE
@@ -587,6 +607,7 @@ int peer::handle_pkt_out(int sock)
 	//0307			
 					Sleep(1);
 //					printf ("==============WSAEWOULDBLOCK ===========\n\n", chunk_ptr ->header.cmd) ; 
+					_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"==============WSAEWOULDBLOCK ===========");
 					continue ;
 //					PAUSE
 //				return RET_SOCK_ERROR;

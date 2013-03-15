@@ -49,7 +49,7 @@ int bit_stream_out::handle_pkt_out(int sock){
 
 		
 		if (!_queue_out_data_ptr->size()) {
-			_log_ptr->write_log_format("s => s \n", __FUNCTION__, "_queue_out_data_ptr->size =0");
+//			_log_ptr->write_log_format("s => s \n", __FUNCTION__, "_queue_out_data_ptr->size =0");
 			_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN);	
 			return RET_OK;
 		}
@@ -72,7 +72,7 @@ int bit_stream_out::handle_pkt_out(int sock){
 
 
 
-_log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt sequence_number", chunk_ptr ->header.sequence_number, send_rt_val);
+//_log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt sequence_number", chunk_ptr ->header.sequence_number, send_rt_val);
 		if(send_rt_val<0){
 			printf("socket error number=%d\n",WSAGetLastError());
 			if((WSAGetLastError()==WSAEWOULDBLOCK )){								//buff full

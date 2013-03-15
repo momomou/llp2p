@@ -14,7 +14,7 @@
 #define PARAMETER_P		2
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
-#define BUFF_SIZE		100
+#define BUFF_SIZE		400
 
 
 #include "configuration.h"
@@ -110,23 +110,23 @@ using std::bitset;
 #define RTMP_PKT_BUF_PAY_SIZE	(RTMP_PKT_BUF_MAX - sizeof(struct chunk_header_t))	// This value defines the max rtp packet size
 
 #define CHNK_CMD_PEER_REG				0x01	// register
-#define CHNK_CMD_RESCUE_LIST			0x02	// recv rescue list
-#define CHNK_CMD_PEER_RSC				0x03	// rescue cmd
-#define CHNK_CMD_PEER_CUT				0x04	// cut cmd
-#define CHNK_CMD_PEER_BWN				0x05	// bandwidth notification cmd
+//#define CHNK_CMD_RESCUE_LIST			0x02	// recv rescue list
+//#define CHNK_CMD_PEER_RSC				0x03	// rescue cmd
+//#define CHNK_CMD_PEER_CUT				0x04	// cut cmd
+//#define CHNK_CMD_PEER_BWN				0x05	// bandwidth notification cmd
 #define CHNK_CMD_PEER_CON				0x06	// connect cmd (connect to peer)
 #define CHNK_CMD_PEER_DATA				0x07	// Data cmd (this cmd encapsulate data into transport layer)
 #define CHNK_CMD_PEER_REQ_FROM			0x08	// req from (the peer will send this command that which seq itslf want to request from)
-#define CHNK_CMD_PEER_RSC_LIST			0x09	// rescue to pk's cmd
-#define CHNK_CMD_PEER_SWAP				0x0a	// swap cmd
-#define CHNK_CMD_CHN_OPEN				0x0b		// open channel
-#define CHNK_CMD_CHN_STOP				0x0c		// stop channel
-#define CHNK_CMD_CHN_INFO				0x0d		// query channel information
-#define CHNK_CMD_RT_NLM					0x0e    // network latency measurement    //--!!0121
-#define CHNK_CMD_PEER_LAT				0x0f	// latency cmd, can only used by NS2, implementation can only use this cmd until iplement NTP to sync peer's time
-#define CHNK_CMD_PEER_DEP				0x10	// departure
-#define CHNK_CMD_PEER_NOTIFY        	0x11
-#define CHNK_CMD_PEER_LATENCY           0x12
+//#define CHNK_CMD_PEER_RSC_LIST			0x09	// rescue to pk's cmd
+//#define CHNK_CMD_PEER_SWAP				0x0a	// swap cmd
+//#define CHNK_CMD_CHN_OPEN				0x0b		// open channel
+//#define CHNK_CMD_CHN_STOP				0x0c		// stop channel
+//#define CHNK_CMD_CHN_INFO				0x0d		// query channel information
+//#define CHNK_CMD_RT_NLM					0x0e    // network latency measurement    //--!!0121
+//#define CHNK_CMD_PEER_LAT				0x0f	// latency cmd, can only used by NS2, implementation can only use this cmd until iplement NTP to sync peer's time
+//#define CHNK_CMD_PEER_DEP				0x10	// departure
+//#define CHNK_CMD_PEER_NOTIFY        	0x11
+//#define CHNK_CMD_PEER_LATENCY           0x12
 #define CHNK_CMD_CHN_UPDATA_DATA        0x13	// update steam id to peer
 #define CHNK_CMD_PEER_RESCUE      		0x14	//rescue from pk
 #define CHNK_CMD_PEER_RESCUE_UPDATE      	0x15
@@ -139,8 +139,8 @@ using std::bitset;
 //////////////////////////////////////////////////////////////////////////////////
 #define CHNK_CMD_PEER_SEED				0X1B
 //#define CHNK_CMD_PEER_START_DELAY_UPDATE			0X1C
-#define CHNK_CMD_PEER_PARENT_CHILDREN	0xF0	//暫時不用
-#define CHNK_CMD_TOPO_INFO			0x1e
+//#define CHNK_CMD_PEER_PARENT_CHILDREN	0xF0	//暫時不用
+#define CHNK_CMD_TOPO_INFO				0x1E
 
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 #define MAX_DELAY 2000
