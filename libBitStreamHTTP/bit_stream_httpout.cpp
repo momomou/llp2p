@@ -112,7 +112,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 	if (_send_ctl_info.ctl_state == READY) {
 		size_t send_size;
 
-		struct chunk_bitstream_t *chunk_ptr;
+		struct chunk_t *chunk_ptr;
 
 		if (!_queue_out_data_ptr->size()) {
 			_log_ptr->write_log_format("s => s \n", __FUNCTION__, "_queue_out_data_ptr->size =0");
@@ -120,7 +120,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 			return RET_OK;
 		}
 
-		chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();
+		chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();
 
 
 //pop until get the first keyframe
@@ -129,8 +129,10 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 			if(_queue_out_data_ptr ->size() >=10){
 				for(int i=0;i<5;i++){
 					if(!isKeyFrame(chunk_ptr )){
+						if( _queue_out_data_ptr ->size()<=1)
+							return RET_OK;
 					_queue_out_data_ptr->pop();
-					chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();
+					chunk_ptr = _queue_out_data_ptr->front();
 					}else{
 						_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "First Key Frame is ", chunk_ptr ->header.sequence_number);
 						first_pkt=false;
@@ -144,7 +146,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 
 //here is to down-sampling (這邊可能有些bug 可能會去pop一個空的_queue_out_data_ptr!?)
-/*
+
 		int sentSequenceNumber = chunk_ptr ->header.sequence_number ;
 		int differenceValue = (_pk_mgr_ptr ->_least_sequence_number -sentSequenceNumber);
 		if (differenceValue > 100){ //if (recv -sent)diff >100 pkt pop until  queue <=30 and continuance pop until last key frame
@@ -152,35 +154,44 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 				_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "POP queue ", _queue_out_data_ptr ->size());
 				_queue_out_data_ptr->pop();
 			}
-			chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();
+			chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();
 			while(! isKeyFrame(chunk_ptr )){
+				if( _queue_out_data_ptr ->size()<=1)
+					return RET_OK;
 				_queue_out_data_ptr->pop();
 				_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "POP queue ", _queue_out_data_ptr ->size());
-				chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();
+				chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();
 				if(_queue_out_data_ptr ->size() <=10)
 					break;
 				}
 		}
+
 		else if(differenceValue <=100 && differenceValue >40){  
 			  	if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 3 == 0) ){   //not key frame &&  sampling by 1/3
 					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/3", chunk_ptr ->header.sequence_number);
+					if( _queue_out_data_ptr ->size()<=1)
+						return RET_OK;
 					_queue_out_data_ptr->pop();
-					chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();			 //ignore and not send
+					chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();			 //ignore and not send
 					}
 		}else if(differenceValue <=40 && differenceValue >20){
 				if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 5 == 0) ){   //not key frame &&  sampling by 1/5
+					if( _queue_out_data_ptr ->size()<=1)
+						return RET_OK;
 					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/5", chunk_ptr ->header.sequence_number);
 					_queue_out_data_ptr->pop();
-					chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();			 //ignore and not send
+					chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();			 //ignore and not send
 					}
 		}else if (differenceValue <=20 && differenceValue >5){
 				if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 7 == 0) ){   //not key frame &&  sampling by 1/7
+					if( _queue_out_data_ptr ->size()<=1)
+						return RET_OK;
 					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/7", chunk_ptr ->header.sequence_number);
 					_queue_out_data_ptr->pop();
-					chunk_ptr = (chunk_bitstream_t *)_queue_out_data_ptr->front();			 //ignore and not send
+					chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();			 //ignore and not send
 					}	
 		}
-*/
+
 
 
 //for debug
@@ -286,7 +297,7 @@ unsigned char bit_stream_httpout::get_stream_pk_id()
 
 
 
-bool bit_stream_httpout::isKeyFrame(struct chunk_bitstream_t *chunk_ptr)
+bool bit_stream_httpout::isKeyFrame(struct chunk_t *chunk_ptr)
 {
 	char flvBitFlag;
 	if(*(char*)(chunk_ptr->buf) == 0x09){		//video
@@ -335,7 +346,7 @@ bool bit_stream_httpout::isStreamID_inChannel(int streamid)
 }
 
 
-unsigned int bit_stream_httpout::getFlvTimeStamp(struct chunk_bitstream_t *chunk_ptr)
+unsigned int bit_stream_httpout::getFlvTimeStamp(struct chunk_t *chunk_ptr)
 {
 	unsigned int timeStampInt=0;
 	unsigned int *intPtr;

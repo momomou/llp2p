@@ -45,7 +45,7 @@ int bit_stream_out::handle_pkt_out(int sock){
 	if (_send_ctl_info.ctl_state == READY) {
 		size_t send_size;
 
-		struct chunk_bitstream_t *chunk_ptr;
+		struct chunk_t *chunk_ptr;
 
 		
 		if (!_queue_out_data_ptr->size()) {
@@ -54,7 +54,7 @@ int bit_stream_out::handle_pkt_out(int sock){
 			return RET_OK;
 		}
 
-		chunk_ptr = (struct chunk_bitstream_t *)_queue_out_data_ptr->front();
+		chunk_ptr = (struct chunk_t *)_queue_out_data_ptr->front();
 
 
 		_queue_out_data_ptr->pop();

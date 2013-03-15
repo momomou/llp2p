@@ -11,10 +11,6 @@ class pk_mgr;
 class bit_stream_server;
 
 
-
-
-
-
 class bit_stream_httpout:public stream {
 public:
 
@@ -46,6 +42,7 @@ private:
 	int _send_byte;
 	int _expect_len;
 	int _offset;
+
 	FILE *file_ptr;
 	FILE *file_ptr_test;
 
@@ -61,8 +58,8 @@ private:
 	void data_close(int cfd, const char *reason);
 	bool isStreamID_inChannel(int streamid);
 	int getStreamID_FromHTTP_Request(char *httpBuffer,unsigned long BufferSize );
-	bool isKeyFrame(struct chunk_bitstream_t *chunk_ptr);
-	unsigned int getFlvTimeStamp(struct chunk_bitstream_t *chunk_ptr);
+	bool isKeyFrame(struct chunk_t *chunk_ptr);
+	unsigned int getFlvTimeStamp(struct chunk_t *chunk_ptr);
 
 
 

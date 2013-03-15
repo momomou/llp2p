@@ -303,7 +303,8 @@ int peer::handle_pkt_in(int sock)
 
 		_pk_mgr_ptr->handle_stream(chunk_ptr, sock);
 
-
+		//不刪除 chunk_ptr 全權由handle_stream處理
+		return RET_OK;
 	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SYN) {	
 	//////////////////////////////////////////////////////////////////////////////////measure start delay

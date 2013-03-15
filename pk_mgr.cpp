@@ -46,20 +46,39 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 
 
 //主要的大buffer
-	_chunk_bitstream = (struct chunk_bitstream_t *)malloc(RTP_PKT_BUF_MAX * _bucket_size);
-	memset( _chunk_bitstream, 0x0, _bucket_size * RTP_PKT_BUF_MAX );
+//	_chunk_bitstream = (struct chunk_bitstream_t *)malloc(RTP_PKT_BUF_MAX * _bucket_size);
+//	memset( _chunk_bitstream, 0x0, _bucket_size * RTP_PKT_BUF_MAX );
 
-/*
-	_chunk_bitstream = (struct chunk_t **)malloc(_bucket_size)
-	memset( _chunk_bitstream, 0x0, _bucket_size);
-*/
+
+	buf_chunk_t = (struct chunk_t **)malloc(_bucket_size * sizeof(struct chunk_t **) ) ;
+	memset( buf_chunk_t, NULL, _bucket_size * sizeof(struct chunk_t **) );
+
+	struct chunk_t* chunk_t_ptr ;
+
+
+	for(int i=0 ; i<_bucket_size ;i++){
+		chunk_t_ptr  = (struct chunk_t *)new unsigned char[ sizeof (struct chunk_t) ] ;
+		if (chunk_t_ptr == NULL) {
+			printf("memory not enough\n");
+		}
+		memset( chunk_t_ptr , 0x0, sizeof (struct chunk_t) ) ;
+		*(buf_chunk_t + i) = chunk_t_ptr ;
+
+	}
+
+
+
 }
 
 pk_mgr::~pk_mgr() 
 {
 
-	if(_chunk_bitstream)
-		free(_chunk_bitstream);
+//	if(_chunk_bitstream)
+//		free(_chunk_bitstream);
+
+	if(buf_chunk_t)
+		free(buf_chunk_t);
+
 	if(ssDetect_ptr)
 		free(ssDetect_ptr);
 	if(statsArryCount_ptr)
@@ -738,7 +757,7 @@ int pk_mgr::handle_pkt_in(int sock)
 			new_peer ->manifest = tempManifes;
 
 printf( "  pid = %d   ",new_peer->pid);
-_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"  pid =   ",new_peer->pid,"manifest=",new_peer ->manifest );
+_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"  pid =   ",new_peer->pid,"manifest=",new_peer ->manifest );
 
 		}
 _log_ptr->write_log_format("\n");
@@ -824,7 +843,7 @@ _log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"lane_member ",
 
 			new_peer ->manifest = ((struct chunk_rescue_list*)chunk_ptr) ->manifest;
 printf( "  pid = %d   ",new_peer->pid);
-_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"  pid =   ",new_peer->pid,"manifest=",new_peer ->manifest );
+_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"  pid =   ",new_peer->pid,"manifest=",new_peer ->manifest );
 
 		}
 _log_ptr->write_log_format("\n");
@@ -864,6 +883,9 @@ _log_ptr->write_log_format("\n");
 		//printf("%s, CHNK_CMD_PEER_DATA\n", __FUNCTION__);
 		//printf("seq : %d , sub id : %d\n",chunk_ptr ->header.sequence_number,(chunk_ptr ->header.sequence_number) % sub_stream_num);
 		handle_stream(chunk_ptr, sock);	
+
+		//不刪除 chunk_ptr 全權由handle_stream處理
+		return RET_OK;
 
 //cmd == CHNK_CMD_PEER_RSC_LIST	
 //	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_RSC_LIST) {
@@ -912,11 +934,11 @@ _log_ptr->write_log_format("\n");
 
 		printf("cmd =recv CHNK_CMD_PEER_SEED\n");
 		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"cmd =recv CHNK_CMD_PEER_SEED");
-		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"RECV manifest ",((struct seed_notify *)chunk_ptr) ->manifest,"old manifest",	pkDownInfoPtr ->peerInfo.manifest);
+		_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"RECV manifest ",((struct seed_notify *)chunk_ptr) ->manifest,"old manifest",	pkDownInfoPtr ->peerInfo.manifest);
 
 		pkDownInfoPtr ->peerInfo.manifest |= ((struct seed_notify *)chunk_ptr) ->manifest ;
 
-		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"new manifest ",pkDownInfoPtr ->peerInfo.manifest );
+		_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"new manifest ",pkDownInfoPtr ->peerInfo.manifest );
 
 		//join
 		//跟PK的拓樸全權交給PK 不做任何送拓樸的動作
@@ -928,7 +950,7 @@ _log_ptr->write_log_format("\n");
 			{
 				if( pkDownInfoPtr ->peerInfo.manifest &  SubstreamIDToManifest(substreamID)){
 					printf("send topology %d\n",pkDownInfoPtr ->peerInfo.manifest);
-					_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"send topology",pkDownInfoPtr ->peerInfo.manifest);
+					_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"send topology",pkDownInfoPtr ->peerInfo.manifest);
 
 					send_parentToPK ( SubstreamIDToManifest(substreamID) , PK_PID+1 );
 				}
@@ -1074,14 +1096,14 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 	unsigned long testingManifest=0;
 
-	_log_ptr->write_log_format("s =>u s u s u s u s u s u\n", __FUNCTION__,__LINE__,"stream ID=" ,chunk_ptr->header .stream_id,"pkt seqnum", chunk_ptr->header.sequence_number,"bytes=" ,chunk_ptr ->header.length,"timestamp=",chunk_ptr->header.timestamp);
 //
 
 
 	//還沒註冊拿到substream num  不做任何偵測和運算
-	if(sub_stream_num == 0)
+	if(sub_stream_num == 0){
+		delete [] (unsigned char*)chunk_ptr ;
 		return;
-
+	}
 //↓↓↓↓↓↓↓↓↓↓↓↓任何chunk 都會run↓↓↓↓↓↓↓↓↓↓↓↓↓
 
 
@@ -1133,6 +1155,9 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		}
 	}
 
+	_log_ptr->write_log_format("s =>u s u s u s u s u s u s u s u\n", __FUNCTION__,__LINE__,"parentPid",parentPid,"parent manifest",parentPeerPtr->peerInfo.manifest,"substreamID=",chunk_ptr->header.sequence_number % sub_stream_num,"stream ID=" ,chunk_ptr->header .stream_id,"pkt seqnum", chunk_ptr->header.sequence_number,"bytes=" ,chunk_ptr ->header.length,"timestamp=",chunk_ptr->header.timestamp);
+
+
 	//更新最後的seq 用來做time out
 	parentPeerPtr->timeOutNewSeq =chunk_ptr ->header.sequence_number;
 
@@ -1147,7 +1172,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 		(ssDetect_ptr + temp_sub_id) ->isTesting =1 ;	//ture
 		printf("SSID = %d start testing stream\n",temp_sub_id);
-		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"start testing stream SSID = ",temp_sub_id);
+		_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"start testing stream SSID = ",temp_sub_id);
 
 		//這邊只是暫時改變PK的substream 實際上還是有串流下來
 		_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"PK old manifest",pkDownInfoPtr->peerInfo.manifest);
@@ -1212,23 +1237,45 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 //↑↑↑↑↑↑↑↑↑↑↑↑任何chunk 都會run↑↑↑↑↑↑↑↑↑↑↑↑
 
 
-
 	//to ensure sequence number  higher than previous and overlay _chunk_ptr (會過濾一些重複和比原本小的封包)
-	if(chunk_ptr->header.sequence_number > (*(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number) {
-		memset((char *)(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size)), 0x0, RTP_PKT_BUF_MAX);
-		memcpy((char *)(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size)), chunk_ptr, (sizeof(struct chunk_header_t) + chunk_ptr->header.length));
-	} else if((*(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number == chunk_ptr->header.sequence_number){
-		chunk_ptr->header.length = 0;
+//	if(chunk_ptr->header.sequence_number > (*(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number) {
+//		memset((char *)(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size)), 0x0, RTP_PKT_BUF_MAX);
+//		memcpy((char *)(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size)), chunk_ptr, (sizeof(struct chunk_header_t) + chunk_ptr->header.length));
+	
+	if(chunk_ptr->header.sequence_number > (**(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number) {
+		delete [] (unsigned char*) *(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size)) ;
+		*(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size)) =  chunk_ptr ;
+
+	
+//	} else if((*(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number == chunk_ptr->header.sequence_number){
+//		chunk_ptr->header.length = 0;
 //printf("duplicate sequence number in the buffer  seq=%u\n",chunk_ptr->header.sequence_number);
-_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"duplicate sequence number in the buffer  seq",chunk_ptr->header.sequence_number);
+//_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"duplicate sequence number in the buffer  seq",chunk_ptr->header.sequence_number);
+//		return;
+
+	} else if((**(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number == chunk_ptr->header.sequence_number){
+//		chunk_ptr->header.length = 0;
+//printf("duplicate sequence number in the buffer  seq=%u\n",chunk_ptr->header.sequence_number);
+_log_ptr->write_log_format("s =>u s u u\n", __FUNCTION__,__LINE__,"duplicate sequence number in the buffer  seq",(**(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number,chunk_ptr->header.sequence_number);
+		delete [] (unsigned char*)chunk_ptr ;
 		return;
-	} else {
-		chunk_ptr->header.length = 0;
+
+
+
+//	} else {
+//		chunk_ptr->header.length = 0;
 //		printf("sequence number smaller than the index in the buffer seq=%u\n",chunk_ptr->header.sequence_number);
-_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"sequence number smaller than the index in the buffer seq",chunk_ptr->header.sequence_number);
+//_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"sequence number smaller than the index in the buffer seq",chunk_ptr->header.sequence_number);
+//		return;
+//	}
+	
+	} else {
+//		chunk_ptr->header.length = 0;
+//		printf("sequence number smaller than the index in the buffer seq=%u\n",chunk_ptr->header.sequence_number);
+_log_ptr->write_log_format("s =>u s u u\n", __FUNCTION__,__LINE__,"sequence number smaller than the index in the buffer seq",(**(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number,chunk_ptr->header.sequence_number);
+		delete [] (unsigned char*)chunk_ptr ;
 		return;
 	}
-	
 
 
 //↓↓↓↓↓↓↓↓↓↓↓↓以下只有先到的chunk才會run(會濾掉重複的和更小的)↓↓↓↓↓↓↓↓↓↓↓↓↓
@@ -1249,7 +1296,9 @@ _log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"sequence number
 		}
 
 		if((peer->manifest & (1 << (chunk_ptr->header.sequence_number % sub_stream_num))) ) {
-			queue_out_data_ptr->push((struct chunk_t *)(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size)));
+//			queue_out_data_ptr->push((struct chunk_t *)(_chunk_bitstream + (chunk_ptr->header.sequence_number % _bucket_size)));
+			queue_out_data_ptr->push( *(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size)) ) ;
+
 //			printf("chunk_ptr->header.sequence_number =%d \n",chunk_ptr->header.sequence_number);
 			_net_ptr->epoll_control(downStreamSock, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
 		}
@@ -1277,17 +1326,17 @@ _log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"sequence number
 
 			for(; ;_current_send_sequence_number++ ){
 					//代表有封包還沒到.略過
-					if((*(_chunk_bitstream + (_current_send_sequence_number % _bucket_size))).header.sequence_number != _current_send_sequence_number){
+					if((**(buf_chunk_t + (_current_send_sequence_number % _bucket_size))).header.sequence_number != _current_send_sequence_number){
 
 printf("here1 leastCurrDiff =%d  _current= %d SSID =%d\n ",leastCurrDiff ,_current_send_sequence_number,_current_send_sequence_number%sub_stream_num);
-_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"here1 leastCurrDiff =",leastCurrDiff,"_current=",_current_send_sequence_number,"SSID =",_current_send_sequence_number%sub_stream_num);
+_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__,"here1 leastCurrDiff =",leastCurrDiff,"_current=",_current_send_sequence_number,"SSID =",_current_send_sequence_number%sub_stream_num);
 
 
 for(pid_peerDown_info_iter = map_pid_peerDown_info.begin() ;pid_peerDown_info_iter != map_pid_peerDown_info.end();pid_peerDown_info_iter++){
 	if(pid_peerDown_info_iter ->second ->peerInfo.manifest & SubstreamIDToManifest ((_current_send_sequence_number%sub_stream_num)))
 		
 		printf("should from %d \n manifest",pid_peerDown_info_iter ->first,pid_peerDown_info_iter ->second->peerInfo.manifest);
-		_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"should from ",pid_peerDown_info_iter ->first,"manifest",pid_peerDown_info_iter ->second->peerInfo.manifest);
+		_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"should from ",pid_peerDown_info_iter ->first,"manifest",pid_peerDown_info_iter ->second->peerInfo.manifest);
 
 }
 
@@ -1303,7 +1352,7 @@ for(pid_peerDown_info_iter = map_pid_peerDown_info.begin() ;pid_peerDown_info_it
 						break;
 			}
 		printf("here3 least CurrDiff =%d\n",leastCurrDiff);
-_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"here3 least CurrDiff =",leastCurrDiff,"_current=",_current_send_sequence_number,"SSID =",_current_send_sequence_number%sub_stream_num);
+_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__,"here3 least CurrDiff =",leastCurrDiff,"_current=",_current_send_sequence_number,"SSID =",_current_send_sequence_number%sub_stream_num);
 
 
 		//可能某個subtream 追過_bucket_size,直接跳到最後一個 (應該不會發生)
@@ -1325,22 +1374,22 @@ _log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"here3 least Cur
 		for(;_current_send_sequence_number <= _least_sequence_number;){
 
 			//_current_send_sequence_number 指向的地方還沒到 ,不做處理等待並return
-			if((*(_chunk_bitstream + (_current_send_sequence_number % _bucket_size))).header.sequence_number != _current_send_sequence_number){
+			if((**(buf_chunk_t + (_current_send_sequence_number % _bucket_size))).header.sequence_number != _current_send_sequence_number){
 //				printf("wait packet,seq= %d  SSID =%d\n",_current_send_sequence_number,_current_send_sequence_number%sub_stream_num);
 //				_current_send_sequence_number = seq_ready_to_send;
 //	_log_ptr->write_log_format("s u s u s u s u\n","seq_ready_to_send",seq_ready_to_send,"_least_sequence_number",_least_sequence_number);
 				return ;
 
 			//為連續,丟給player
-			}else if((*(_chunk_bitstream + (_current_send_sequence_number % _bucket_size))).header.stream == STRM_TYPE_MEDIA) {
+			}else if((**(buf_chunk_t + (_current_send_sequence_number % _bucket_size))).header.stream == STRM_TYPE_MEDIA) {
 
 				//以下為丟給player
 				for (_map_stream_iter = _map_stream_media.begin(); _map_stream_iter != _map_stream_media.end(); _map_stream_iter++) {
 					//per fd mean a player   
 					strm_ptr = _map_stream_iter->second;
 					 //stream_id 和request 一樣才add chunk
-					if((strm_ptr -> _reqStreamID) == (*(_chunk_bitstream + (_current_send_sequence_number % _bucket_size))).header.stream_id ){ 
-						strm_ptr->add_chunk((struct chunk_t *)(_chunk_bitstream + (_current_send_sequence_number % _bucket_size)));
+					if((strm_ptr -> _reqStreamID) == (**(buf_chunk_t + (_current_send_sequence_number % _bucket_size))).header.stream_id ){ 
+						strm_ptr->add_chunk(*(buf_chunk_t + (_current_send_sequence_number % _bucket_size)));
 						_net_ptr->epoll_control(_map_stream_iter->first, EPOLL_CTL_MOD, EPOLLOUT);
 					}
 				}
@@ -1409,7 +1458,7 @@ void pk_mgr::send_syn_token_to_pk(int pk_sock){
 	syn_token_send_ptr->header.cmd = CHNK_CMD_PEER_SYN;
 	syn_token_send_ptr->header.rsv_1 = REQUEST;
 	syn_token_send_ptr->header.length = sizeof(struct syn_token_send) - sizeof(struct chunk_header_t);
-
+	syn_token_send_ptr->reserve = 0;
 	printf("starting send start delay token to pk ...\n");
 	int send_byte = 0;
 	int expect_len = syn_token_send_ptr->header.length + sizeof(struct chunk_header_t);
@@ -1492,18 +1541,20 @@ void pk_mgr::init_rescue_detection()
 	//Detect substream 的buff
 	ssDetect_ptr = (struct detectionInfo *)malloc(sizeof(struct detectionInfo) * sub_stream_num );
 	memset( ssDetect_ptr , 0x00 ,sizeof(struct detectionInfo) * sub_stream_num ); 
-
-	statsArryCount_ptr =(int *)malloc(sizeof(int) * (sub_stream_num+1) );
-	memset( statsArryCount_ptr , 0x00 ,sizeof(int) * (sub_stream_num+1)  ); 
-
-//	_beginthread(launchThread, 0,this );
-
 	for(int i =0 ; i<sub_stream_num ;i++){
 //	childrenSet_ptr  = new std::set<int>;
 //	map_streamID_childrenSet[i]=childrenSet_ptr;
 		ssDetect_ptr->previousParentPID = (PK_PID +1);
 
 	}
+
+
+	statsArryCount_ptr =(int *)malloc(sizeof(int) * (sub_stream_num+1) );
+	memset( statsArryCount_ptr , 0x00 ,sizeof(int) * (sub_stream_num+1)  ); 
+
+//	_beginthread(launchThread, 0,this );
+
+
 
 }
 
@@ -2100,7 +2151,7 @@ unsigned long pk_mgr::manifestFactory(unsigned long manifestValue,unsigned int s
 	}
 
 	printf("sent capacity totalRescueNum = %d \n",totalRescueNum);
-	_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__," sent capacity totalRescueNum =",totalRescueNum) ;
+	_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__," sent capacity totalRescueNum =",totalRescueNum) ;
 
 
 
@@ -2217,11 +2268,12 @@ void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){
 	}
 
 	if(count == 0){
-		printf("parent is PK do nothing");
+		printf("parent is PK do nothing\n");
 		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"parent is PK do nothing") ;
 
 		return ;
 	}
+
 
 	packetlen = count * sizeof (unsigned long ) + sizeof(struct update_topology_info) ;
 	parentListPtr = (struct update_topology_info *) new char [packetlen];

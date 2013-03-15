@@ -534,7 +534,7 @@ void peer_mgr::handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr)
 	rescuePeerInfoPtr ->manifest = chunk_ptr ->manifest ;
 
 	printf("children pid= %u set manifest=%d\n",rescuePeerInfoPtr ->pid,rescuePeerInfoPtr ->manifest);
-	_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"children pid=",rescuePeerInfoPtr ->pid,"set manifest=",rescuePeerInfoPtr ->manifest);
+	_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"children pid=",rescuePeerInfoPtr ->pid,"set manifest=",rescuePeerInfoPtr ->manifest);
 
 	}else{
 	printf("handle_manifestSet what happen\n");

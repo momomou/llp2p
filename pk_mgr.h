@@ -37,7 +37,9 @@ public:
 
 	struct chunk_level_msg_t *level_msg_ptr ;
 	unsigned long lane_member;
-	struct chunk_bitstream_t *_chunk_bitstream;
+
+//	struct chunk_bitstream_t *_chunk_bitstream;
+	struct chunk_t ** buf_chunk_t;
 
 	//rescue
 	struct detectionInfo *ssDetect_ptr;

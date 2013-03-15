@@ -338,13 +338,19 @@ struct chunk_rtmp_t{
 	unsigned char buf[RTMP_PKT_BUF_PAY_SIZE];
 };
 
-
+/*
 struct chunk_bitstream_t{
 	struct chunk_header_t header;
 	unsigned char buf[RTMP_PKT_BUF_PAY_SIZE];
 };
+*/
 
-
+/*
+struct chunk_bitstream_t{
+	struct chunk_header_t header;
+	unsigned char buf[0];
+};
+*/
 
 struct chunk_request_msg_t{
 	struct chunk_header_t header;
@@ -557,6 +563,7 @@ struct source_delay {
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 struct syn_token_send{
 	struct chunk_header_t header;
+	unsigned long reserve;
 };
 
 struct syn_token_receive{
