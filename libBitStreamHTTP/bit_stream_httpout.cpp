@@ -100,9 +100,9 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 	if(first_HTTP_Header){
 		cout << "============= Acceppt New Player ============"<<endl;
 		int sendHeaderBytes = _net_ptr->send(sock,httpHeader,sizeof(httpHeader) -1 ,0);  //-1 to subtract '\0'
-		cout << "send_HttpHeaderBytes=" << sendHeaderBytes<<endl;
+//		cout << "send_HttpHeaderBytes=" << sendHeaderBytes<<endl;
 		sendHeaderBytes = _net_ptr->send(sock,FLV_Header,sizeof(FLV_Header),0);
-		cout << "send_FLVHeaderBytes=" << sendHeaderBytes<<endl;
+//		cout << "send_FLVHeaderBytes=" << sendHeaderBytes<<endl;
 		first_HTTP_Header =false;
 	}
 
@@ -115,7 +115,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 		struct chunk_t *chunk_ptr;
 
 		if (!_queue_out_data_ptr->size()) {
-			_log_ptr->write_log_format("s => s \n", __FUNCTION__, "_queue_out_data_ptr->size =0");
+//			_log_ptr->write_log_format("s => s \n", __FUNCTION__, "_queue_out_data_ptr->size =0");
 			_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN);	
 			return RET_OK;
 		}
@@ -218,7 +218,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 	
 		
-_log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt sequence_number", chunk_ptr ->header.sequence_number, send_rt_val);
+//_log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt sequence_number", chunk_ptr ->header.sequence_number, send_rt_val);
 
 
 		if(send_rt_val<0){

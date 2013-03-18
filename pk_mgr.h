@@ -69,6 +69,8 @@ public:
 	void delay_table_init();
 	void source_delay_detection(int sock, unsigned long sub_id, unsigned int seq_now);
 	void reset_source_delay_detection(unsigned long sub_id);
+	void set_rescue_state(unsigned long sub_id,int state);
+	int check_rescue_state(unsigned long sub_id,int state);
 
 	int peer_start_delay_count;
 	void send_capacity_init();

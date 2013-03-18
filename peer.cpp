@@ -202,9 +202,6 @@ int peer::handle_pkt_in(int sock)
 //	int different = 0;
 
 	struct peer_info_t *peerInfoPtr;
-//	unsigned long manifest;
-//	unsigned long n_alpha;
-//	unsigned char reply;
 
 
 	struct chunk_t *chunk_ptr = NULL;
@@ -227,7 +224,7 @@ int peer::handle_pkt_in(int sock)
 				continue;
 				
 			} else {
-				DBG_PRINTF("here\n");
+//				DBG_PRINTF("here\n");
 				data_close(sock, "recv error in peer::handle_pkt_in",DONT_CARE);
 				//PAUSE
 				return RET_SOCK_ERROR;
@@ -399,7 +396,7 @@ int peer::handle_pkt_in(int sock)
 
 					//在這裡面sequence_number 裡面塞的是manifest
 					printf("first_reply_peer=%d  manifest =%d \n",firstReplyPid,replyManifest);
-					_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"first_reply_peer=",replyManifest,"manifest",replyManifest);
+					_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"first_reply_peer=",firstReplyPid,"manifest",replyManifest);
 
 					pid_peer_info_iter = _pk_mgr_ptr ->map_pid_peer_info.find(firstReplyPid);
 
@@ -478,20 +475,23 @@ int peer::handle_pkt_in(int sock)
 
 								if(map_in_pid_fd.find( peerInfoPtr->pid ) != map_in_pid_fd.end()){
 									data_close(map_in_pid_fd[peerInfoPtr->pid ],"close by firstReplyPid ",CLOSE_PARENT);
-//									_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"socket close by firstReplyPid close pid =",peerInfoPtr->pid,"socket = ",map_in_pid_fd[peerInfoPtr->pid ]);
 
-									pid_peer_info_iter  = _pk_mgr_ptr ->map_pid_peer_info.begin() ;
+//									pid_peer_info_iter  = _pk_mgr_ptr ->map_pid_peer_info.begin() ;
 									//刪掉最後一個  離開
-									if(pid_peer_info_iter == _pk_mgr_ptr ->map_pid_peer_info.end())
-										break;
-								}
+//									if(pid_peer_info_iter == _pk_mgr_ptr ->map_pid_peer_info.end())
+//										break;
+								}else{
 
+//若在傳送期間PARENT socket error 則應該是可忽略
+									printf("testdelay 485 \n");
+//									PAUSE
+								}
 							}
-//						_pk_mgr_ptr ->clear_map_pid_peer_info(replyManifest);  //重看一下
 						}
 						_pk_mgr_ptr ->clear_map_pid_peer_info(replyManifest);
+
 					}else{
-						printf("what !?");
+						printf("what peer.cpp 492!?");
 						PAUSE
 					}
 				}
@@ -548,16 +548,35 @@ int peer::handle_pkt_out(int sock)
 	map<int, queue<struct chunk_t *> *>::iterator fd_out_ctrl_iter;
 	map<int, queue<struct chunk_t *> *>::iterator fd_out_data_iter;
 
+	map<int , unsigned long>::iterator map_fd_pid_iter;
+	map<unsigned long, int>::iterator map_pid_fd_in_iter;
+	map<unsigned long, int>::iterator map_pid_fd_out_iter;
+//	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
+//	struct peer_connect_down_t* peerDownInfo ;
+	struct peer_info_t *peerInfoPtr ;
+	map<unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
+
+
+
 	fd_out_ctrl_iter = map_fd_out_ctrl.find(sock);
 	if(fd_out_ctrl_iter != map_fd_out_ctrl.end()) {
 		queue_out_ctrl_ptr = fd_out_ctrl_iter->second;
+	}else{
+		printf("queue_out_ctrl_ptr NOT FIND \n");
+		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"queue_out_ctrl_ptr NOT FIND");
+		return RET_SOCK_ERROR;
 	}
 	
 	fd_out_data_iter = map_fd_out_data.find(sock);
 	if(fd_out_data_iter != map_fd_out_data.end()) {
 		queue_out_data_ptr = fd_out_data_iter->second;
+	}else{
+		printf("queue_out_data_ptr NOT FIND \n");
+		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"queue_out_data_ptr NOT FIND");
+		return RET_SOCK_ERROR;
 	}
-	
+
+
 	while(queue_out_ctrl_ptr->size() != 0  ||  queue_out_data_ptr->size() != 0){
 
 		if(queue_out_ctrl_ptr->size() != 0 && _chunk_ptr == NULL) {
@@ -594,9 +613,37 @@ int peer::handle_pkt_out(int sock)
 				}
 			}
 		
+		// DATA
 		} else if(queue_out_data_ptr->size() != 0) {
-			//cout << "data buffer size =" << queue_out_data_ptr->size() <<endl;
+
 			chunk_ptr = queue_out_data_ptr->front();
+
+//測試性功能
+//////////////////////////////////////////////////////////////////////////////
+/*
+			map_fd_pid_iter= map_fd_pid .find(sock) ;
+			if(map_fd_pid_iter != map_fd_pid.end()){
+				map_pid_rescue_peer_info_iter = _pk_mgr_ptr->map_pid_rescue_peer_info .find(map_fd_pid_iter ->second);
+				if(map_pid_rescue_peer_info_iter ==  _pk_mgr_ptr->map_pid_rescue_peer_info.end()){
+				printf("peer::handle_pkt_out where is the peer\n");
+				PAUSE
+				}else{
+				peerInfoPtr = map_pid_rescue_peer_info_iter ->second ;				
+				}
+			}
+
+			//如果現在manifest 的值已經沒有要送了  則略過這個
+			if (!(peerInfoPtr ->manifest & (_pk_mgr_ptr ->SubstreamIDToManifest ( (chunk_ptr->header.sequence_number % _pk_mgr_ptr ->sub_stream_num)) ) )){
+				queue_out_data_ptr ->pop() ;
+				chunk_ptr = queue_out_data_ptr->front();
+				continue ;
+			}
+*/
+//////////////////////////////////////////////////////////////////////////////
+
+
+			//cout << "data buffer size =" << queue_out_data_ptr->size() <<endl;
+
 			_chunk_ptr = chunk_ptr;
 			_expect_len = chunk_ptr->header.length + sizeof(struct chunk_header_t);
 			_expect_len = _expect_len - _offset;
@@ -660,8 +707,8 @@ void peer::handle_job_timer()
 
 
 //全部裡面最完整的close
-////注意!!!!!!!!map_in_pid_fd 必須由關閉者自行判斷清除(pid -> fd 是一對多 所以可能會刪到其他的table)
-//這邊的iter 都不參考class 的iter(因位會開thread 來close socket 會搶iter 使用)
+
+//這邊的區域變數都不參考環境變數(因位會開thread 來close socket 會搶 變數 使用)
 ////暫時不close  pid_peer_info 須自行清理
 void peer::data_close(int cfd, const char *reason ,int type) 
 {
@@ -673,16 +720,14 @@ void peer::data_close(int cfd, const char *reason ,int type)
 //	multimap <unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 
-//	struct peer_info_t *peerInfoPtr = NULL;
-//	struct peer_connect_down_t *peerDownInfoPtr = NULL;
+	map<unsigned long, int>::iterator map_pid_fd_in_iter;
+	map<unsigned long, int>::iterator map_pid_fd_out_iter;
+	struct peer_info_t *peerInfoPtr = NULL;
+	struct peer_connect_down_t *peerDownInfoPtr = NULL;
 
-//	map<int, int>::iterator map_rescue_fd_count_iter;
-//	map<int, int>::iterator map_rescue_fd_count_iter2;
-//	int sockfd;
-//	list<unsigned long>::iterator rescue_pid_iter;
-//	list<unsigned long>::iterator rescue_pid_list_iter;
+
 //	unsigned long manifest = 0;	
-	unsigned long  testingManifest=0;
+
 	unsigned long  peerTestingManifest=0;
 
 	_log_ptr->write_log_format("s => s (s)\n", (char*)__PRETTY_FUNCTION__, "pk", reason);
@@ -690,7 +735,7 @@ void peer::data_close(int cfd, const char *reason ,int type)
 //	_net_ptr->epoll_control(cfd, EPOLL_CTL_DEL, 0);
 	_net_ptr->close(cfd);
 
-
+	unsigned long  testingManifest=0;
 	for(unsigned long i =0  ; i < _pk_mgr_ptr ->sub_stream_num;i++){
 		if(  ((_pk_mgr_ptr->ssDetect_ptr) + i) ->isTesting ){
 			testingManifest |= _pk_mgr_ptr ->SubstreamIDToManifest(i);
@@ -706,11 +751,6 @@ void peer::data_close(int cfd, const char *reason ,int type)
 		}
 	}
 
-	map_fd_pid_iter = map_fd_pid.find(cfd);
-	if(map_fd_pid_iter != map_fd_pid.end()) {
-		pid = map_fd_pid_iter->second;
-		map_fd_pid.erase(map_fd_pid_iter);
-	}
 
 
 	map_fd_queue_iter = map_fd_out_ctrl.find(cfd);
@@ -723,6 +763,270 @@ void peer::data_close(int cfd, const char *reason ,int type)
 		map_fd_out_data.erase(map_fd_queue_iter);
 
 
+
+	map_fd_pid_iter= map_fd_pid.find(cfd) ;
+
+	if(map_fd_pid_iter != map_fd_pid.end()){
+
+		pid = map_fd_pid_iter->second;
+		map_pid_fd_out_iter= map_out_pid_fd .find(pid);
+		map_pid_fd_in_iter=  map_in_pid_fd.find(pid);
+
+
+
+	//清除所有跟這個peer相關的 previousParentPID
+	for(int i=0 ; i<  _pk_mgr_ptr->sub_stream_num ; i++){
+		if ((_pk_mgr_ptr->ssDetect_ptr +i) -> previousParentPID == pid) {
+			(_pk_mgr_ptr->ssDetect_ptr +i) -> previousParentPID = PK_PID +1 ;
+		}
+
+	}
+
+
+		//CLOSE CHILD
+		if (map_pid_fd_out_iter != map_out_pid_fd.end()  && (map_pid_fd_out_iter ->second == cfd)){
+
+			printf("CLOSE CHILD\n");
+
+			map_pid_fd_iter = map_out_pid_fd.find(pid);
+			if(map_pid_fd_iter != map_out_pid_fd.end()) 
+				map_out_pid_fd.erase(map_pid_fd_iter);
+
+
+			map_pid_rescue_peer_info_iter =_pk_mgr_ptr ->map_pid_rescue_peer_info.find(pid);
+			if( map_pid_rescue_peer_info_iter != _pk_mgr_ptr ->map_pid_rescue_peer_info.end() ){
+				peerInfoPtr = map_pid_rescue_peer_info_iter ->second ;
+
+				_log_ptr->write_log_format("s =>u s s u s u\n", __FUNCTION__,__LINE__,"CLOSE CHILD","PID=",map_pid_rescue_peer_info_iter->first,"manifest",peerInfoPtr->manifest);
+
+				delete peerInfoPtr;
+				_pk_mgr_ptr ->map_pid_rescue_peer_info.erase(map_pid_rescue_peer_info_iter);
+
+			}
+
+
+			map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
+			map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
+			for(temp_map_pid_fd_out_iter = map_out_pid_fd.begin();temp_map_pid_fd_out_iter != map_out_pid_fd.end();temp_map_pid_fd_out_iter++){
+				printf("map_out_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
+			}
+			for(temp_map_pid_fd_in_iter = map_in_pid_fd.begin();temp_map_pid_fd_in_iter != map_in_pid_fd.end();temp_map_pid_fd_in_iter++){
+				printf("map_in_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
+			}
+
+
+
+		//CLOSE  PARENT
+		}else if (map_pid_fd_in_iter != map_in_pid_fd.end() && map_pid_fd_in_iter->second == cfd ){
+
+			printf("CLOSE PARENT\n");
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CLOSE PARENT");
+
+			pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(pid) ;
+			if (pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_peerDown_info.end() ){
+
+				peerDownInfoPtr = pid_peerDown_info_iter ->second ;
+
+				//防止peer離開 狀態卡在testing
+				if(peerDownInfoPtr->peerInfo.manifest & testingManifest){
+					peerTestingManifest = peerDownInfoPtr->peerInfo.manifest & testingManifest;
+
+					for(int i=0 ; i<  _pk_mgr_ptr->sub_stream_num ; i++){
+						if( peerTestingManifest & i<<1){
+							 (_pk_mgr_ptr->ssDetect_ptr +i) ->isTesting =false ;
+							 (_pk_mgr_ptr->ssDetect_ptr +i) ->previousParentPID = PK_PID +1 ;
+							 //set recue stat true
+							 _pk_mgr_ptr->set_rescue_state(i,0);
+						}
+					}
+				}
+				_pk_mgr_ptr ->reSet_detectionInfo();
+
+				_log_ptr->write_log_format("s =>u s s u s u\n", __FUNCTION__,__LINE__,"CLOSE PARENT","PID=",pid_peerDown_info_iter->first,"manifest",peerDownInfoPtr->peerInfo.manifest);
+
+				delete peerDownInfoPtr;
+				_pk_mgr_ptr ->map_pid_peerDown_info.erase(pid_peerDown_info_iter);
+
+			}
+
+			map_pid_fd_iter = map_in_pid_fd.find(pid);
+			if(map_pid_fd_iter != map_in_pid_fd.end()) 
+				map_in_pid_fd.erase(map_pid_fd_iter);
+
+
+			map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
+			map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
+			for(temp_map_pid_fd_out_iter = map_out_pid_fd.begin();temp_map_pid_fd_out_iter != map_out_pid_fd.end();temp_map_pid_fd_out_iter++){
+				printf("map_out_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
+			}
+			for(temp_map_pid_fd_in_iter = map_in_pid_fd.begin();temp_map_pid_fd_in_iter != map_in_pid_fd.end();temp_map_pid_fd_in_iter++){
+				printf("map_in_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
+			}
+
+
+
+		}else{
+
+			printf("peer:: not parent and not children\n");
+			PAUSE
+
+		}
+		
+
+
+		map_fd_pid.erase(map_fd_pid_iter);
+
+
+	}else{
+	printf("peer:: CLOSE map_fd_pid not find why \n");
+	PAUSE
+	}
+
+/*
+	map_fd_pid_iter = map_fd_pid.find(cfd);
+	if(map_fd_pid_iter != map_fd_pid.end()) {
+//		pid = map_fd_pid_iter->second;
+		map_fd_pid.erase(map_fd_pid_iter);
+	}
+*/
+
+
+/*
+
+	map_fd_pid_iter= map_fd_pid.find(cfd) ;
+
+	if(map_fd_pid_iter != map_fd_pid.end()){
+
+		pid = map_fd_pid_iter->second;
+		map_pid_fd_out_iter= map_out_pid_fd .find(map_fd_pid_iter ->second);
+		map_pid_fd_in_iter=  map_in_pid_fd.find(map_fd_pid_iter ->second);
+
+
+		if(map_pid_fd_out_iter == map_out_pid_fd.end() && map_pid_fd_in_iter ==map_in_pid_fd.end()){
+			printf("peer::data close why not find\n");
+			PAUSE
+		
+
+		//CLOSE_PARENT
+		}else if (map_pid_fd_out_iter == map_out_pid_fd.end() && map_pid_fd_in_iter !=map_in_pid_fd.end()){
+
+			printf("CLOSE PARENT\n");
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CLOSE PARENT");
+
+			pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(pid) ;
+			if (pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_peerDown_info.end() ){
+
+				peerDownInfoPtr = pid_peerDown_info_iter ->second ;
+
+				//防止peer離開 狀態卡在testing
+				if(peerDownInfoPtr->peerInfo.manifest & testingManifest){
+					peerTestingManifest = peerDownInfoPtr->peerInfo.manifest & testingManifest;
+
+					for(int i=0 ; i<  _pk_mgr_ptr->sub_stream_num ; i++){
+						if( peerTestingManifest & i<<1){
+							 (_pk_mgr_ptr->ssDetect_ptr +i) ->isTesting =false ;
+							 (_pk_mgr_ptr->ssDetect_ptr +i) ->previousParentPID = PK_PID +1 ;
+						}
+					}
+				}
+				_pk_mgr_ptr ->reSet_detectionInfo();
+
+				_log_ptr->write_log_format("s =>u s s u s u\n", __FUNCTION__,__LINE__,"CLOSE PARENT","PID=",pid_peerDown_info_iter->first,"manifest",peerDownInfoPtr->peerInfo.manifest);
+
+				delete peerDownInfoPtr;
+				_pk_mgr_ptr ->map_pid_peerDown_info.erase(pid_peerDown_info_iter);
+
+			}
+
+			map_pid_fd_iter = map_in_pid_fd.find(pid);
+			if(map_pid_fd_iter != map_in_pid_fd.end()) 
+				map_in_pid_fd.erase(map_pid_fd_iter);
+
+
+			map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
+			map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
+			for(temp_map_pid_fd_out_iter = map_out_pid_fd.begin();temp_map_pid_fd_out_iter != map_out_pid_fd.end();temp_map_pid_fd_out_iter++){
+				printf("map_out_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
+			}
+			for(temp_map_pid_fd_in_iter = map_in_pid_fd.begin();temp_map_pid_fd_in_iter != map_in_pid_fd.end();temp_map_pid_fd_in_iter++){
+				printf("map_in_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
+			}
+
+
+		//CLOSE_CHILD
+		}else if (map_pid_fd_out_iter != map_out_pid_fd.end() && map_pid_fd_in_iter ==map_in_pid_fd.end()){
+
+		printf("CLOSE CHILD\n");
+
+		map_pid_fd_iter = map_out_pid_fd.find(pid);
+		if(map_pid_fd_iter != map_out_pid_fd.end()) 
+			map_out_pid_fd.erase(map_pid_fd_iter);
+
+
+		map_pid_rescue_peer_info_iter =_pk_mgr_ptr ->map_pid_rescue_peer_info.find(pid);
+		if( map_pid_rescue_peer_info_iter != _pk_mgr_ptr ->map_pid_rescue_peer_info.end() ){
+			peerInfoPtr = map_pid_rescue_peer_info_iter ->second ;
+
+			_log_ptr->write_log_format("s =>u s s u s u\n", __FUNCTION__,__LINE__,"CLOSE PARENT","PID=",map_pid_rescue_peer_info_iter->first,"manifest",peerInfoPtr->manifest);
+
+			delete peerInfoPtr;
+			_pk_mgr_ptr ->map_pid_rescue_peer_info.erase(map_pid_rescue_peer_info_iter);
+
+		}
+
+
+		map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
+		map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
+		for(temp_map_pid_fd_out_iter = map_out_pid_fd.begin();temp_map_pid_fd_out_iter != map_out_pid_fd.end();temp_map_pid_fd_out_iter++){
+			printf("map_out_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
+		}
+		for(temp_map_pid_fd_in_iter = map_in_pid_fd.begin();temp_map_pid_fd_in_iter != map_in_pid_fd.end();temp_map_pid_fd_in_iter++){
+			printf("map_in_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
+		}
+
+
+
+		//DONT_CARE
+		}else if (map_pid_fd_out_iter != map_out_pid_fd.end() && map_pid_fd_in_iter !=map_in_pid_fd.end()){
+
+		printf("CLOSE ALL  what\n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CLOSE ALL");
+
+
+		map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
+		map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
+		for(temp_map_pid_fd_out_iter = map_out_pid_fd.begin();temp_map_pid_fd_out_iter != map_out_pid_fd.end();temp_map_pid_fd_out_iter++){
+			printf("map_out_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
+		}
+		for(temp_map_pid_fd_in_iter = map_in_pid_fd.begin();temp_map_pid_fd_in_iter != map_in_pid_fd.end();temp_map_pid_fd_in_iter++){
+			printf("map_in_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
+		}
+
+
+		for(temp_map_pid_fd_out_iter = map_out_pid_fd.begin();temp_map_pid_fd_out_iter != map_out_pid_fd.end();temp_map_pid_fd_out_iter++){
+			printf("map_out_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
+		}
+		for(temp_map_pid_fd_in_iter = map_in_pid_fd.begin();temp_map_pid_fd_in_iter != map_in_pid_fd.end();temp_map_pid_fd_in_iter++){
+			printf("map_in_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
+		}
+
+		PAUSE
+
+		}
+
+		map_fd_pid.erase(map_fd_pid_iter);
+
+
+	}else{
+	printf("peer:: CLOSE map_fd_pid not find why \n");
+	PAUSE
+	}
+
+
+
+*/
+
+/*
 	if(type == CLOSE_PARENT){
 
 		pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(pid) ;
@@ -783,6 +1087,8 @@ void peer::data_close(int cfd, const char *reason ,int type)
 					if( peerTestingManifest & i<<1){
 						 (_pk_mgr_ptr->ssDetect_ptr +i) ->isTesting =false ;
 						 (_pk_mgr_ptr->ssDetect_ptr +i) ->previousParentPID = PK_PID +1 ;
+						 //set recue stat true
+						 _pk_mgr_ptr->set_rescue_state(i,0);
 					}
 				}
 			}
@@ -809,8 +1115,8 @@ void peer::data_close(int cfd, const char *reason ,int type)
 		map_pid_fd_iter = map_out_pid_fd.find(pid);
 		if(map_pid_fd_iter != map_out_pid_fd.end()) 
 			map_out_pid_fd.erase(map_pid_fd_iter);
+*/
 
-	}
 
 //暫時不close  pid_peer_info_iter 
 /*
@@ -824,5 +1130,4 @@ void peer::data_close(int cfd, const char *reason ,int type)
 */
 
 }
-
 

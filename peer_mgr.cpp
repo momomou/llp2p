@@ -146,7 +146,7 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 			return 0;
 		} else {
 			cout << "_sock = " << _sock << endl;
-			_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"new socket =",_sock );
+//			_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"new socket =",_sock );
 
 			_net_ptr->set_nonblocking(_sock);
 			_net_ptr->epoll_control(_sock, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT);	
@@ -211,7 +211,7 @@ int peer_mgr::handle_pkt_in(int sock)
 		}
 		else if(recv_byte == 0){
 			printf("sock closed\n");
-			peer_ptr->data_close(sock, "recv error in peer::handle_pkt_in",DONT_CARE);
+			data_close(new_fd, "recv error in peer_mgr::handle_pkt_in");
 				//PAUSE
 			return RET_SOCK_ERROR;
 		}
@@ -279,6 +279,7 @@ int peer_mgr::handle_pkt_in(int sock)
 	
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_CON) {
 		cout << "CHNK_CMD_PEER_CON" << endl;
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_PEER_CON ");
 		peer_ptr->handle_connect(new_fd, chunk_ptr,_cin);
 
 	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SYN) {

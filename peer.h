@@ -72,7 +72,7 @@ private:
 	multimap<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 	map<unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
-	set<unsigned long>::iterator set_childrenPID_iter;
+//	set<unsigned long>::iterator set_childrenPID_iter;
 
 	struct peer_info_t *peerInfoPtr ;
 	struct peer_connect_down_t *peerDownInfoPtr;

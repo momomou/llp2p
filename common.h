@@ -16,6 +16,10 @@
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
 #define BUFF_SIZE		400
 
+//source delay PARAMETER
+#define MAX_DELAY 700
+#define SOURCE_DELAY_CONTINUOUS 4
+
 
 #include "configuration.h"
 
@@ -143,8 +147,7 @@ using std::bitset;
 #define CHNK_CMD_TOPO_INFO				0x1E
 
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
-#define MAX_DELAY 2000
-#define SOURCE_DELAY_CONTINUOUS 5
+
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 #define CHNK_CMD_PEER_UNKNOWN			0xFF	// 1 B cmd => 0xFF is reserved for unknown cmd
@@ -556,7 +559,7 @@ struct source_delay {
 	unsigned long end_seq_num;
 	unsigned int end_seq_abs_time;
 	int first_pkt_recv;
-	int rescue_state;	//0 normal 1 rescue trigger
+	int rescue_state;	//0 normal 1 rescue trigger 2 testing
 	int delay_beyond_count;
 
 };
