@@ -471,7 +471,7 @@ enum pkg_nonblocking_ctl_state {
 
 typedef struct {
 	char *buffer;
-	struct chunk_rtmp_t* rtmp_chunk;
+	struct chunk_t* chunk_ptr;
 	unsigned int offset;
 	unsigned int total_len;
 	unsigned int expect_len;

@@ -28,7 +28,8 @@ public:
 	map<unsigned long, int> map_in_pid_fd;
 	map<unsigned long, int> map_out_pid_fd;
 	map<int , unsigned long> map_fd_pid;
-	set<unsigned long> set_childrenPID;
+	map<int , Recv_nonblocking_ctl * > map_fd_nonblocking_ctl;
+//	set<unsigned long> set_childrenPID;
 
 	list<int> *fd_list_ptr;
 
@@ -73,6 +74,7 @@ private:
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 	map<unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
 //	set<unsigned long>::iterator set_childrenPID_iter;
+	map<int , Recv_nonblocking_ctl * > ::iterator map_fd_nonblocking_ctl_iter;
 
 	struct peer_info_t *peerInfoPtr ;
 	struct peer_connect_down_t *peerDownInfoPtr;

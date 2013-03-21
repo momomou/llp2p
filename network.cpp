@@ -349,7 +349,7 @@ int network::nonblock_recv(int sock, Recv_nonblocking_ctl* send_info)
 		//DBG_PRINTF("%s: send_rt = %d, expect_len = %d", __FUNCTION__, send_rt_val, send_info->expect_len);
 	
 		if (recv_rt_val < 0) {
-			if (errno == EINTR | errno == EAGAIN) {		//這邊寫得怪怪的
+			if (errno == EINTR || errno == EAGAIN) {		 //這邊寫得怪怪的
 				send_info->recv_ctl_info.ctl_state = RUNNING;
 				return RET_OK;
 			} else {
@@ -379,7 +379,7 @@ int network::nonblock_recv(int sock, Recv_nonblocking_ctl* send_info)
 		
 		//Log(LOGDEBUG, "%s: offset = %d, send_rt_val = %d, expect_len = %d", __FUNCTION__, _send_ctl_info.offset, send_rt_val, _send_ctl_info.expect_len);
 		if (recv_rt_val < 0) {
-			if ( errno == EINTR | errno == EAGAIN) {
+			if ( errno == EINTR || errno == EAGAIN) {
 				send_info->recv_ctl_info.ctl_state = RUNNING;
 				return RET_OK;
 			} else {
@@ -415,7 +415,11 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 		//DBG_PRINTF("%s: send_rt = %d, expect_len = %d", __FUNCTION__, send_rt_val, send_info->expect_len);
 	
 		if (send_rt_val < 0) {
-			if (errno == EINTR | errno == EAGAIN) {
+#ifdef _WIN32 
+			if (WSAGetLastError() == WSAEWOULDBLOCK) {
+#else
+			if (errno == EINTR || errno == EAGAIN) {
+#endif
 				send_info->ctl_state = RUNNING;
 				return RET_OK;
 			} else {
@@ -426,7 +430,9 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 			return RET_OK;
 		}
 		else if (send_rt_val == send_info->expect_len) {
+//			send_info->ctl_state = READY;
 			return send_rt_val;
+
 		} else {	
 			send_info->expect_len -= send_rt_val;
 			send_info->offset += send_rt_val;
@@ -435,15 +441,20 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 		}
 	} else { //_send_ctl_info._send_ctl_state is RUNNING
 		//DBG_PRINTF("In RUNNING state\n");
-		if (send_info->serial_num != send_info->rtmp_chunk->header.sequence_number) { //check serial num
+		if (send_info->serial_num != send_info->chunk_ptr->header.sequence_number) { //check serial num
 			printf("%s, recv returned RET_WRONG_SER_NUM\n", __FUNCTION__);
 			return RET_WRONG_SER_NUM;
 		}
+
 		send_rt_val = send(sock, send_info->buffer + send_info->offset, send_info->expect_len, 0);
 		
 		//Log(LOGDEBUG, "%s: offset = %d, send_rt_val = %d, expect_len = %d", __FUNCTION__, _send_ctl_info.offset, send_rt_val, _send_ctl_info.expect_len);
 		if (send_rt_val < 0) {
-			if (errno == EINTR | errno == EAGAIN) {
+#ifdef _WIN32 
+			if (WSAGetLastError() == WSAEWOULDBLOCK) {
+#else
+			if (errno == EINTR || errno == EAGAIN) {
+#endif
 				send_info->ctl_state = RUNNING;
 				return RET_OK;
 			} else {

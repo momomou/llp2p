@@ -41,6 +41,8 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 //	 childrenSet_ptr = NULL;
 	 full_manifest =0 ;
 
+//	 _log_measureDataPtr =new 
+
 	 
 	_prep->read_key("bucket_size", _bucket_size);
 
@@ -87,6 +89,7 @@ pk_mgr::~pk_mgr()
 	clear_map_pid_peer_info();
 	clear_map_pid_peerDown_info();
 	clear_map_pid_rescue_peer_info();
+
 	
 }
 
@@ -238,6 +241,8 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 							pid_peerDown_info_iter->second->peerInfo.manifest &= (~ SubstreamIDToManifest (testingSubStreamID )) ;
 							_peer_mgr_ptr -> send_manifest_to_parent(pid_peerDown_info_iter->second->peerInfo.manifest ,pid_peerDown_info_iter->second->peerInfo.pid);
 							_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"after cut stream manifest",pid_peerDown_info_iter->second->peerInfo.manifest);
+
+							send_parentToPK ( SubstreamIDToManifest (testingSubStreamID ) ,PK_PID+1 ) ;
 
 							peerTestingManifest &= ( ~SubstreamIDToManifest(testingSubStreamID) );
 
@@ -1015,6 +1020,7 @@ _log_ptr->write_log_format("\n");
 //other 
 	}else {
 		printf("cmd =%d else\n", chunk_ptr->header.cmd);
+		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"what from PK !?");
 		PAUSE
 	}
 
@@ -1140,7 +1146,9 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 	unsigned long testingManifest=0;
 
-//
+//////////////////////////////for measure data (paper)
+
+//////////////////////////////for measure data (paper)
 
 
 	//還沒註冊拿到substream num  不做任何偵測和運算
@@ -1149,7 +1157,6 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		return;
 	}
 //↓↓↓↓↓↓↓↓↓↓↓↓任何chunk 都會run↓↓↓↓↓↓↓↓↓↓↓↓↓
-
 
 
 	temp_sub_id = (chunk_ptr ->header.sequence_number) % sub_stream_num;
@@ -1169,6 +1176,8 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 	//printf("%d %d\n",(delay_table+temp_sub_id)->start_delay_struct.init_flag,temp_sub_id);
+
+	//若SYN完了
 	if((!(delay_table_iter->second->first_pkt_recv))&&(syn_table.init_flag == 2)){
 
 		if(chunk_ptr ->header.sequence_number > syn_table.start_seq){
@@ -1513,6 +1522,7 @@ int pk_mgr::check_rescue_state(unsigned long sub_id,int state){
 	}
 }
 
+
 void pk_mgr::syn_recv_handler(struct syn_token_receive* syn_struct_back_token){
 	if(syn_table.init_flag==0){
 		printf("error in syn_recv_handler syn not send\n");
@@ -1529,6 +1539,7 @@ void pk_mgr::syn_recv_handler(struct syn_token_receive* syn_struct_back_token){
 			printf("pk_time : %ld\n",syn_struct_back_token->pk_time);
 			printf("(syn_round_time/2) : %ld\n",(syn_round_time/2));
 			printf("syn_round_time : %ld\n",syn_round_time);
+			PAUSE
 			exit(1);
 		}
 		else{
@@ -1569,6 +1580,7 @@ void pk_mgr::send_syn_token_to_pk(int pk_sock){
 	memcpy(send_buf, syn_token_send_ptr, expect_len);
 	
 	syn_table.start_clock = _log_ptr -> getTime();
+
 	send_byte = _net_ptr->send(pk_sock, send_buf, expect_len, 0);
 	if( send_byte <= 0 ) {
 		data_close(pk_sock, "send pkt error");
@@ -1959,13 +1971,13 @@ _log_ptr->write_log_format("↑\n");
 					_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"PK manifest set back to",pkDownInfoPtr ->peerInfo.manifest);
 
 					//should sent to peer cut stream
-										_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__," old Peer manifest ",connectPeerInfo ->peerInfo.manifest);
+					_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__," old Peer manifest ",connectPeerInfo ->peerInfo.manifest);
 					connectPeerInfo ->peerInfo.manifest &= (~ SubstreamIDToManifest (testingSubStreamID )) ;
 					_peer_mgr_ptr -> send_manifest_to_parent(connectPeerInfo ->peerInfo.manifest ,connectPeerInfo ->peerInfo.pid);
 					_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"after cut stream manifest",connectPeerInfo ->peerInfo.manifest);
 
 
-//					send_parentToPK ( SubstreamIDToManifest (testingSubStreamID ) ,PK_PID+1 ) ;
+					send_parentToPK ( SubstreamIDToManifest (testingSubStreamID ) ,PK_PID+1 ) ;
 
 					peerTestingManifest &= ( ~SubstreamIDToManifest(testingSubStreamID) );
 
@@ -2376,13 +2388,14 @@ void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){
 		}
 	}
 
+/*
 	if(count == 0){
 		printf("parent is PK do nothing\n");
 		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"parent is PK do nothing") ;
 
 		return ;
 	}
-
+*/
 
 	packetlen = count * sizeof (unsigned long ) + sizeof(struct update_topology_info) ;
 	parentListPtr = (struct update_topology_info *) new char [packetlen];
@@ -2426,7 +2439,7 @@ void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){
 	_log_ptr->write_log_format("s =>u s", __FUNCTION__,__LINE__,"SEND Parent topology OK! ") ;
 
 
-	delete parentListPtr;
+	delete [] parentListPtr;
 
 	return ;
 

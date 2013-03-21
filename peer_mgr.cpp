@@ -75,7 +75,20 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 	struct sockaddr_in peer_saddr;
 	int ret;
 	struct in_addr ip;
+	
+	struct peer_info_t *peerInfoPtr =NULL;
+	multimap<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 //	struct in_addr selfip;
+
+	pid_peer_info_iter = _pk_mgr_ptr ->map_pid_peer_info.find(level_info_ptr ->pid);
+	if(pid_peer_info_iter !=  _pk_mgr_ptr ->map_pid_peer_info.end() ){
+
+		//兩個以上就沿用第一個的連線
+		if(_pk_mgr_ptr ->map_pid_peer_info.count(level_info_ptr ->pid) >= 2 )
+			printf("pid =%d already in connect find in map_pid_peer_info  testing",level_info_ptr ->pid);
+			_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_peer_info testing");
+				return 1;
+	}
 
 //若在map_pid_peerDown_info 則不再次建立連線
 	pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(level_info_ptr ->pid);
@@ -128,7 +141,7 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 #ifdef _WIN32
 		::closesocket(_sock);
 		::WSACleanup();
-		peer_ptr ->data_close(_sock,"peer_mgr::build_connection",DONT_CARE) ;
+		data_close(_sock,"peer_mgr::build_connection") ;
 #else
 		::close(_sock);
 #endif
@@ -261,7 +274,7 @@ int peer_mgr::handle_pkt_in(int sock)
 		}
 		else if(recv_byte == 0){
 			printf("sock closed\n");
-			peer_ptr->data_close(sock, "recv error in peer::handle_pkt_in",DONT_CARE);
+			data_close(sock, "recv error in peer::handle_pkt_in");
 				//PAUSE
 			return RET_SOCK_ERROR;
 		}
@@ -282,14 +295,15 @@ int peer_mgr::handle_pkt_in(int sock)
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_PEER_CON ");
 		peer_ptr->handle_connect(new_fd, chunk_ptr,_cin);
 
-	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SYN) {
+//	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SYN) {
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
-	printf("CHNK_CMD_PEER_SYN not here peer_mgr\n");
-	PAUSE
+//	printf("CHNK_CMD_PEER_SYN not here peer_mgr\n");
+//	PAUSE
 	//////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 	} else{
 	printf("what this\n");
+	_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"what this at peer mgr ");
 	PAUSE
 	}
 

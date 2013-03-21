@@ -107,165 +107,164 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 	}
 
 
-	while(true){
+//	while(_queue_out_data_ptr ->size() !=0){
 
-	if (_send_ctl_info.ctl_state == READY) {
-		size_t send_size;
+		if (_send_ctl_info.ctl_state == READY) {
+			size_t send_size;
 
-		struct chunk_t *chunk_ptr;
+			struct chunk_t *chunk_ptr;
 
-		if (!_queue_out_data_ptr->size()) {
-//			_log_ptr->write_log_format("s => s \n", __FUNCTION__, "_queue_out_data_ptr->size =0");
-			_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN);	
-			return RET_OK;
-		}
+			if (!_queue_out_data_ptr->size()) {
+	//			_log_ptr->write_log_format("s => s \n", __FUNCTION__, "_queue_out_data_ptr->size =0");
+				_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN);	
+				return RET_OK;
+			}
 
-		chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();
+			chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();
 
 
-//pop until get the first keyframe
+	//pop until get the first keyframe
 
-		while(first_pkt){
-			if(_queue_out_data_ptr ->size() >=10){
-				for(int i=0;i<5;i++){
-					if(!isKeyFrame(chunk_ptr )){
-						if( _queue_out_data_ptr ->size()<=1)
-							return RET_OK;
+			while(first_pkt){
+				if(_queue_out_data_ptr ->size() >=10){
+					for(int i=0;i<5;i++){
+						if(!isKeyFrame(chunk_ptr )){
+							if( _queue_out_data_ptr ->size()<=1)
+								return RET_OK;
+						_queue_out_data_ptr->pop();
+						chunk_ptr = _queue_out_data_ptr->front();
+						}else{
+							_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "First Key Frame is ", chunk_ptr ->header.sequence_number);
+							first_pkt=false;
+							break;
+						}
+					return RET_OK;
+					}
+				}else
+					return RET_OK;
+			}
+
+
+	//here is to down-sampling (這邊可能有些bug 可能會去pop一個空的_queue_out_data_ptr!?)
+
+			int sentSequenceNumber = chunk_ptr ->header.sequence_number ;
+			int differenceValue = (_pk_mgr_ptr ->_current_send_sequence_number -sentSequenceNumber);
+			if (differenceValue > 100){ //if (recv -sent)diff >100 pkt pop until  queue <30 and continuance pop until last key frame
+				while(_queue_out_data_ptr ->size() >=30){
+					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "POP queue ", _queue_out_data_ptr ->size());
 					_queue_out_data_ptr->pop();
-					chunk_ptr = _queue_out_data_ptr->front();
-					}else{
-						_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "First Key Frame is ", chunk_ptr ->header.sequence_number);
-						first_pkt=false;
+				}
+				chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();
+				while(! isKeyFrame(chunk_ptr )){
+					if( _queue_out_data_ptr ->size()<=1)
+						return RET_OK;
+					_queue_out_data_ptr->pop();
+					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "POP queue ", _queue_out_data_ptr ->size());
+					chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();
+					if(_queue_out_data_ptr ->size() <=10)
 						break;
 					}
-				return RET_OK;
-				}
-			}else
-				return RET_OK;
-		}
-
-
-//here is to down-sampling (這邊可能有些bug 可能會去pop一個空的_queue_out_data_ptr!?)
-
-		int sentSequenceNumber = chunk_ptr ->header.sequence_number ;
-		int differenceValue = (_pk_mgr_ptr ->_least_sequence_number -sentSequenceNumber);
-		if (differenceValue > 100){ //if (recv -sent)diff >100 pkt pop until  queue <=30 and continuance pop until last key frame
-			while(_queue_out_data_ptr ->size() <=30){
-				_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "POP queue ", _queue_out_data_ptr ->size());
-				_queue_out_data_ptr->pop();
 			}
-			chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();
-			while(! isKeyFrame(chunk_ptr )){
-				if( _queue_out_data_ptr ->size()<=1)
-					return RET_OK;
-				_queue_out_data_ptr->pop();
-				_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "POP queue ", _queue_out_data_ptr ->size());
-				chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();
-				if(_queue_out_data_ptr ->size() <=10)
-					break;
-				}
-		}
 
-		else if(differenceValue <=100 && differenceValue >40){  
-			  	if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 3 == 0) ){   //not key frame &&  sampling by 1/3
-					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/3", chunk_ptr ->header.sequence_number);
-					if( _queue_out_data_ptr ->size()<=1)
-						return RET_OK;
-					_queue_out_data_ptr->pop();
-					chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();			 //ignore and not send
-					}
-		}else if(differenceValue <=40 && differenceValue >20){
-				if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 5 == 0) ){   //not key frame &&  sampling by 1/5
-					if( _queue_out_data_ptr ->size()<=1)
-						return RET_OK;
-					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/5", chunk_ptr ->header.sequence_number);
-					_queue_out_data_ptr->pop();
-					chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();			 //ignore and not send
-					}
-		}else if (differenceValue <=20 && differenceValue >5){
-				if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 7 == 0) ){   //not key frame &&  sampling by 1/7
-					if( _queue_out_data_ptr ->size()<=1)
-						return RET_OK;
-					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/7", chunk_ptr ->header.sequence_number);
-					_queue_out_data_ptr->pop();
-					chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();			 //ignore and not send
-					}	
-		}
+			else if(differenceValue <=100 && differenceValue >40){  
+			  		if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 3 == 0) ){   //not key frame &&  sampling by 1/3
+						_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/3", chunk_ptr ->header.sequence_number);
+						if( _queue_out_data_ptr ->size()<=1)
+							return RET_OK;
+						_queue_out_data_ptr->pop();
+						chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();			 //ignore and not send
+						}
+			}else if(differenceValue <=40 && differenceValue >20){
+					if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 5 == 0) ){   //not key frame &&  sampling by 1/5
+						if( _queue_out_data_ptr ->size()<=1)
+							return RET_OK;
+						_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/5", chunk_ptr ->header.sequence_number);
+						_queue_out_data_ptr->pop();
+						chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();			 //ignore and not send
+						}
+			}else if (differenceValue <=20 && differenceValue >5){
+					if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 7 == 0) ){   //not key frame &&  sampling by 1/7
+						if( _queue_out_data_ptr ->size()<=1)
+							return RET_OK;
+						_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/7", chunk_ptr ->header.sequence_number);
+						_queue_out_data_ptr->pop();
+						chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();			 //ignore and not send
+						}	
+			}
 
 
-
-//for debug
-//		fwrite(chunk_ptr->buf,1,chunk_ptr->header.length,file_ptr);
-//		_log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "write pkt", chunk_ptr->header.length, _stream_id);
+	//for debug
+	//		fwrite(chunk_ptr->buf,1,chunk_ptr->header.length,file_ptr);
+	//		_log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "write pkt", chunk_ptr->header.length, _stream_id);
 		
 
-//to set preTag len=0
-//		memset( chunk_ptr->buf + (chunk_ptr->header.length) -4 ,0x0,4);
+	//to set preTag len=0
+	//		memset( chunk_ptr->buf + (chunk_ptr->header.length) -4 ,0x0,4);
 
-//		unsigned int stamp=getFlvTimeStamp(chunk_ptr);
+	//		unsigned int stamp=getFlvTimeStamp(chunk_ptr);
 
-		_queue_out_data_ptr->pop();
-		send_size = chunk_ptr->header.length;
+			_queue_out_data_ptr->pop();
+			send_size = chunk_ptr->header.length;
 		
-		_send_ctl_info.offset = 0;
-		_send_ctl_info.total_len = send_size;
-		_send_ctl_info.expect_len = send_size;
-		_send_ctl_info.buffer = (char *)chunk_ptr->buf;
-		_send_ctl_info.rtmp_chunk = (chunk_rtmp_t *)chunk_ptr;
-		_send_ctl_info.serial_num = chunk_ptr->header.sequence_number;
+			_send_ctl_info.offset = 0;
+			_send_ctl_info.total_len = send_size;
+			_send_ctl_info.expect_len = send_size;
+			_send_ctl_info.buffer = (char *)chunk_ptr->buf;
+			_send_ctl_info.chunk_ptr  = (chunk_t *)chunk_ptr;
+			_send_ctl_info.serial_num = chunk_ptr->header.sequence_number;
 
-		send_rt_val = _net_ptr->nonblock_send(sock, &_send_ctl_info);
+			send_rt_val = _net_ptr->nonblock_send(sock, &_send_ctl_info);
 
 	
 		
-//_log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt sequence_number", chunk_ptr ->header.sequence_number, send_rt_val);
+	//_log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt sequence_number", chunk_ptr ->header.sequence_number, send_rt_val);
 
 
-		if(send_rt_val<0){
-			printf("socket error number=%d\n",WSAGetLastError());
-			if((WSAGetLastError()==WSAEWOULDBLOCK )){								//buff full
-				//it not a error
-				_send_ctl_info.ctl_state = READY;
-				_queue_out_data_ptr->pop();
-				continue;
-			}else{
-					printf("delete map and bit_stream_httpout_ptr\n");
-					_net_ptr->epoll_control(sock, EPOLL_CTL_DEL, EPOLLIN | EPOLLOUT);	
-					_pk_mgr_ptr ->del_stream(sock,(stream*)this, STRM_TYPE_MEDIA);
-					_pk_mgr_ptr ->data_close(sock," bit_stream_httpout ");
-					delete this;
-					}
+			if(send_rt_val<0){
+				printf("socket error number=%d\n",WSAGetLastError());
+				if((WSAGetLastError()==WSAEWOULDBLOCK )){								//buff full
+					//it not a error
+					_send_ctl_info.ctl_state = READY;
+					_queue_out_data_ptr->pop();
+//					continue;
+				}else{
+						printf("delete map and bit_stream_httpout_ptr\n");
+						_net_ptr->epoll_control(sock, EPOLL_CTL_DEL, EPOLLIN | EPOLLOUT);	
+						_pk_mgr_ptr ->del_stream(sock,(stream*)this, STRM_TYPE_MEDIA);
+						_pk_mgr_ptr ->data_close(sock," bit_stream_httpout ");
+						delete this;
+						}
 
+				}
+
+			switch (send_rt_val) {
+				case RET_SOCK_ERROR:
+					printf("%s, socket error\n", __FUNCTION__);
+	//				return RET_OK;
+					return RET_SOCK_ERROR;
+				default:
+					return RET_OK;
 			}
-
-		switch (send_rt_val) {
-			case RET_SOCK_ERROR:
-				printf("%s, socket error\n", __FUNCTION__);
-//				return RET_OK;
-				return RET_SOCK_ERROR;
-			default:
-				return RET_OK;
-		}
 		
-	} else { //_send_ctl_info._send_ctl_state is RUNNING
-//        _log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt", _send_ctl_info.serial_num, _stream_id);
+		} else { //_send_ctl_info._send_ctl_state is RUNNING
+	//        _log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt", _send_ctl_info.serial_num, _stream_id);
 
-		send_rt_val = _net_ptr->nonblock_send(sock, &_send_ctl_info);
-//_log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt", send_rt_val, _stream_id);
+			send_rt_val = _net_ptr->nonblock_send(sock, &_send_ctl_info);
+	//_log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt", send_rt_val, _stream_id);
 
-		switch (send_rt_val) {
-			case RET_WRONG_SER_NUM:
-				_log_ptr->Log(LOGDEBUG, "%s, serial number changed, queue rewrite?", __FUNCTION__);
-				printf("%s, serial number changed, queue rewrite?\n", __FUNCTION__);
-			case RET_SOCK_ERROR:				
+			switch (send_rt_val) {
+				case RET_WRONG_SER_NUM:
+					_log_ptr->Log(LOGDEBUG, "%s, serial number changed, queue rewrite?", __FUNCTION__);
+					printf("%s, serial number changed, queue rewrite?\n", __FUNCTION__);
+				case RET_SOCK_ERROR:				
 
-				printf("%s, socket error\n", __FUNCTION__);
-				return RET_SOCK_ERROR;
-			default:
-				return RET_OK;
+					printf("%s, socket error\n", __FUNCTION__);
+					return RET_SOCK_ERROR;
+				default:
+					return RET_OK;
+				}
 			}
-		}
-	}//end while (1)
+//		}//end while (1)
 	}
 
 void bit_stream_httpout::handle_pkt_error(int sock)

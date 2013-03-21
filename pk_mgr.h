@@ -28,8 +28,7 @@ public:
 	list <int> streamID_list;
 	struct peer_connect_down_t *pkDownInfoPtr;
 
-//	set< int > *childrenSet_ptr;
-//	map<unsigned long ,set< int > *> map_streamID_childrenSet ;
+
 
 	multimap <unsigned long, struct peer_info_t *> map_pid_peer_info; 	// <pid, struct peer_info_t *>
 	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		// <pid, struct peer_info_t *>
@@ -57,6 +56,9 @@ public:
 	unsigned long current_child_manifest;
 	unsigned long full_manifest;
 	int _sock; 		//PK socket
+
+	////measure
+	logger *_log_measureDataPtr ;
 
 
 	unsigned long syn_round_time;

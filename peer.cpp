@@ -111,6 +111,9 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 	map_fd_out_ctrl[sock] = queue_out_ctrl_ptr;
 	map_fd_out_data[sock] = queue_out_data_ptr;
 
+	Recv_nonblocking_ctl * Recv_nonblocking_ctl_ptr = new Recv_nonblocking_ctl ;
+	memset(Recv_nonblocking_ctl_ptr, 0x0 , sizeof(Recv_nonblocking_ctl));
+	map_fd_nonblocking_ctl[sock] = Recv_nonblocking_ctl_ptr ;
 //	pid_peer_info_iter = _pk_mgr_ptr->map_pid_peer_info.find(chunk_request_ptr->info.pid);	//2013/01/24
 	
 //	if(pid_peer_info_iter == _pk_mgr_ptr->map_pid_peer_info.end()) {						//2013/01/24
@@ -147,6 +150,11 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 	if(map_pid_fd_iter == map_in_pid_fd.end())
 		map_in_pid_fd[level_info_ptr->pid] = sock;
 	
+	Recv_nonblocking_ctl * Recv_nonblocking_ctl_ptr = new Recv_nonblocking_ctl ;
+	memset(Recv_nonblocking_ctl_ptr, 0x0 , sizeof(Recv_nonblocking_ctl));
+	map_fd_nonblocking_ctl[sock] = Recv_nonblocking_ctl_ptr ;
+
+
 	map_fd_pid[sock] = level_info_ptr->pid;
 	map_fd_out_ctrl[sock] = queue_out_ctrl_ptr;
 	map_fd_out_data[sock] = queue_out_data_ptr;
@@ -303,12 +311,12 @@ int peer::handle_pkt_in(int sock)
 		//不刪除 chunk_ptr 全權由handle_stream處理
 		return RET_OK;
 	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
-	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SYN) {	
+//	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SYN) {	
 	//////////////////////////////////////////////////////////////////////////////////measure start delay
-		printf("CHNK_CMD_PEER_SYN  not here peer\n");
-		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_PEER_SYN  not here peer");
-		PAUSE
-		exit(1);
+//		printf("CHNK_CMD_PEER_SYN  not here peer\n");
+//		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_PEER_SYN  not here peer");
+//		PAUSE
+//		exit(1);
 	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 //cmd =CHNK_CMD_PEER_BWN
@@ -474,7 +482,9 @@ int peer::handle_pkt_in(int sock)
 								}*/
 
 								if(map_in_pid_fd.find( peerInfoPtr->pid ) != map_in_pid_fd.end()){
-									data_close(map_in_pid_fd[peerInfoPtr->pid ],"close by firstReplyPid ",CLOSE_PARENT);
+									//只剩最後一個才關socket
+									if(map_in_pid_fd.count(peerInfoPtr->pid) == 1)
+										data_close(map_in_pid_fd[peerInfoPtr->pid ],"close by firstReplyPid ",CLOSE_PARENT);
 
 //									pid_peer_info_iter  = _pk_mgr_ptr ->map_pid_peer_info.begin() ;
 									//刪掉最後一個  離開
@@ -484,6 +494,7 @@ int peer::handle_pkt_in(int sock)
 
 //若在傳送期間PARENT socket error 則應該是可忽略
 									printf("testdelay 485 \n");
+									_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"testdelay 485 ");
 //									PAUSE
 								}
 							}
@@ -492,6 +503,7 @@ int peer::handle_pkt_in(int sock)
 
 					}else{
 						printf("what peer.cpp 492!?");
+						_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"what peer.cpp 492!?");
 						PAUSE
 					}
 				}
@@ -527,6 +539,7 @@ int peer::handle_pkt_in(int sock)
 		printf ("%d   " , chunk_ptr->header.cmd);
 
 		cout << "what's this?" << endl;
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"what's this? from peer");
 		PAUSE
 	}
 
@@ -543,19 +556,20 @@ int peer::handle_pkt_in(int sock)
 //0311 這邊改成如果阻塞了  就會blocking 住直到送出去為止
 int peer::handle_pkt_out(int sock)
 {
-	struct chunk_t *chunk_ptr;
+	struct chunk_t *chunk_ptr=NULL;
 	
 	map<int, queue<struct chunk_t *> *>::iterator fd_out_ctrl_iter;
 	map<int, queue<struct chunk_t *> *>::iterator fd_out_data_iter;
+	map<int , Recv_nonblocking_ctl * > ::iterator map_fd_nonblocking_ctl_iter;
 
 	map<int , unsigned long>::iterator map_fd_pid_iter;
 	map<unsigned long, int>::iterator map_pid_fd_in_iter;
 	map<unsigned long, int>::iterator map_pid_fd_out_iter;
 //	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 //	struct peer_connect_down_t* peerDownInfo ;
-	struct peer_info_t *peerInfoPtr ;
-	map<unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
+	struct peer_info_t *peerInfoPtr =NULL;
 
+	Recv_nonblocking_ctl * Recv_nonblocking_ctl_ptr =NULL;
 
 
 	fd_out_ctrl_iter = map_fd_out_ctrl.find(sock);
@@ -576,110 +590,143 @@ int peer::handle_pkt_out(int sock)
 		return RET_SOCK_ERROR;
 	}
 
+	map_fd_nonblocking_ctl_iter = map_fd_nonblocking_ctl.find(sock);
+	if(map_fd_nonblocking_ctl_iter != map_fd_nonblocking_ctl.end()) {
+		Recv_nonblocking_ctl_ptr = map_fd_nonblocking_ctl_iter->second;
+	}else{
+		printf("Recv_nonblocking_ctl_ptr NOT FIND \n");
+		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"Recv_nonblocking_ctl_ptr NOT FIND");
+		return RET_SOCK_ERROR;
+	}
 
-	while(queue_out_ctrl_ptr->size() != 0  ||  queue_out_data_ptr->size() != 0){
 
-		if(queue_out_ctrl_ptr->size() != 0 && _chunk_ptr == NULL) {
-			chunk_ptr = queue_out_ctrl_ptr->front();
-			_expect_len = chunk_ptr->header.length + sizeof(struct chunk_header_t);
-			_expect_len = _expect_len - _offset;
-			_send_byte = send(sock, (char *)chunk_ptr+_offset, _expect_len, 0);
-			if(_send_byte < 0) {
-#ifdef _WIN32 
-				if (WSAGetLastError() == WSAEWOULDBLOCK) {
-#else
-				if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-#endif
-//					printf ("==============WSAEWOULDBLOCK ===========\n\n", chunk_ptr ->header.cmd) ; 
-					_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"==============WSAEWOULDBLOCK ===========");
 
-					Sleep(1);
-					continue ;
-	//				PAUSE
-	//				return RET_SOCK_ERROR;
-				} else {
+//測試性功能
+////////////////////////////////////////////////////////////
+	map_fd_pid_iter= map_fd_pid .find(sock) ;
+	if(map_fd_pid_iter != map_fd_pid.end()){
+		map_pid_rescue_peer_info_iter = _pk_mgr_ptr->map_pid_rescue_peer_info .find(map_fd_pid_iter ->second);
+		if(map_pid_rescue_peer_info_iter ==  _pk_mgr_ptr->map_pid_rescue_peer_info.end()){
+//			printf("peer::handle_pkt_out where is the peer\n");
+			peerInfoPtr =NULL ;
+//			PAUSE
+//			return RET_SOCK_ERROR;
+		}else{
+			peerInfoPtr = map_pid_rescue_peer_info_iter ->second ;
+		}
+	}else{
+		printf("map_fd_pid NOT FIND \n");
+		PAUSE
+		return RET_SOCK_ERROR;
+	}
+//////////////////////////////////////////////////////////////
 
+//	while(queue_out_ctrl_ptr->size() != 0  ||  queue_out_data_ptr->size() != 0){
+
+		if(queue_out_ctrl_ptr->size() != 0 && chunk_ptr == NULL) {
+
+			if(Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == READY ){
+
+				chunk_ptr = queue_out_ctrl_ptr->front();
+
+				Recv_nonblocking_ctl_ptr ->recv_ctl_info.offset =0 ;
+				Recv_nonblocking_ctl_ptr ->recv_ctl_info.total_len = chunk_ptr->header.length + sizeof(chunk_header_t) ;
+				Recv_nonblocking_ctl_ptr ->recv_ctl_info.expect_len = chunk_ptr->header.length + sizeof(chunk_header_t) ;
+				Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer = (char *)chunk_ptr ;
+				Recv_nonblocking_ctl_ptr ->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_ptr;
+				Recv_nonblocking_ctl_ptr ->recv_ctl_info.serial_num =  chunk_ptr->header.sequence_number;
+
+				_send_byte = _net_ptr->nonblock_send(sock, & (Recv_nonblocking_ctl_ptr->recv_ctl_info ));
+
+//				_send_byte = send(sock, (char *)chunk_ptr+_offset, _expect_len, 0);
+
+				if(_send_byte < 0) {
 					data_close(sock, "error occured in send queue_out_ctrl",DONT_CARE);
 					return RET_SOCK_ERROR;
-				}
-			} else {
-				_offset += _send_byte;
-				_expect_len = _expect_len - _send_byte;
-				if(_expect_len == 0) {
-					queue_out_ctrl_ptr->pop();
-					_offset = 0;
+
+				} else if(Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == READY ){
+						queue_out_ctrl_ptr->pop();
+						if(chunk_ptr)
+							delete chunk_ptr;
+						chunk_ptr = NULL;
+					}
+
+			}else if (Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == RUNNING ){
+				_send_byte = _net_ptr->nonblock_send(sock, & (Recv_nonblocking_ctl_ptr->recv_ctl_info ));
+			
+				if(_send_byte < 0) {
+						data_close(sock, "error occured in send queue_out_data",DONT_CARE);
+						//PAUSE
+						return RET_SOCK_ERROR;
+				}else if (Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == READY){
+					queue_out_data_ptr->pop();
 					if(chunk_ptr)
 						delete chunk_ptr;
+					chunk_ptr = NULL;
 				}
 			}
 		
 		// DATA
 		} else if(queue_out_data_ptr->size() != 0) {
 
-			chunk_ptr = queue_out_data_ptr->front();
+			if(Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == READY ){
+
+				chunk_ptr = queue_out_data_ptr->front();
 
 //測試性功能
 //////////////////////////////////////////////////////////////////////////////
-/*
-			map_fd_pid_iter= map_fd_pid .find(sock) ;
-			if(map_fd_pid_iter != map_fd_pid.end()){
-				map_pid_rescue_peer_info_iter = _pk_mgr_ptr->map_pid_rescue_peer_info .find(map_fd_pid_iter ->second);
-				if(map_pid_rescue_peer_info_iter ==  _pk_mgr_ptr->map_pid_rescue_peer_info.end()){
-				printf("peer::handle_pkt_out where is the peer\n");
-				PAUSE
-				}else{
-				peerInfoPtr = map_pid_rescue_peer_info_iter ->second ;				
-				}
-			}
 
-			//如果現在manifest 的值已經沒有要送了  則略過這個
-			if (!(peerInfoPtr ->manifest & (_pk_mgr_ptr ->SubstreamIDToManifest ( (chunk_ptr->header.sequence_number % _pk_mgr_ptr ->sub_stream_num)) ) )){
-				queue_out_data_ptr ->pop() ;
-				chunk_ptr = queue_out_data_ptr->front();
-				continue ;
-			}
-*/
+				if(peerInfoPtr){
+					//如果現在manifest 的值已經沒有要送了  則略過這個
+					if (!(peerInfoPtr ->manifest & (_pk_mgr_ptr ->SubstreamIDToManifest ( (chunk_ptr->header.sequence_number % _pk_mgr_ptr ->sub_stream_num)) ) )){
+						if(queue_out_data_ptr->size() !=0)
+							queue_out_data_ptr ->pop() ;
+						chunk_ptr = queue_out_data_ptr->front();
+						//continue ;
+	//					PAUSE
+					}
+				}
+
 //////////////////////////////////////////////////////////////////////////////
 
+				Recv_nonblocking_ctl_ptr ->recv_ctl_info.offset =0 ;
+				Recv_nonblocking_ctl_ptr ->recv_ctl_info.total_len = chunk_ptr->header.length + sizeof(chunk_header_t) ;
+				Recv_nonblocking_ctl_ptr ->recv_ctl_info.expect_len = chunk_ptr->header.length + sizeof(chunk_header_t) ;
+				Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer = (char *)chunk_ptr ;
+				Recv_nonblocking_ctl_ptr ->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_ptr;
+				Recv_nonblocking_ctl_ptr ->recv_ctl_info.serial_num =  chunk_ptr->header.sequence_number;
 
-			//cout << "data buffer size =" << queue_out_data_ptr->size() <<endl;
+				_send_byte = _net_ptr->nonblock_send(sock, & (Recv_nonblocking_ctl_ptr->recv_ctl_info ));
 
-			_chunk_ptr = chunk_ptr;
-			_expect_len = chunk_ptr->header.length + sizeof(struct chunk_header_t);
-			_expect_len = _expect_len - _offset;
-			_send_byte = send(sock, (char *)chunk_ptr+_offset, _expect_len, 0);
-			if(_send_byte < 0) {
-	#ifdef _WIN32 
-				if (WSAGetLastError() == WSAEWOULDBLOCK) {
-	#else
-				if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-	#endif
-	//0307			
-					Sleep(1);
-//					printf ("==============WSAEWOULDBLOCK ===========\n\n", chunk_ptr ->header.cmd) ; 
-					_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"==============WSAEWOULDBLOCK ===========");
-					continue ;
-//					PAUSE
-//				return RET_SOCK_ERROR;
-				} else {
+
+				if(_send_byte < 0) {
 					data_close(sock, "error occured in send queue_out_data",DONT_CARE);
 					//PAUSE
 					return RET_SOCK_ERROR;
-				}
-			} else {
-				_offset += _send_byte;
-				_expect_len = _expect_len - _send_byte;
-				if(_expect_len == 0) {
+				} else if(Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == READY ){
 					queue_out_data_ptr->pop();
-					_offset = 0;
-					_chunk_ptr = NULL;
+					chunk_ptr = NULL;
+				}
+
+			}else if (Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == RUNNING){
+		
+				_send_byte = _net_ptr->nonblock_send(sock, & (Recv_nonblocking_ctl_ptr->recv_ctl_info ));
+			
+				if(_send_byte < 0) {
+						data_close(sock, "error occured in send queue_out_data",DONT_CARE);
+						//PAUSE
+						return RET_SOCK_ERROR;
+				}else if (Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == READY){
+					queue_out_data_ptr->pop();
+					chunk_ptr = NULL;
 				}
 			}
+
 	
 		} else {
 			_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN);
 		}
-	}
+
 
 	return RET_OK;
 }
@@ -717,6 +764,7 @@ void peer::data_close(int cfd, const char *reason ,int type)
 	map<int, queue<struct chunk_t *> *>::iterator map_fd_queue_iter;
 	map<int , unsigned long>::iterator map_fd_pid_iter;
 	map<unsigned long, int>::iterator map_pid_fd_iter;
+	map<int , Recv_nonblocking_ctl * > ::iterator map_fd_nonblocking_ctl_iter;
 //	multimap <unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 
@@ -761,6 +809,10 @@ void peer::data_close(int cfd, const char *reason ,int type)
 	map_fd_queue_iter = map_fd_out_data.find(cfd);
 	if(map_fd_queue_iter != map_fd_out_data.end()) 
 		map_fd_out_data.erase(map_fd_queue_iter);
+
+	map_fd_nonblocking_ctl_iter = map_fd_nonblocking_ctl.find(cfd);
+	if(map_fd_nonblocking_ctl_iter != map_fd_nonblocking_ctl.end()) 
+		map_fd_nonblocking_ctl.erase(map_fd_nonblocking_ctl_iter);
 
 
 

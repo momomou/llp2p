@@ -531,7 +531,7 @@ int rtmp_viewer::handle_pkt_out(int sock) {
 		_send_ctl_info.total_len = send_size;
 		_send_ctl_info.expect_len = send_size;
 		_send_ctl_info.buffer = (char *)chunk_ptr->buf;
-		_send_ctl_info.rtmp_chunk = chunk_ptr;
+		_send_ctl_info.chunk_ptr = (chunk_t *)chunk_ptr;
 		_send_ctl_info.serial_num = chunk_ptr->header.sequence_number;
 
 		/*if(control_pkt < 1000){
