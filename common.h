@@ -274,8 +274,8 @@ struct chunk_header_t {
 	unsigned char stream_id;
 	unsigned int sequence_number;
 	unsigned int timestamp;
-	unsigned short rsv_3;
-	unsigned short length;
+//	unsigned short rsv_3;
+	unsigned long length;
 };
 
 
@@ -554,7 +554,7 @@ struct syn_struct{
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 struct source_delay {
 
-	long long source_delay_time;
+	unsigned long source_delay_time;
 	DWORD client_end_time;
 	unsigned long end_seq_num;
 	unsigned int end_seq_abs_time;
@@ -584,7 +584,7 @@ struct rescue_peer_capacity_measurement{
 	//int rescue_condition;
 	char NAT_status;
 	char content_integrity;
-	long long *source_delay_measur[0];
+	unsigned long *source_delay_measur[0];
 };
 //////////////////////////////////////////////////////////////////////////////////
 struct seed_notify{

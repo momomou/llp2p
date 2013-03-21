@@ -41,6 +41,8 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 //	 childrenSet_ptr = NULL;
 	 full_manifest =0 ;
 
+//
+//	pkmgrfile_ptr = fopen("./herein.flv" , "wb");
 //	 _log_measureDataPtr =new 
 
 	 
@@ -149,7 +151,7 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 	}
 
 	if((seq_now > syn_table.start_seq)&&(delay_table_iter->second->rescue_state==0)){
-	long long detect_source_delay_time;
+	unsigned long detect_source_delay_time;
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 	map<int , unsigned long>::iterator detect_map_fd_pid_iter;
 	unsigned long detect_peer_id;
@@ -173,24 +175,25 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 		exit(1);
 	}
 
-	detect_source_delay_time = (long long)(_log_ptr ->diffgetTime_ms(syn_table.start_clock,delay_table_iter->second->client_end_time));
+	detect_source_delay_time = (_log_ptr ->diffgetTime_ms(syn_table.start_clock,delay_table_iter->second->client_end_time));
 	if(delay_table_iter->second->end_seq_num == 0){
 		printf("start delay end seq error in source_delay_detection\n");
 		PAUSE
 		exit(1);
 	}
 	else{
-			unsigned long temp;
-			long long diff_temp;
+			int temp;
+			int diff_temp;
 			temp = (delay_table_iter->second->end_seq_abs_time) - (syn_table.client_abs_start_time);
-			diff_temp = (long long)(detect_source_delay_time) - (long long)temp;
+			diff_temp = (detect_source_delay_time) - (unsigned long)temp;
 			if(diff_temp < 0){
 				printf("diff error in source_delay_detection\n");
-				printf("differ : %lld ",(long long)diff_temp);
+				printf("differ : %ld ",diff_temp);
 				printf("syn_round : %ld\n",syn_round_time);
 				printf("syn_table.client_abs_start_time : %ld\n",syn_table.client_abs_start_time);
-				syn_table.client_abs_start_time = syn_table.client_abs_start_time + abs(diff_temp);
+				syn_table.client_abs_start_time = syn_table.client_abs_start_time + (unsigned long)abs(diff_temp);
 				printf("syn_table.client_abs_start_time : %ld\n",syn_table.client_abs_start_time);
+				delay_table_iter->second->delay_beyond_count = 0;
 				//PAUSE
 				//exit(1);
 			}
@@ -219,7 +222,7 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 
 						}
 						else if(peerTestingManifest){
-							printf("differ : %lld need to rescue source_delay_detection\n",(long long)diff_temp);
+							printf("differ : %ld need to rescue source_delay_detection\n",diff_temp);
 							printf("sub stream : %ld pid : %d need to rescue source_delay_detection\n",sub_id,pid_peerDown_info_iter->second->peerInfo.pid);
 							printf("The substream is testing!!!!!\n",sub_id,pid_peerDown_info_iter->second->peerInfo.pid);
 							//若有多個正在測試中一次只選擇一個substream cut(最右邊的)  並且重設全部記數器的count
@@ -256,7 +259,7 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 							_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"stream testing fail ");
 						}
 						else{
-							printf("differ : %lld need to rescue source_delay_detection\n",(long long)diff_temp);
+							printf("differ : %ld need to rescue source_delay_detection\n",diff_temp);
 							printf("sub stream : %ld pid : %d need to rescue source_delay_detection\n",sub_id,pid_peerDown_info_iter->second->peerInfo.pid);
 							printf("normal rescue \n");
 							_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"normal rescue ");
@@ -271,9 +274,6 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 
 							printf("original manifest %d after cut manifest %d  PK manifest=%d \n",pid_peerDown_info_iter->second->peerInfo.manifest,afterManifest,pkDownInfoPtr ->peerInfo.manifest );
 							_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__,"original manifest",pid_peerDown_info_iter->second->peerInfo.manifest,"after cut manifest",afterManifest," PK manifest= ",pkDownInfoPtr ->peerInfo.manifest);
-						
-//							set_rescue_state(sub_id,1);
-							//PAUSE
 
 							tempManifest =(pid_peerDown_info_iter->second->peerInfo.manifest &(~afterManifest)) ;
 
@@ -297,7 +297,8 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 				}
 			}
 			else{
-//				printf("differ : %lld source_delay_detection sub id : %d\n",(long long)diff_temp,sub_id);
+				delay_table_iter->second->delay_beyond_count = 0;
+//				printf("differ : %ld source_delay_detection sub id : %d\n",diff_temp,sub_id);
 			}
 	}
 	}
@@ -313,8 +314,8 @@ void pk_mgr::send_capacity_to_pk(int sock){
 	int msg_size,send_size;
 	map<unsigned long, struct source_delay *>::iterator delay_table_iter;
 
-	msg_size = sizeof(struct rescue_peer_capacity_measurement) + sizeof(long long *)*sub_stream_num;
-	send_size = msg_size - sizeof(long long *)*sub_stream_num + sizeof(long long)*sub_stream_num; 
+	msg_size = sizeof(struct rescue_peer_capacity_measurement) + sizeof(unsigned long *)*sub_stream_num;
+	send_size = msg_size - sizeof(unsigned long *)*sub_stream_num + sizeof(unsigned long)*sub_stream_num; 
 
 	chunk_capacity_ptr = (struct rescue_peer_capacity_measurement *)new unsigned char[msg_size];
 	//chunk_ptr = (struct chunk_t *) new unsigned char[send_size];
@@ -341,7 +342,7 @@ void pk_mgr::send_capacity_to_pk(int sock){
 				PAUSE
 				exit(1);
 			}
-			delay_table_iter->second->source_delay_time = (long long)(_log_ptr ->diffgetTime_ms(syn_table.start_clock,delay_table_iter->second->client_end_time));
+			delay_table_iter->second->source_delay_time = (_log_ptr ->diffgetTime_ms(syn_table.start_clock,delay_table_iter->second->client_end_time));
 			if(delay_table_iter->second->end_seq_num == 0){
 				printf("start delay end seq error in send_capacity_to_pk\n");
 				PAUSE
@@ -358,36 +359,36 @@ void pk_mgr::send_capacity_to_pk(int sock){
 				exit(1);
 			}*/
 			else{
-				unsigned long temp;
-				long long diff_temp;
+				int temp;
+				int diff_temp;
 				temp = (delay_table_iter->second->end_seq_abs_time) - (syn_table.client_abs_start_time);
-				diff_temp = (long long)(delay_table_iter->second->source_delay_time) - (long long)temp;
+				diff_temp = (delay_table_iter->second->source_delay_time) - (unsigned long)temp;
 				//printf("source_delay_time : %ld",(delay_table+i)->source_delay_time);
 				//printf(" time : %d\n",temp);
 				printf("abs differ : %ld\n",temp);
 				printf("abs start : %ld\n",(syn_table.client_abs_start_time));
 				printf("abs end : %ld\n",(delay_table_iter->second->end_seq_abs_time));
-				printf("relate differ : %lld\n",(long long)(delay_table_iter->second->source_delay_time));
-				printf("differ : %lld\n",(long long)diff_temp);
+				printf("relate differ : %ld\n",(delay_table_iter->second->source_delay_time));
+				printf("differ : %ld\n",diff_temp);
 				if(diff_temp < 0){
 					printf("diff error in send_capacity_to_pk\n");
-					printf("differ : %lld\n",(long long)diff_temp);
+					printf("differ : %ld\n",diff_temp);
 					delay_table_iter->second->source_delay_time = 0;
 					printf("syn_table.client_abs_start_time : %ld\n",syn_table.client_abs_start_time);
-					syn_table.client_abs_start_time = syn_table.client_abs_start_time + abs(diff_temp);
+					syn_table.client_abs_start_time = syn_table.client_abs_start_time + (unsigned long)abs(diff_temp);
 					printf("syn_table.client_abs_start_time : %ld\n",syn_table.client_abs_start_time);
 					//PAUSE
 					//exit(1);
 				}
 				else{
-					delay_table_iter->second->source_delay_time = diff_temp;
+					delay_table_iter->second->source_delay_time = (unsigned long)diff_temp;
 				}
 			}
 			//(delay_table+i)->source_delay_time = (delay_table+i)->source_delay_time + (delay_table+i)->start_delay_struct.start_delay;
-			chunk_capacity_ptr->source_delay_measur[i] = new (long long);
-			memset(chunk_capacity_ptr->source_delay_measur[i], 0x0 , sizeof(long long));
-			memcpy(chunk_capacity_ptr->source_delay_measur[i],&(delay_table_iter->second->source_delay_time),sizeof(long long));
-			printf(" source delay : %lld\n",(long long)(*(chunk_capacity_ptr->source_delay_measur[i])));
+			chunk_capacity_ptr->source_delay_measur[i] = new (unsigned long);
+			memset(chunk_capacity_ptr->source_delay_measur[i], 0x0 , sizeof(unsigned long));
+			memcpy(chunk_capacity_ptr->source_delay_measur[i],&(delay_table_iter->second->source_delay_time),sizeof(unsigned long));
+			printf(" source delay : %ld\n",(*(chunk_capacity_ptr->source_delay_measur[i])));
 		}
 	}
 
@@ -396,20 +397,17 @@ void pk_mgr::send_capacity_to_pk(int sock){
 	int send_byte = 0;
 	int expect_len = chunk_capacity_ptr->header.length + sizeof(struct chunk_header_t);
 	char *send_buf;
-	int capacity_chunk_offset = expect_len - sizeof(long long)*sub_stream_num;
+	int capacity_chunk_offset = expect_len - sizeof(unsigned long)*sub_stream_num;
 	_net_ptr->set_blocking(sock);	// set to blocking
 
 	send_buf = (char *)new char[send_size];
 	memset(send_buf, 0x0, send_size);
 	memcpy(send_buf, chunk_capacity_ptr, capacity_chunk_offset);
 	for(int i=0;i<sub_stream_num;i++){
-		memcpy((send_buf+capacity_chunk_offset),chunk_capacity_ptr->source_delay_measur[i],sizeof(long long));
-		capacity_chunk_offset+=sizeof(long long);
+		memcpy((send_buf+capacity_chunk_offset),chunk_capacity_ptr->source_delay_measur[i],sizeof(unsigned long));
+		capacity_chunk_offset+=sizeof(unsigned long);
 	}
 	
-	//printf("%ld\n",*((long long *)(send_buf+sizeof(chunk_header_t)+sizeof(unsigned int)+sizeof(int)+sizeof(char)+sizeof(char))));
-	//printf("%d %d\n",capacity_chunk_offset,expect_len);
-
 	send_byte = _net_ptr->send(sock, send_buf, expect_len, 0);
 	if( send_byte <= 0 ) {
 		data_close(sock, "send pkt error");
@@ -1147,7 +1145,26 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	unsigned long testingManifest=0;
 
 //////////////////////////////for measure data (paper)
+/*
 
+	const  char FLV_Header[] = { 0x46,0x4c,0x56,0x01,0x05,0x00,0x00,0x00,0x09,0x00,0x00,0x00,0x00,0x12,0x00,0x00
+							,0xb6,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02,0x00,0x0a,0x6f,0x6e,0x4d,0x65,0x74
+							,0x61,0x44,0x61,0x74,0x61,0x08,0x00,0x00,0x00,0x07,0x00,0x08,0x64,0x75,0x72,0x61
+							,0x74,0x69,0x6f,0x6e,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x05,0x77
+							,0x69,0x64,0x74,0x68,0x00,0x40,0x84,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x06,0x68
+							,0x65,0x69,0x67,0x68,0x74,0x00,0x40,0x7e,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x09
+							,0x66,0x72,0x61,0x6d,0x65,0x72,0x61,0x74,0x65,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+							,0x00,0x00,0x00,0x0c,0x76,0x69,0x64,0x65,0x6f,0x63,0x6f,0x64,0x65,0x63,0x69,0x64
+							,0x00,0x40,0x1c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0d,0x76,0x69,0x64,0x65,0x6f
+							,0x64,0x61,0x74,0x61,0x72,0x61,0x74,0x65,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+							,0x00,0x00,0x07,0x65,0x6e,0x63,0x6f,0x64,0x65,0x72,0x02,0x00,0x0b,0x4c,0x61,0x76
+							,0x66,0x35,0x32,0x2e,0x38,0x37,0x2e,0x31,0x00,0x08,0x66,0x69,0x6c,0x65,0x73,0x69
+							,0x7a,0x65,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x09,0x00,0x00
+							,0x00,0xc1};
+	fwrite(FLV_Header,1,sizeof(FLV_Header),pkmgrfile_ptr) ;
+	fwrite(chunk_ptr->buf,1,chunk_ptr->header.length,pkmgrfile_ptr);
+
+*/
 //////////////////////////////for measure data (paper)
 
 
@@ -2010,16 +2027,14 @@ _log_ptr->write_log_format("↑\n");
 				printf("original manifest %d after cut manifest %d  PK manifest=%d \n",connectPeerInfo ->peerInfo.manifest,afterManifest,pkDownInfoPtr ->peerInfo.manifest );
 				_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__,"original manifest",connectPeerInfo ->peerInfo.manifest,"after cut manifest",afterManifest," PK manifest= ",pkDownInfoPtr ->peerInfo.manifest);
 
-				//set recue stat true
-//				unsigned long temp_rescue_sub_id = 0;
-//				temp_rescue_sub_id = manifestToSubstreamID(((connectPeerInfo ->peerInfo.manifest)^afterManifest));
-//				set_rescue_state(temp_rescue_sub_id,1);
+
 
 				tempManifest =(connectPeerInfo ->peerInfo.manifest &(~afterManifest)) ;
 
 				//把先前的連接的PID存起來
 				while(tempManifest){
 					testingSubStreamID = manifestToSubstreamID (tempManifest);
+					//set recue stat true
 					set_rescue_state(testingSubStreamID,1);
 					(ssDetect_ptr + testingSubStreamID) ->previousParentPID = connectPeerInfo ->peerInfo.pid;
 					tempManifest &=  (~SubstreamIDToManifest(testingSubStreamID) );

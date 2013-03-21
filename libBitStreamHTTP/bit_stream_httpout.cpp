@@ -194,12 +194,12 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 
 	//for debug
-	//		fwrite(chunk_ptr->buf,1,chunk_ptr->header.length,file_ptr);
-	//		_log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "write pkt", chunk_ptr->header.length, _stream_id);
+//			fwrite(chunk_ptr->buf,1,chunk_ptr->header.length,file_ptr);
+//			_log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "write pkt", chunk_ptr->header.length, _stream_id);
 		
 
 	//to set preTag len=0
-	//		memset( chunk_ptr->buf + (chunk_ptr->header.length) -4 ,0x0,4);
+//			memset( chunk_ptr->buf + (chunk_ptr->header.length) -4 ,0x0,4);
 
 	//		unsigned int stamp=getFlvTimeStamp(chunk_ptr);
 

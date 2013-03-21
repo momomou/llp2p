@@ -160,6 +160,8 @@ private:
 	peer_mgr * _peer_mgr_ptr;
 	peer *_peer_ptr;
 	rtsp_viewer *_rtsp_viewer_ptr;
+	
+	FILE *pkmgrfile_ptr ;
 
 	unsigned long _manifest;
 

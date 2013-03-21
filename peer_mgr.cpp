@@ -84,10 +84,11 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 	if(pid_peer_info_iter !=  _pk_mgr_ptr ->map_pid_peer_info.end() ){
 
 		//兩個以上就沿用第一個的連線
-		if(_pk_mgr_ptr ->map_pid_peer_info.count(level_info_ptr ->pid) >= 2 )
+		if(_pk_mgr_ptr ->map_pid_peer_info.count(level_info_ptr ->pid) >= 2 ){
 			printf("pid =%d already in connect find in map_pid_peer_info  testing",level_info_ptr ->pid);
 			_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_peer_info testing");
 				return 1;
+		}
 	}
 
 //若在map_pid_peerDown_info 則不再次建立連線
