@@ -268,7 +268,11 @@ int main(int argc, char **argv)
 #endif
 		net_ptr->epoll_dispatcher();
 
+		pk_mgr_ptr->threadLock(MAIN_LOCKER,1);
+
 		Sleep(1);
+
+		pk_mgr_ptr->threadFree(MAIN_LOCKER);
 
 	}
 

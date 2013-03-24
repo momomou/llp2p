@@ -29,7 +29,6 @@ public:
 	struct peer_connect_down_t *pkDownInfoPtr;
 
 
-
 	multimap <unsigned long, struct peer_info_t *> map_pid_peer_info; 	// <pid, struct peer_info_t *>
 	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		// <pid, struct peer_info_t *>
 	map<unsigned long, struct peer_connect_down_t *> map_pid_peerDown_info ; //// <pid, struct peer_connect_down_t *>
@@ -114,6 +113,8 @@ public:
 	int get_sock(void);
 	void send_request_sequence_number_to_pk(unsigned int req_from, unsigned int req_to);
     void send_pkt_to_pk(struct chunk_t *chunk_ptr);
+
+
 	void handle_stream(struct chunk_t *chunk_ptr, int sockfd);
 
 
@@ -125,8 +126,7 @@ public:
 	void measure();
 	void send_rescueManifestToPK(unsigned long manifestValue);
 	unsigned long manifestFactory(unsigned long manifestValue,unsigned int ssNumber);
-	void threadTimeout();
-	static void launchThread(void * arg);
+
 	unsigned int rescueNumAccumulate();
 	void send_rescueManifestToPKUpdate(unsigned long manifestValue);
 	void send_parentToPK(unsigned long manifestValue ,unsigned long oldPID);
@@ -136,6 +136,12 @@ public:
 	unsigned long manifestToSubstreamID(unsigned long  manifest );
 	unsigned long SubstreamIDToManifest(unsigned long  SubstreamID );
 	unsigned long manifestToSubstreamNum(unsigned long  manifest );
+
+	volatile int threadLockKey ;
+	void threadTimeout();
+	static void launchThread(void * arg);
+	void threadLock(int locker,unsigned long sleepTime);
+	void threadFree(int locker);
 
 
 //clear

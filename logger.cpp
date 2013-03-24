@@ -340,6 +340,9 @@ unsigned int logger::gettimeofday_ms(struct timeval *tv)
 DWORD logger::getTime()
 {
 	return timeGetTime();
+//	return (DWORD)clock();
+//	return GetTickCount();
+
 }
 #endif
 
@@ -350,6 +353,8 @@ DWORD logger::diffgetTime_ms(DWORD startTime,DWORD endTime)
     return (endTime-startTime);
 }
 #endif
+
+
 
 #ifdef WIN32
 void logger::getTickTime(LARGE_INTEGER *tickTime)

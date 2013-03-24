@@ -15,6 +15,7 @@
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
 #define BUFF_SIZE		400
+#define CHUNK_LOSE		20
 
 //source delay PARAMETER
 #define MAX_DELAY 700
@@ -193,6 +194,11 @@ using std::bitset;
 #define REQUEST				0
 #define REPLY				1
 
+#define FREE				0
+#define LOCK				1
+#define MAIN_LOCKER			2
+#define TIMEOUT_LOCKER		3
+
 #define CLOSE_PARENT			0
 #define CLOSE_CHILD				1
 #define DONT_CARE				2
@@ -281,9 +287,9 @@ struct chunk_header_t {
 
 //detection Info for each substream
 struct detectionInfo{
-	DWORD	lastAlarm;
-	DWORD	firstAlarm;
-	DWORD	previousAlarm;
+	LARGE_INTEGER	lastAlarm;
+	LARGE_INTEGER	firstAlarm;
+	LARGE_INTEGER	previousAlarm;
 
 	unsigned int	last_timestamp;
 	unsigned int	first_timestamp;
@@ -376,6 +382,7 @@ struct peer_connect_down_t {
 	volatile unsigned int timeOutLastSeq;
 	volatile unsigned int timeOutNewSeq;
 	volatile unsigned int lastTriggerCount;
+	volatile unsigned int outBuffCount;
 	
 };
 
@@ -548,19 +555,20 @@ struct syn_struct{
 	int init_flag; // 0 not init 1 send 2 init complete
 	unsigned long client_abs_start_time;
 	unsigned long start_seq;
-	DWORD start_clock;
-	DWORD end_clock;
+	LARGE_INTEGER start_clock;
+	LARGE_INTEGER end_clock;
 };
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 struct source_delay {
 
 	unsigned long source_delay_time;
-	DWORD client_end_time;
+	LARGE_INTEGER client_end_time;
 	unsigned long end_seq_num;
 	unsigned int end_seq_abs_time;
 	int first_pkt_recv;
 	int rescue_state;	//0 normal 1 rescue trigger 2 testing
 	int delay_beyond_count;
+//	int delay time
 
 };
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
