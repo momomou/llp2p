@@ -41,7 +41,7 @@ public:
 
 	//rescue
 	struct detectionInfo *ssDetect_ptr;
-	int *statsArryCount_ptr ;
+	unsigned long *statsArryCount_ptr ;
 
 	int	_bucket_size;
 	unsigned long _channel_id;

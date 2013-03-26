@@ -9,17 +9,17 @@
 #define BIG_CHUNK	512
 
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
-#define PARAMETER_M		8
+#define PARAMETER_M		4
 #define PARAMETER_N		4
 #define PARAMETER_P		2
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
-#define BUFF_SIZE		400
-#define CHUNK_LOSE		20
+#define BUFF_SIZE		200
+#define CHUNK_LOSE		30
 
 //source delay PARAMETER
-#define MAX_DELAY 700
-#define SOURCE_DELAY_CONTINUOUS 4
+#define MAX_DELAY 100
+#define SOURCE_DELAY_CONTINUOUS 2
 
 
 #include "configuration.h"
@@ -206,6 +206,12 @@ using std::bitset;
 #define CAPACITY_THRESHOLD 0.75
 #define CAPACITY_BASE 5
 #define MAX_PEER_LIST		5
+
+//  state 0 normal detection  -> rescue detect  and rescue (go to state 1) -> recv a List (go to state 2) 
+#define STATE_DETECTION		0
+#define STATE_RESCUE		1
+#define STATE_LIST			2
+#define STATE_TESTING		3
 
 #define DBG_MODE
 
