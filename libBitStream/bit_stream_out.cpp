@@ -17,10 +17,11 @@ bit_stream_out::bit_stream_out(int stream_id,network *net_ptr, logger *log_ptr,b
 		_pk_mgr_ptr = pk_mgr_ptr;
 		fd_list_ptr = fd_list;
 		_bit_stream_server_ptr = bit_stream_server_ptr;
-		
+		_reqStreamID =0 ;
 		_queue_out_data_ptr = new std::queue<struct chunk_t *>;
 		memset(&_send_ctl_info, 0x00, sizeof(_send_ctl_info));
 
+		file_ptr = fopen("./FILEOUT" , "wb");
 
 	}
 bit_stream_out::~bit_stream_out(){
@@ -40,7 +41,7 @@ int bit_stream_out::handle_pkt_out(int sock){
 	int send_rt_val; //send return value
 	send_rt_val=0;
 
-	while(true){
+//	while(true){
 
 	if (_send_ctl_info.ctl_state == READY) {
 		size_t send_size;
@@ -56,6 +57,7 @@ int bit_stream_out::handle_pkt_out(int sock){
 
 		chunk_ptr = (struct chunk_t *)_queue_out_data_ptr->front();
 
+		fwrite(chunk_ptr->buf,1,chunk_ptr->header.length,file_ptr);
 
 		_queue_out_data_ptr->pop();
 		send_size = chunk_ptr->header.length;
@@ -77,8 +79,8 @@ int bit_stream_out::handle_pkt_out(int sock){
 			printf("socket error number=%d\n",WSAGetLastError());
 			if((WSAGetLastError()==WSAEWOULDBLOCK )){								//buff full
 				//it not a error
-				_send_ctl_info.ctl_state = READY;
-				_queue_out_data_ptr->pop();
+				_send_ctl_info.ctl_state = RUNNING;
+//				_queue_out_data_ptr->pop();
 				}else{
 						printf("delete map and bit_stream_out_ptr");
 						_pk_mgr_ptr ->del_stream(sock,(stream*)this, STRM_TYPE_MEDIA);
@@ -115,7 +117,7 @@ int bit_stream_out::handle_pkt_out(int sock){
 				return RET_OK;
 			}
 		}
-	}//end while (1)
+//	}//end while (1)
 	}
 void bit_stream_out::handle_pkt_error(int sock){
 	}

@@ -23,7 +23,7 @@ in main should init sock to listen to listen other peer connected
 
 using namespace std;
 
-int mode=mode_BitStream;
+//int mode=mode_BitStream;
 
 
 const char version[] = "1.0.0";
@@ -268,11 +268,11 @@ int main(int argc, char **argv)
 #endif
 		net_ptr->epoll_dispatcher();
 
-		pk_mgr_ptr->threadLock(MAIN_LOCKER,1);
+//		pk_mgr_ptr->threadLock(MAIN_LOCKER,1);
 
-		Sleep(1);
+//		Sleep(1);
 
-		pk_mgr_ptr->threadFree(MAIN_LOCKER);
+//		pk_mgr_ptr->threadFree(MAIN_LOCKER);
 
 	}
 

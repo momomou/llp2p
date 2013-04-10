@@ -79,6 +79,15 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 	struct peer_info_t *peerInfoPtr =NULL;
 	multimap<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 //	struct in_addr selfip;
+	map<unsigned long, int>::iterator map_pid_fd_iter;
+
+	//之前已經建立過連線的 在map_in_pid_fd裡面 則不再建立(保證對同個parent不再建立第二條線)
+	for(map_pid_fd_iter = peer_ptr->map_in_pid_fd.begin();map_pid_fd_iter != peer_ptr->map_in_pid_fd.end(); map_pid_fd_iter++){
+		if(map_pid_fd_iter->first == level_info_ptr->pid ){
+			return 1;
+		}
+	}
+
 
 	pid_peer_info_iter = _pk_mgr_ptr ->map_pid_peer_info.find(level_info_ptr ->pid);
 	if(pid_peer_info_iter !=  _pk_mgr_ptr ->map_pid_peer_info.end() ){
@@ -547,6 +556,15 @@ void peer_mgr::handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr)
 	if(map_pid_rescue_peer_info_iter !=  _pk_mgr_ptr->map_pid_rescue_peer_info.end()){
 	rescuePeerInfoPtr = map_pid_rescue_peer_info_iter ->second;
 
+		//如果Substream 的數量是變少的話 ,只有在給的串流變少的時候才Clean
+/*
+		if(_pk_mgr_ptr->manifestToSubstreamNum (chunk_ptr ->manifest) < _pk_mgr_ptr->manifestToSubstreamNum(rescuePeerInfoPtr ->manifest)){
+		//clear_ouput_buffer( chunk_ptr ->pid);
+
+		_pk_mgr_ptr->stopsleep++ ;
+		}
+*/
+
 	rescuePeerInfoPtr ->manifest = chunk_ptr ->manifest ;
 
 	printf("children pid= %u set manifest=%d\n",rescuePeerInfoPtr ->pid,rescuePeerInfoPtr ->manifest);
@@ -558,10 +576,7 @@ void peer_mgr::handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr)
 	}
 	
 	//如果Substream 的數量是變少的話 ,只有在給的串流變少的時候才Clean
-	if(_pk_mgr_ptr->manifestToSubstreamNum (chunk_ptr ->manifest) < _pk_mgr_ptr->manifestToSubstreamNum(rescuePeerInfoPtr ->manifest)){
-	//clear_ouput_buffer( chunk_ptr ->pid);
 
-	}
 
 }
 

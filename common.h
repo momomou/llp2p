@@ -4,22 +4,26 @@
 
 #define FD_SETSIZE		2048
 ////resuce PARAMETER////
-#define PARAMETER_X		8
+#define PARAMETER_X		25
 #define PK_PID			999999
 #define BIG_CHUNK	512
 
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
-#define PARAMETER_M		4
+#define PARAMETER_M		8
 #define PARAMETER_N		4
 #define PARAMETER_P		2
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
-#define BUFF_SIZE		200
+#define BUFF_SIZE		10000
 #define CHUNK_LOSE		30
 
 //source delay PARAMETER
-#define MAX_DELAY 100
-#define SOURCE_DELAY_CONTINUOUS 2
+#define MAX_DELAY 2000
+#define SOURCE_DELAY_CONTINUOUS 5
+
+//p
+//#define mode mode_HTTP // mod_HTTP
+#define mode mode_BitStream
 
 
 #include "configuration.h"
@@ -143,6 +147,7 @@ using std::bitset;
 #define CHNK_CMD_PEER_SYN				0X1A
 //////////////////////////////////////////////////////////////////////////////////
 #define CHNK_CMD_PEER_SEED				0X1B
+#define CHNK_CMD_PEER_MEASURE_DATA		0X1C
 //#define CHNK_CMD_PEER_START_DELAY_UPDATE			0X1C
 //#define CHNK_CMD_PEER_PARENT_CHILDREN	0xF0	//暫時不用
 #define CHNK_CMD_TOPO_INFO				0x1E

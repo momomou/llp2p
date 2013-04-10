@@ -6,7 +6,7 @@
 #include "libBitStreamHTTP/bit_stream_httpout.h"
 #include <sstream>
 
-#define mode 5 // mod_HTTP
+
 
 //need to init a server to listen
 //after accept a client need call pk_mgr -> add_stream 
@@ -140,6 +140,7 @@ int bit_stream_server::handle_pkt_in(int sock)
 
 	return RET_OK;
 	}else if (mode==mode_RTMP){
+
 	// other mode  RTSP RTMP FILE TE_SG
 	}
 

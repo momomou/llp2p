@@ -168,6 +168,7 @@ private:
 	rtsp_viewer *_rtsp_viewer_ptr;
 	
 	FILE *pkmgrfile_ptr ;
+	FILE *performance_filePtr ;
 
 	unsigned long _manifest;
 
