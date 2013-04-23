@@ -176,7 +176,7 @@ int main(int argc, char **argv)
 
 
 //mode BitStream
-	}else if(mode==mode_BitStream){
+	}else if(mode==mode_BitStream  || mode == mode_HTTP){
 	printf("mode_BitStream\n");
 	
 

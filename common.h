@@ -22,7 +22,7 @@
 #define SOURCE_DELAY_CONTINUOUS 5
 
 //p
-//#define mode mode_HTTP // mod_HTTP
+//#define mode mode_HTTP // mode_BitStream
 #define mode mode_BitStream
 
 

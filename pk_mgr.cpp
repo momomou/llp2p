@@ -41,6 +41,7 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 	//	 childrenSet_ptr = NULL;
 	full_manifest =0 ;
 	threadLockKey = FREE ;
+	 Xcount =100;
 
 	//
 	pkmgrfile_ptr = fopen("./HEREin" , "wb");
@@ -140,7 +141,8 @@ void pk_mgr::send_capacity_init(){
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 
-void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int seq_now){
+void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int seq_now)
+{
 	map<unsigned long,struct source_delay *>::iterator delay_table_iter;
 	delay_table_iter = delay_table.find(sub_id);
 	if(delay_table_iter == delay_table.end()){
@@ -174,16 +176,16 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 		if(detect_map_fd_pid_iter == _peer_ptr->map_fd_pid.end()){
 			printf("error : can not find fd pid in source_delay_detection\n");
 			return;
-			PAUSE
-				exit(1);
+//			PAUSE
+//			exit(1);
 		}
 
 		pid_peerDown_info_iter = map_pid_peerDown_info.find(detect_map_fd_pid_iter->second);
 		if(pid_peerDown_info_iter == map_pid_peerDown_info.end()){
 			printf("error : can not find pid peerinfo in source_delay_detection\n");
 			return;
-			PAUSE
-				exit(1);
+//			PAUSE
+//			exit(1);
 		}
 
 		detect_source_delay_time = (_log_ptr ->diffTime_ms(syn_table.start_clock,delay_table_iter->second->client_end_time));
@@ -217,6 +219,7 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 				delay_table_iter->second->delay_beyond_count = delay_table_iter->second->delay_beyond_count + 1;
 
 				//觸發條件
+//				printf("(SOURCE_DELAY_CONTINUOUS* stream_number) = %d delay_table_iter->second->delay_beyond_count=%d \n",(int)(SOURCE_DELAY_CONTINUOUS* stream_number) ,delay_table_iter->second->delay_beyond_count);
 				if( (delay_table_iter->second->delay_beyond_count > (int)(SOURCE_DELAY_CONTINUOUS* stream_number) ) && (pid_peerDown_info_iter->second->lastTriggerCount == 0)){
 					delay_table_iter->second->delay_beyond_count = 0;
 					pid_peerDown_info_iter->second -> lastTriggerCount = 1 ;
@@ -322,8 +325,9 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 							map_out_pid_fd_iter = _peer_ptr ->map_in_pid_fd.find(pid_peerDown_info_iter ->first) ;
 							if(map_out_pid_fd_iter !=_peer_ptr ->map_in_pid_fd.end()){
 								_peer_ptr ->data_close(_peer_ptr ->map_in_pid_fd[pid_peerDown_info_iter ->first],"manifest=0",CLOSE_PARENT) ;
-								}else{printf("pkmgr"); //PAUSE
-						}
+							}else{
+								printf("pkmgr"); //PAUSE
+							}
 
 						//	} //end if
 
@@ -1283,6 +1287,8 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		(ssDetect_ptr + temp_sub_id) ->testing_count++ ;
 
 		//下面會濾掉慢到的封包 所以在此進入偵測
+
+//p
 		rescue_detecion(chunk_ptr);
 		//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 		if(syn_table.init_flag == 2){
@@ -1357,9 +1363,38 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 
 	//↓↓↓↓↓↓↓↓↓↓↓↓以下只有先到的chunk才會run(會濾掉重複的和更小的)↓↓↓↓↓↓↓↓↓↓↓↓↓
+//p
+///*
+//CHILDREN ONLY
+	static unsigned long pkt_count =0 ;
+	static unsigned long totalbyte=0;
+	static unsigned long fisttimestamp=0;
+	if(!fisttimestamp){
+		fisttimestamp = chunk_ptr->header.timestamp;
+		_log_ptr ->getTickTime(&start);
+	}
+
+	_log_ptr ->getTickTime(&end);
+//	_log_ptr ->getTickTime(&temp_end);
+
+//	totalbyte +=chunk_ptr->header.length ;
 
 
-	fwrite(chunk_ptr->buf,1,chunk_ptr->header.length,pkmgrfile_ptr);
+	pkt_count++;
+
+	if(_log_ptr->diffTime_ms(start,end) >=10000){
+
+		Xcount = ((double)pkt_count / (3*10));
+		printf("Xcount = %d ",Xcount);
+//		printf("%f\n",(double)totalbyte / ((double)(_log_ptr->diffTime_ms(start,end))));
+//		fprintf(fp,"%f\n",(double)totalbyte / ( (double)(_log_ptr->diffTime_ms(start,end))));
+//		fflush(fp);
+		start = end;
+//		totalbyte =0;
+		pkt_count =0;
+	}
+
+//*/
 
 
 	//send down stream(UPLOAD) to other peer if SSID match and in map_pid_rescue_peer_info
@@ -1374,7 +1409,6 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 			iter = _peer_ptr ->map_fd_out_data.find(downStreamSock) ;
 			if(iter != _peer_ptr ->map_fd_out_data.end())
 				queue_out_data_ptr = iter ->second ;		//get queue_out_data_ptr
-		
 		}
 
 		if((peer->manifest & (1 << (chunk_ptr->header.sequence_number % sub_stream_num))) ) {
@@ -1396,13 +1430,13 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	}else if ( !((ssDetect_ptr + temp_sub_id) ->isTesting)){          
 		//丟給rescue_detecion一定是有方向性的
 //p
-//		rescue_detecion(chunk_ptr);
+		rescue_detecion(chunk_ptr);
 
 		if(syn_table.init_flag == 2){
 
 			delay_table_iter->second->end_seq_abs_time = chunk_ptr ->header.timestamp;
 			_log_ptr -> getTickTime(&(delay_table_iter->second->client_end_time));
-//
+//p
 			source_delay_detection(sockfd,temp_sub_id,chunk_ptr ->header.sequence_number);
 		}
 	}
@@ -1827,8 +1861,9 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 
 
 	substreamID= (chunk_ptr ->header.sequence_number) % sub_stream_num  ;
-	int X = stream_number * PARAMETER_X;								//測量參數X 和stream_number成正比
-
+//p
+//	int X = stream_number * PARAMETER_X;								//測量參數X 和stream_number成正比
+	int X = Xcount;
 
 	if(! ( (ssDetect_ptr + substreamID) -> last_seq ) ){  //第一個封包做初始化
 		(ssDetect_ptr + substreamID) ->last_timestamp = chunk_ptr->header.timestamp;
@@ -1851,11 +1886,16 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 		if((ssDetect_ptr + substreamID) ->  count_X   == 1)
 			(ssDetect_ptr + substreamID) ->first_timestamp = chunk_ptr->header.timestamp;
 
-		if( (ssDetect_ptr + substreamID) ->  count_X   == (X -1) )
+//p
+//	if( (ssDetect_ptr + substreamID) ->  count_X   == (X -1) ){
+	if( (ssDetect_ptr + substreamID) ->  count_X   >= (X -1) ){
 			_log_ptr -> getTickTime(&((ssDetect_ptr + substreamID) ->previousAlarm));
+	}
 
 		//累積X個封包後做判斷
-		if(  (ssDetect_ptr + substreamID) ->  count_X  == X ){
+//p
+//	if(  (ssDetect_ptr + substreamID) ->  count_X  == X ){
+	if(  (ssDetect_ptr + substreamID) ->  count_X  >= X ){
 
 			( (ssDetect_ptr + substreamID) ->measure_N )++;  //從1開始計
 
@@ -1999,10 +2039,12 @@ void pk_mgr::measure()
 			}
 		}
 
+//p 這邊狀態怪怪的 0 不會洗掉 (改成int 應該就好了)
+
 		//printf("totalSourceBitrate=%.5f   totalLocalBitrate=%.5f\n",totalSourceBitrate,totalLocalBitrate);
 
 		//設定最近偵測的狀態到rescueStatsArry
-		for(unsigned long i=0 ; i<= perPeerSS_num ;i++){
+		for(int i=0 ; i<= perPeerSS_num ;i++){
 			//介在需要rescue i 個substream之間
 			if ( (totalLocalBitrate < (1 - (double)(2*i-1)/(double)(2*perPeerSS_num) )*totalSourceBitrate ) && ( totalLocalBitrate > (1 - (double)(2*(i+1)-1)/(double)(2*perPeerSS_num) )*totalSourceBitrate)){
 				//rescue i substream
@@ -2027,6 +2069,8 @@ void pk_mgr::measure()
 				count_N++;
 			}
 
+
+			
 			//printf("%d  ",connectPeerInfo ->rescueStatsArry[i]);
 			_log_ptr->write_log_format("u  ",connectPeerInfo ->rescueStatsArry[i]);
 
@@ -2076,9 +2120,8 @@ void pk_mgr::measure()
 			peerTestingManifest = (testingManifest & connectPeerInfo ->peerInfo.manifest);
 
 
-			//			if(connectPeerInfo ->lastTriggerCount  == 0){
 
-			//				connectPeerInfo ->lastTriggerCount = 1 ;
+//				connectPeerInfo ->lastTriggerCount = 1 ;
 			printf("continuous_P =%d\npid=%d need cut %d substream and need rescue\n",continuous_P,connectPeerInfo ->peerInfo.pid,rescueSS);
 			_log_ptr->write_log_format("s =>u s u s u s \n", __FUNCTION__,__LINE__,"pid ",connectPeerInfo ->peerInfo.pid ," need cut",rescueSS,"substream and need rescue");
 
@@ -2527,7 +2570,8 @@ void pk_mgr::threadFree(int locker)
 }
 
 
-void pk_mgr::launchThread(void * arg){
+void pk_mgr::launchThread(void * arg)
+{
 
 	pk_mgr * pk_mgr_ptr = NULL ;
 
