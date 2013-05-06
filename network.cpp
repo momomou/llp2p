@@ -341,6 +341,173 @@ int network::close(int sock)
 
 }
 
+//這邊的nonblocking recv 沿用rtmp 原本Recv_nonblocking_ctl的定義方式 重新刻的
+//狀態必須是READY or RUNNING 才能用這個function
+int network::nonblock_recv(int sock, Recv_nonblocking_ctl* send_info)
+{
+	int recv_rt_val;
+
+//	LARGE_INTEGER teststart,testend;
+
+
+	recv_rt_val = recv(sock, send_info->recv_ctl_info.buffer + send_info->recv_ctl_info.offset, send_info->recv_ctl_info.expect_len, 0);
+
+
+
+	if (recv_rt_val < 0) {
+
+
+#ifdef _WIN32 
+			if (WSAGetLastError() == WSAEWOULDBLOCK) {
+#else
+			if (errno == EINTR || errno == EAGAIN) {
+#endif		
+
+			if(send_info ->recv_packet_state == READ_HEADER_READY){
+				send_info ->recv_packet_state = READ_HEADER_RUNNING;
+//printf("READ_HEADER_RUNNING\n");
+			}else if(send_info ->recv_packet_state == READ_HEADER_RUNNING){
+//printf("READ_HEADER_RUNNING\n");
+				//also RUNNING
+			}else if(send_info ->recv_packet_state == READ_HEADER_OK){
+				printf("READ_HEADER_OK");
+				PAUSE
+			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_READY){
+				send_info ->recv_packet_state = READ_PAYLOAD_RUNNING;
+//printf("READ_PAYLOAD_RUNNING\n");
+			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_RUNNING){
+//printf("READ_PAYLOAD_RUNNING\n");
+				//also RUNNING
+			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_OK){
+				printf("READ_PAYLOAD_OK");
+				PAUSE
+			}
+
+//			send_info->recv_ctl_info.ctl_state = RUNNING;
+			return RET_OK;
+		} else {
+			return RET_SOCK_ERROR;
+		}
+	} else if (recv_rt_val == 0) {
+		cout << "recv 0 byte from sock: " << sock << ", expect len = " << send_info->recv_ctl_info.expect_len << endl;
+		if (send_info->recv_ctl_info.expect_len == 0) {
+
+			if(send_info ->recv_packet_state == READ_HEADER_READY){
+				printf("READ_HEADER_READY\n");
+				PAUSE
+			}else if(send_info ->recv_packet_state == READ_HEADER_RUNNING){
+				send_info ->recv_packet_state = READ_HEADER_OK ;
+//printf("READ_HEADER_OK\n");
+
+			}else if(send_info ->recv_packet_state == READ_HEADER_OK){
+				printf("READ_HEADER_OK");
+				PAUSE
+			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_READY){
+				printf("READ_PAYLOAD_READY\n");
+				PAUSE
+			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_RUNNING){
+				send_info ->recv_packet_state = READ_PAYLOAD_OK ;
+//printf("READ_PAYLOAD_OK\n");
+			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_OK){
+				printf("READ_PAYLOAD_OK");
+				PAUSE
+			}
+
+//			send_info->recv_ctl_info.ctl_state = READY;
+			return RET_OK;
+		} else {
+
+			if(send_info ->recv_packet_state == READ_HEADER_READY){
+				send_info ->recv_packet_state = READ_HEADER_RUNNING;
+//printf("READ_HEADER_RUNNING\n");
+			}else if(send_info ->recv_packet_state == READ_HEADER_RUNNING){
+				//also RUNNING
+//printf("READ_HEADER_RUNNING\n");
+			}else if(send_info ->recv_packet_state == READ_HEADER_OK){
+				printf("READ_HEADER_OK");
+				PAUSE
+			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_READY){
+				send_info ->recv_packet_state = READ_PAYLOAD_RUNNING;
+//printf("READ_PAYLOAD_RUNNING\n");
+			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_RUNNING){
+				//also RUNNING
+//printf("READ_PAYLOAD_RUNNING\n");
+			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_OK){
+				printf("READ_PAYLOAD_OK");
+				PAUSE
+			}
+
+//			send_info->recv_ctl_info.ctl_state = RUNNING;
+//here maybe a sock error
+			return RET_SOCK_ERROR;
+//			return RET_OK;
+
+		}
+
+	}else if (recv_rt_val == send_info->recv_ctl_info.expect_len) {
+
+//			QueryPerformanceCounter(&teststart);
+
+		if(send_info ->recv_packet_state == READ_HEADER_READY){
+			send_info ->recv_packet_state = READ_HEADER_OK;
+//printf("READ_HEADER_OK\n");
+		}else if(send_info ->recv_packet_state == READ_HEADER_RUNNING){
+			send_info ->recv_packet_state = READ_HEADER_OK;
+//printf("READ_HEADER_OK\n");
+		}else if(send_info ->recv_packet_state == READ_HEADER_OK){
+			printf("READ_HEADER_OK");
+			PAUSE
+		}else if(send_info ->recv_packet_state ==READ_PAYLOAD_READY){
+
+			send_info ->recv_packet_state = READ_PAYLOAD_OK;
+
+//printf("READ_PAYLOAD_OK\n");
+
+		}else if(send_info ->recv_packet_state ==READ_PAYLOAD_RUNNING){
+			send_info ->recv_packet_state = READ_PAYLOAD_OK;
+//printf("READ_PAYLOAD_OK\n");
+		}else if(send_info ->recv_packet_state ==READ_PAYLOAD_OK){
+			printf("READ_PAYLOAD_OK");
+			PAUSE
+		}
+
+		return recv_rt_val;
+
+	} else {	
+		send_info->recv_ctl_info.expect_len -= recv_rt_val;
+		send_info->recv_ctl_info.offset += recv_rt_val;
+
+		if(send_info ->recv_packet_state == READ_HEADER_READY){
+			send_info ->recv_packet_state = READ_HEADER_RUNNING;
+//printf("READ_HEADER_RUNNING\n");
+		}else if(send_info ->recv_packet_state == READ_HEADER_RUNNING){
+			send_info ->recv_packet_state = READ_HEADER_RUNNING;
+//printf("READ_HEADER_RUNNING\n");
+		}else if(send_info ->recv_packet_state == READ_HEADER_OK){
+			printf("READ_HEADER_OK");
+			PAUSE
+		}else if(send_info ->recv_packet_state ==READ_PAYLOAD_READY){
+			send_info ->recv_packet_state = READ_PAYLOAD_RUNNING;
+//printf("READ_PAYLOAD_RUNNING\n");
+		}else if(send_info ->recv_packet_state ==READ_PAYLOAD_RUNNING){
+			send_info ->recv_packet_state = READ_PAYLOAD_RUNNING;
+//printf("READ_PAYLOAD_RUNNING\n");
+		}else if(send_info ->recv_packet_state ==READ_PAYLOAD_OK){
+			printf("READ_PAYLOAD_OK");
+			PAUSE
+		}
+
+
+//		send_info->recv_ctl_info.ctl_state = RUNNING;
+		return recv_rt_val;
+	}
+
+
+}
+
+
+/*
+
 int network::nonblock_recv(int sock, Recv_nonblocking_ctl* send_info)
 {
 	int recv_rt_val;
@@ -406,6 +573,9 @@ int network::nonblock_recv(int sock, Recv_nonblocking_ctl* send_info)
 		}
 	}
 }
+
+
+*/
 
 int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 {
@@ -496,3 +666,23 @@ void network::handle_rtmp_error(int sock)
 {
 	_error_cfd->push(sock);
 }
+
+/*
+void network::set_recv_packet_state(int sock) 
+{
+			if(send_info ->recv_packet_state == READ_HEADER_READY){
+			
+			}else if(send_info ->recv_packet_state == READ_HEADER_RUNNING){
+			
+			}else if(send_info ->recv_packet_state ==READ_HEADER_OK){
+
+			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_RUNNING){
+
+			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_READY){
+
+			}else(send_info ->recv_packet_state ==READ_PAYLOAD_OK){
+
+			}
+
+}
+*/

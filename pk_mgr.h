@@ -27,7 +27,10 @@ public:
 //	list<int> outside_rescue_list;
 	list <int> streamID_list;
 	struct peer_connect_down_t *pkDownInfoPtr;
+	LARGE_INTEGER start,end;
+	volatile int Xcount ;
 
+	LARGE_INTEGER teststart,testend;
 
 	multimap <unsigned long, struct peer_info_t *> map_pid_peer_info; 	// <pid, struct peer_info_t *>
 	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		// <pid, struct peer_info_t *>
@@ -82,7 +85,7 @@ public:
 	volatile unsigned int _current_send_sequence_number; //最後送給player的seq(還沒送)
 
 	unsigned long stream_number;	//channel 下stream的個數
-	
+	map<int, struct update_stream_header *> map_streamID_header;
 	
 	pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , logger *log_ptr , configuration *prep);
 	~pk_mgr();

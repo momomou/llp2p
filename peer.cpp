@@ -199,15 +199,128 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 
 int peer::handle_pkt_in(int sock)
 {
-//	ftime(&interval_time);	//--!!0215
+
+	int offset = 0;
+	int recv_byte=0;
+	Recv_nonblocking_ctl * Recv_nonblocking_ctl_ptr =NULL;
+	struct chunk_header_t* chunk_header_ptr = NULL;
+	struct chunk_t* chunk_ptr = NULL;
+	unsigned long buf_len=0;
+
+	map<int , Recv_nonblocking_ctl * > ::iterator map_fd_nonblocking_ctl_iter;
+
+
+	map_fd_nonblocking_ctl_iter = map_fd_nonblocking_ctl.find(sock);
+	if(map_fd_nonblocking_ctl_iter != map_fd_nonblocking_ctl.end()) {
+		Recv_nonblocking_ctl_ptr = map_fd_nonblocking_ctl_iter->second;
+		if(Recv_nonblocking_ctl_ptr ->recv_packet_state == 0){
+			Recv_nonblocking_ctl_ptr ->recv_packet_state =READ_HEADER_READY ;
+		}
+
+	}else{
+		printf("Recv_nonblocking_ctl_ptr NOT FIND \n");
+		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"Recv_nonblocking_ctl_ptr NOT FIND");
+		PAUSE
+		return RET_SOCK_ERROR;
+	}
+
+
+	for(int i =0;i<5;i++){
+
+
+		if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_HEADER_READY){
+	
+		
+			chunk_header_ptr = (struct chunk_header_t *)new unsigned char[sizeof(chunk_header_t)];
+			memset(chunk_header_ptr, 0x0, sizeof(struct chunk_header_t));
+
+			Recv_nonblocking_ctl_ptr ->recv_ctl_info.offset =0 ;
+			Recv_nonblocking_ctl_ptr ->recv_ctl_info.total_len = sizeof(chunk_header_t) ;
+			Recv_nonblocking_ctl_ptr ->recv_ctl_info.expect_len = sizeof(chunk_header_t) ;
+			Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer = (char *)chunk_header_ptr ;
+
+
+		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_HEADER_RUNNING){
+
+			//do nothing
+
+		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_HEADER_OK){
+
+			buf_len = sizeof(chunk_header_t)+ ((chunk_t *)(Recv_nonblocking_ctl_ptr->recv_ctl_info.buffer)) ->header.length ;
+			chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
+
+//			printf("buf_len %d \n",buf_len);
+
+			memset(chunk_ptr, 0x0, buf_len);
+
+			memcpy(chunk_ptr,Recv_nonblocking_ctl_ptr->recv_ctl_info.buffer,sizeof(chunk_header_t));
+
+			if (Recv_nonblocking_ctl_ptr->recv_ctl_info.buffer)
+			delete [] (unsigned char*)Recv_nonblocking_ctl_ptr->recv_ctl_info.buffer ;
+
+			Recv_nonblocking_ctl_ptr ->recv_ctl_info.offset =sizeof(chunk_header_t) ;
+			Recv_nonblocking_ctl_ptr ->recv_ctl_info.total_len = chunk_ptr->header.length ;
+			Recv_nonblocking_ctl_ptr ->recv_ctl_info.expect_len = chunk_ptr->header.length ;
+			Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer = (char *)chunk_ptr ;
+
+//			printf("chunk_ptr->header.length = %d  seq = %d\n",chunk_ptr->header.length,chunk_ptr->header.sequence_number);
+			Recv_nonblocking_ctl_ptr->recv_packet_state = READ_PAYLOAD_READY ;
+
+		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_PAYLOAD_READY){
+		
+			//do nothing
+//			printf("READ_PAYLOAD_READY not here\n");
+//			PAUSE
+
+		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_PAYLOAD_RUNNING){
+	
+			//do nothing
+	
+		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_PAYLOAD_OK){
+		
+//			chunk_ptr =(chunk_t *)Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer;
+
+//			Recv_nonblocking_ctl_ptr->recv_packet_state = READ_HEADER_READY ;
+
+			break;
+		
+		}
+
+		recv_byte =_net_ptr->nonblock_recv(sock,Recv_nonblocking_ctl_ptr);
+
+
+		if(recv_byte < 0) {
+			data_close(sock, "error occured in peer recv ",DONT_CARE);
+			
+			//PAUSE
+			return RET_SOCK_ERROR;
+		}
+
+
+	}
+
+	if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_PAYLOAD_OK){
+			
+		chunk_ptr =(chunk_t *)Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer;
+
+		Recv_nonblocking_ctl_ptr->recv_packet_state = READ_HEADER_READY ;
+	
+	}else{
+	
+		//other stats
+		return RET_OK;
+
+	}
+
+
+
+/*
+
 	unsigned long buf_len;
-//	unsigned long i;
 	int recv_byte;
 	int expect_len;
 	int offset = 0;
-//	unsigned long total_bit_rate = 0;
-//	unsigned long bandwidth = 0;
-//	int different = 0;
+
 
 	struct peer_info_t *peerInfoPtr;
 
@@ -299,6 +412,11 @@ int peer::handle_pkt_in(int sock)
 
 	offset = 0;
 
+
+
+*/
+
+
 //recv ok  
 	
 //CHNK_CMD_PEER_DATA
@@ -310,47 +428,6 @@ int peer::handle_pkt_in(int sock)
 
 		//不刪除 chunk_ptr 全權由handle_stream處理
 		return RET_OK;
-	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
-//	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SYN) {	
-	//////////////////////////////////////////////////////////////////////////////////measure start delay
-//		printf("CHNK_CMD_PEER_SYN  not here peer\n");
-//		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_PEER_SYN  not here peer");
-//		PAUSE
-//		exit(1);
-	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
-
-//cmd =CHNK_CMD_PEER_BWN
-//	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_BWN) {
-
-
-
-
-//cmd = CHNK_CMD_ PEER_RSC
-//	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_RSC) {
-//hidden at 2013/01/13
-
-
-
-
-//cmd == CHNK_CMD_PEER_CUT
-//	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_CUT) {
-		//cout << "CHNK_CMD_PEER_CUT" << endl;
-
-//hidden at 2013/01/27
-
-
-
-//cmd == CHNK_CMD_PEER_LATENCY
-//	} else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_LATENCY){
-//hidden at 2013/01/16
-
-
-
-//cmd == CHNK_CMD_RT_NLM
-//    } else if(chunk_ptr->header.cmd == CHNK_CMD_RT_NLM) {	//--!! 0128
-
-//hidden at 2013/01/16
-
 
 //	just send return
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_TEST_DELAY ){
@@ -377,13 +454,7 @@ int peer::handle_pkt_in(int sock)
 			_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"REPLY  manifest =",replyManifest);
 
 			//第一個回覆的peer 放入peer_connect_down_t加入測量 並關閉其他連線和清除所有相關table
-//			unsigned long subid_replyManifest = 0;
-/*			for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
-				if(replyManifest&(1<<k)){
-					subid_replyManifest = k;
-				}
-			}
-*/
+
 			substream_first_reply_peer_iter = substream_first_reply_peer.find(replyManifest);
 			if(substream_first_reply_peer_iter == substream_first_reply_peer.end()){
 				substream_first_reply_peer[replyManifest] = true;
@@ -457,12 +528,7 @@ int peer::handle_pkt_in(int sock)
 						printf("sent to parent manifest = %d\n",peerDownInfoPtr ->peerInfo.manifest);
 						_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"first_reply_peer=",firstReplyPid,"manifest",peerDownInfoPtr ->peerInfo.manifest);
 
-							/*for(int k=0;k<_pk_mgr_ptr->sub_stream_num;k++){
-								if(peerDownInfoPtr->peerInfo.manifest & (1<<k)){
-									_pk_mgr_ptr->send_start_delay_measure_token(sock, k);
-									((_pk_mgr_ptr->delay_table)+k)->start_delay_struct.init_flag = 1 ;
-								}
-							}*/
+
 //						}
 
 
@@ -522,18 +588,7 @@ int peer::handle_pkt_in(int sock)
 		_pk_mgr_ptr->send_capacity_to_pk(_pk_mgr_ptr->_sock);
 	
 
-//	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_PARENT_CHILDREN){
-/*
-		if(chunk_ptr->header.rsv_1 == REQUEST){
-		
-			_pk_mgr_ptr->handleAppenSelfdPid(chunk_ptr);
-		
-		}else if(chunk_ptr->header.rsv_1 == REPLY && ( leastSeq_set_childrenPID == chunk_ptr ->header.sequence_number )){
-		
-			_pk_mgr_ptr->storeChildrenToSet(chunk_ptr);
-		
-		}
-*/
+
 	
 	} else {
 		printf ("%d   " , chunk_ptr->header.cmd);

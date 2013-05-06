@@ -15,6 +15,7 @@ class bit_stream_httpout:public stream {
 public:
 
 	list<int> *fd_list_ptr;
+	map<int, struct update_stream_header *>::iterator  map_streamID_header_iter;
 
 	bit_stream_httpout(int stream_id , network *net_ptr, logger *log_ptr,bit_stream_server *bit_stream_server_ptr,pk_mgr *pk_mgr_ptr, list<int> *fd_list ,int acceptfd);
 	~bit_stream_httpout();

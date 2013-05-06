@@ -14,7 +14,7 @@
 #define PARAMETER_P		2
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
-#define BUFF_SIZE		10000
+#define BUFF_SIZE		400
 #define CHUNK_LOSE		30
 
 //source delay PARAMETER
@@ -23,7 +23,7 @@
 
 //p
 //#define mode mode_HTTP // mode_BitStream
-#define mode mode_BitStream
+#define mode mode_HTTP
 
 
 #include "configuration.h"
@@ -484,8 +484,34 @@ enum pkg_nonblocking_ctl_state {
 	READ_HEADER_LAST = 3,
 	READ_HEADER_EXTEND_TIME = 4,
 	READ_BODY = 5,
-	READ_CHUNK_FINISH = 6
+	READ_CHUNK_FINISH = 6,
+
+	READ_HEADER_READY = 7,
+	READ_HEADER_RUNNING =8,
+	READ_HEADER_OK=9,
+	READ_PAYLOAD_READY =10,
+	READ_PAYLOAD_RUNNING =11,
+	READ_PAYLOAD_OK=12
+
 };
+
+
+/*
+#define READ_HEADER_TYPE		 0
+#define	READ_HEADER_CHANNEL_0	 1
+#define	READ_HEADER_CHANNEL_1	 2
+#define	READ_HEADER_LAST		 3
+#define	READ_HEADER_EXTEND_TIME  4
+#define	READ_BODY				 5
+#define	READ_CHUNK_FINISH	 	6
+
+#define	READ_HEADER_READY  7
+#define	READ_HEADER_RUNNING 8
+#define	READ_HEADER_OK 9
+#define	READ_PAYLOAD_READY 10
+#define	READ_PAYLOAD_RUNNING 11
+#define	READ_PAYLOAD_OK 12
+*/
 
 typedef struct {
 	char *buffer;
@@ -498,6 +524,7 @@ typedef struct {
 } Network_nonblocking_ctl;
 
 typedef struct {
+//	unsigned char recv_packet_state;
 	pkg_nonblocking_ctl_state recv_packet_state;
 	Network_nonblocking_ctl recv_ctl_info;
 } Recv_nonblocking_ctl;
@@ -640,7 +667,7 @@ struct rescue_update_from_server{
 	unsigned long manifest;
 };
 
-// header | self_pid | manifest | parentPID | parentPID |....
+// header | manifest | parent_num | parentPID | parentPID |....
 struct update_topology_info{
 	struct chunk_header_t header;
 	unsigned int manifest;
@@ -648,7 +675,10 @@ struct update_topology_info{
 	unsigned long parent_pid[0];
 };
 
-
+struct update_stream_header{
+	unsigned int len;
+	unsigned char header[0];
+};
 
 
 #endif

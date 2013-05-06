@@ -454,7 +454,7 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 
 	if( send_byte <= 0 ) {
 		data_close(sock, "send send_test_ delay cmd error");
-		_log_ptr->exit(0, "send send_test_ delay cmd error");
+//		_log_ptr->exit(0, "send send_test_ delay cmd error");
 	} else {
 		if(chunk_delay_ptr)
 			delete chunk_delay_ptr;
