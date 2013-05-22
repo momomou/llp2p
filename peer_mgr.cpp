@@ -84,6 +84,8 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 	//之前已經建立過連線的 在map_in_pid_fd裡面 則不再建立(保證對同個parent不再建立第二條線)
 	for(map_pid_fd_iter = peer_ptr->map_in_pid_fd.begin();map_pid_fd_iter != peer_ptr->map_in_pid_fd.end(); map_pid_fd_iter++){
 		if(map_pid_fd_iter->first == level_info_ptr->pid ){
+			printf("pid =%d already in connect find in map_in_pid_fd  testing",level_info_ptr ->pid);
+			_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_in_pid_fd testing");
 			return 1;
 		}
 	}
@@ -103,8 +105,8 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 //若在map_pid_peerDown_info 則不再次建立連線
 	pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(level_info_ptr ->pid);
 	if(pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_peerDown_info.end()){
-	printf("pid =%d already in connect find in map_pid_peerDown_info",level_info_ptr ->pid);
-	_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_peerDown_info");
+		printf("pid =%d already in connect find in map_pid_peerDown_info",level_info_ptr ->pid);
+		_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_peerDown_info");
 		return 1;
 	}
 
@@ -134,7 +136,7 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 		ip.s_addr = level_info_ptr->public_ip;
 //		selfip.s_addr = self_public_ip ;
 		printf("connect to public %s  port= %d \n", inet_ntoa(ip),level_info_ptr->tcp_port);	
-		_log_ptr->write_log_format("s =>u s u s s s u\n", __FUNCTION__,__LINE__,"connect to PID ",level_info_ptr ->pid,"private_ip",inet_ntoa (ip),"port= ",level_info_ptr->tcp_port );
+		_log_ptr->write_log_format("s =>u s u s s s u\n", __FUNCTION__,__LINE__,"connect to PID ",level_info_ptr ->pid,"public_ip",inet_ntoa (ip),"port= ",level_info_ptr->tcp_port );
 
 	}
 
@@ -421,20 +423,35 @@ void peer_mgr::set_up_public_ip(unsigned long public_ip)
 void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 {
 	int send_byte = 0;
-	char html_buf[BIG_CHUNK];
+//	char html_buf[BIG_CHUNK];
 	struct chunk_delay_test_t *chunk_delay_ptr =NULL;
 	struct timeval detail_time;
 
-	_net_ptr->set_blocking(sock);	// set to blocking
+	queue<struct chunk_t *> *queue_out_ctrl_ptr = NULL;
+	map<unsigned long, int>::iterator map_pid_fd_iter;
+	map<int, queue<struct chunk_t *> *>::iterator fd_queue_iter;
+
+
+
+	fd_queue_iter = peer_ptr->map_fd_out_ctrl.find(sock);
+	if(fd_queue_iter !=  peer_ptr ->map_fd_out_ctrl.end()){
+	queue_out_ctrl_ptr =fd_queue_iter ->second;
+	}else{
+		printf("fd not here");
+		PAUSE
+		return;
+	}
+
+//	_net_ptr->set_blocking(sock);	// set to blocking
 	
 	chunk_delay_ptr = new struct chunk_delay_test_t;
-
+	struct chunk_t * html_buf = (struct chunk_t*)new unsigned char [BIG_CHUNK];
 
 	memset(html_buf, 0x0, sizeof(html_buf));
 	memset(chunk_delay_ptr, 0x0, sizeof(struct chunk_delay_test_t));
 	
 	chunk_delay_ptr->header.cmd = CHNK_CMD_PEER_TEST_DELAY ;
-	chunk_delay_ptr->header.length = (sizeof(html_buf) -sizeof(chunk_delay_test_t)) ;	//pkt_buf paylod length
+	chunk_delay_ptr->header.length = (BIG_CHUNK -sizeof(chunk_delay_test_t)) ;	//pkt_buf paylod length
 	chunk_delay_ptr->header.rsv_1 = REQUEST ;
 	chunk_delay_ptr->header.timestamp = _log_ptr->gettimeofday_ms(&detail_time);
 	//in this test, sequence_number is empty so use sent manifest
@@ -445,13 +462,17 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 
 	memcpy(html_buf, chunk_delay_ptr, sizeof(struct chunk_delay_test_t));
 	
-	send_byte = _net_ptr->send(sock, html_buf, sizeof(html_buf), 0);
+//	send_byte = _net_ptr->send(sock, html_buf, sizeof(html_buf), 0);
+	queue_out_ctrl_ptr->push((struct chunk_t *)html_buf);
 
+	if(queue_out_ctrl_ptr->size() != 0 ) {
+		_net_ptr->epoll_control(fd_queue_iter->first, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
+	} 
 
-	printf("sent test delay OK !!\n");
+	printf("sent test delay OK !!  len = %d\n",html_buf ->header.length);
 	_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"sent test delay OK !!");
 
-
+/*
 	if( send_byte <= 0 ) {
 		data_close(sock, "send send_test_ delay cmd error");
 //		_log_ptr->exit(0, "send send_test_ delay cmd error");
@@ -460,6 +481,7 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 			delete chunk_delay_ptr;
 		_net_ptr->set_nonblocking(sock);	// set to non-blocking
 	}
+*/
 }
 
 
@@ -531,14 +553,24 @@ void peer_mgr::send_manifest_to_parent(unsigned long manifestValue,unsigned long
 	chunk_manifestSetPtr->header.rsv_1 = REQUEST ;
 	chunk_manifestSetPtr->pid = self_pid ;
 	chunk_manifestSetPtr->manifest = manifestValue ;
+
+//	_net_ptr ->set_blocking(parentSock);
+//	_net_ptr->send(parentSock,(char*)chunk_manifestSetPtr,sizeof(struct chunk_manifest_set_t),0);
+//	_net_ptr ->set_nonblocking(parentSock);
+//	if(chunk_manifestSetPtr){
+//		delete chunk_manifestSetPtr;
+//		chunk_manifestSetPtr =NULL;
+//	}
+
 	queue_out_ctrl_ptr->push((struct chunk_t *)chunk_manifestSetPtr);
 
 	if(queue_out_ctrl_ptr->size() != 0 ) {
 		_net_ptr->epoll_control(fd_queue_iter->first, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
 	} 
 
-	_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"sent to parentPid=",parentPid,"manifestValue",manifestValue);
 
+
+	_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"sent to parentPid=",parentPid,"manifestValue",manifestValue);
 	 
 }
 
@@ -569,6 +601,7 @@ void peer_mgr::handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr)
 
 	printf("children pid= %u set manifest=%d\n",rescuePeerInfoPtr ->pid,rescuePeerInfoPtr ->manifest);
 	_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"children pid=",rescuePeerInfoPtr ->pid,"set manifest=",rescuePeerInfoPtr ->manifest);
+
 
 	}else{
 	printf("handle_manifestSet what happen\n");

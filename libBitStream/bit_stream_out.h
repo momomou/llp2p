@@ -49,6 +49,7 @@ private:
 	queue<struct chunk_t *> *_queue_out_data_ptr;
 
 	unsigned long _html_size;
+	bool first_Header;
 
 	void data_close(int cfd, const char *reason);
 };

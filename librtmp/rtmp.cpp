@@ -1929,7 +1929,7 @@ void rtmp::check_SendBytesReceived(RTMP * r, int read_byte)
 }
 
 int
-rtmp::non_block_readpkg(network * net_ptr, RTMP * r, RTMPPacket * packet, Recv_nonblocking_ctl * recv_pkg_info)
+rtmp::non_block_readpkg(network * net_ptr, RTMP * r, RTMPPacket * packet, Nonblocking_Ctl * recv_pkg_info)
 {
 	static char hbuf[RTMP_MAX_HEADER_SIZE];
 	int header_size;

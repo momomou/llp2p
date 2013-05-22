@@ -155,6 +155,7 @@ public:
 
 	void peer_set(peer *peer_ptr);
 	void rtsp_viewer_set(rtsp_viewer *rtsp_viewer_ptr);
+	void time_handle();
 
 //	void rtmp_sock_set(int sock);
 
@@ -174,7 +175,7 @@ private:
 	FILE *performance_filePtr ;
 
 	unsigned long _manifest;
-
+	bool pkSendCapacity;
 
 	map<int, stream *> _map_stream_media;	// <strm_addr, stream *>
 	map<int, stream *>::iterator _map_stream_iter;	// <strm_addr, stream *>

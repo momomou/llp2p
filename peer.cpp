@@ -111,9 +111,9 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 	map_fd_out_ctrl[sock] = queue_out_ctrl_ptr;
 	map_fd_out_data[sock] = queue_out_data_ptr;
 
-	Recv_nonblocking_ctl * Recv_nonblocking_ctl_ptr = new Recv_nonblocking_ctl ;
-	memset(Recv_nonblocking_ctl_ptr, 0x0 , sizeof(Recv_nonblocking_ctl));
-	map_fd_nonblocking_ctl[sock] = Recv_nonblocking_ctl_ptr ;
+	Nonblocking_Buff * Nonblocking_Buff_ptr = new Nonblocking_Buff ;
+	memset(Nonblocking_Buff_ptr, 0x0 , sizeof(Nonblocking_Buff));
+	map_fd_nonblocking_ctl[sock] = Nonblocking_Buff_ptr ;
 //	pid_peer_info_iter = _pk_mgr_ptr->map_pid_peer_info.find(chunk_request_ptr->info.pid);	//2013/01/24
 	
 //	if(pid_peer_info_iter == _pk_mgr_ptr->map_pid_peer_info.end()) {						//2013/01/24
@@ -131,6 +131,12 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 		_pk_mgr_ptr->map_pid_rescue_peer_info[rescue_peer->pid] = rescue_peer;
 		printf("rescue_peer->pid = %d",rescue_peer->pid);
 		_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"rescue_peer->pid =",rescue_peer->pid);
+	}else{
+
+		printf("fd error why dup");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd error why dup");
+		PAUSE
+		
 	}
 //	}																			//2013/01/24
 	
@@ -150,9 +156,9 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 	if(map_pid_fd_iter == map_in_pid_fd.end())
 		map_in_pid_fd[level_info_ptr->pid] = sock;
 	
-	Recv_nonblocking_ctl * Recv_nonblocking_ctl_ptr = new Recv_nonblocking_ctl ;
-	memset(Recv_nonblocking_ctl_ptr, 0x0 , sizeof(Recv_nonblocking_ctl));
-	map_fd_nonblocking_ctl[sock] = Recv_nonblocking_ctl_ptr ;
+	Nonblocking_Buff * Nonblocking_Buff_ptr = new Nonblocking_Buff ;
+	memset(Nonblocking_Buff_ptr, 0x0 , sizeof(Nonblocking_Buff));
+	map_fd_nonblocking_ctl[sock] = Nonblocking_Buff_ptr ;
 
 
 	map_fd_pid[sock] = level_info_ptr->pid;
@@ -202,24 +208,24 @@ int peer::handle_pkt_in(int sock)
 
 	int offset = 0;
 	int recv_byte=0;
-	Recv_nonblocking_ctl * Recv_nonblocking_ctl_ptr =NULL;
+	Nonblocking_Ctl * Nonblocking_Recv_ptr =NULL;
 	struct chunk_header_t* chunk_header_ptr = NULL;
 	struct chunk_t* chunk_ptr = NULL;
 	unsigned long buf_len=0;
 
-	map<int , Recv_nonblocking_ctl * > ::iterator map_fd_nonblocking_ctl_iter;
+	map<int , Nonblocking_Buff * > ::iterator map_fd_nonblocking_ctl_iter;
 
 
 	map_fd_nonblocking_ctl_iter = map_fd_nonblocking_ctl.find(sock);
 	if(map_fd_nonblocking_ctl_iter != map_fd_nonblocking_ctl.end()) {
-		Recv_nonblocking_ctl_ptr = map_fd_nonblocking_ctl_iter->second;
-		if(Recv_nonblocking_ctl_ptr ->recv_packet_state == 0){
-			Recv_nonblocking_ctl_ptr ->recv_packet_state =READ_HEADER_READY ;
+		Nonblocking_Recv_ptr = &(map_fd_nonblocking_ctl_iter->second->nonBlockingRecv);
+		if(Nonblocking_Recv_ptr ->recv_packet_state == 0){
+			Nonblocking_Recv_ptr ->recv_packet_state =READ_HEADER_READY ;
 		}
 
 	}else{
-		printf("Recv_nonblocking_ctl_ptr NOT FIND \n");
-		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"Recv_nonblocking_ctl_ptr NOT FIND");
+		printf("Nonblocking_Buff_ptr NOT FIND \n");
+		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"Nonblocking_Buff_ptr NOT FIND");
 		PAUSE
 		return RET_SOCK_ERROR;
 	}
@@ -228,55 +234,55 @@ int peer::handle_pkt_in(int sock)
 	for(int i =0;i<5;i++){
 
 
-		if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_HEADER_READY){
+		if(Nonblocking_Recv_ptr->recv_packet_state == READ_HEADER_READY){
 	
 		
 			chunk_header_ptr = (struct chunk_header_t *)new unsigned char[sizeof(chunk_header_t)];
 			memset(chunk_header_ptr, 0x0, sizeof(struct chunk_header_t));
 
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.offset =0 ;
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.total_len = sizeof(chunk_header_t) ;
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.expect_len = sizeof(chunk_header_t) ;
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer = (char *)chunk_header_ptr ;
+			Nonblocking_Recv_ptr ->recv_ctl_info.offset =0 ;
+			Nonblocking_Recv_ptr ->recv_ctl_info.total_len = sizeof(chunk_header_t) ;
+			Nonblocking_Recv_ptr ->recv_ctl_info.expect_len = sizeof(chunk_header_t) ;
+			Nonblocking_Recv_ptr ->recv_ctl_info.buffer = (char *)chunk_header_ptr ;
 
 
-		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_HEADER_RUNNING){
+		}else if(Nonblocking_Recv_ptr->recv_packet_state == READ_HEADER_RUNNING){
 
 			//do nothing
 
-		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_HEADER_OK){
+		}else if(Nonblocking_Recv_ptr->recv_packet_state == READ_HEADER_OK){
 
-			buf_len = sizeof(chunk_header_t)+ ((chunk_t *)(Recv_nonblocking_ctl_ptr->recv_ctl_info.buffer)) ->header.length ;
+			buf_len = sizeof(chunk_header_t)+ ((chunk_t *)(Nonblocking_Recv_ptr->recv_ctl_info.buffer)) ->header.length ;
 			chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
 
 //			printf("buf_len %d \n",buf_len);
 
 			memset(chunk_ptr, 0x0, buf_len);
 
-			memcpy(chunk_ptr,Recv_nonblocking_ctl_ptr->recv_ctl_info.buffer,sizeof(chunk_header_t));
+			memcpy(chunk_ptr,Nonblocking_Recv_ptr->recv_ctl_info.buffer,sizeof(chunk_header_t));
 
-			if (Recv_nonblocking_ctl_ptr->recv_ctl_info.buffer)
-			delete [] (unsigned char*)Recv_nonblocking_ctl_ptr->recv_ctl_info.buffer ;
+			if (Nonblocking_Recv_ptr->recv_ctl_info.buffer)
+			delete [] (unsigned char*)Nonblocking_Recv_ptr->recv_ctl_info.buffer ;
 
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.offset =sizeof(chunk_header_t) ;
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.total_len = chunk_ptr->header.length ;
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.expect_len = chunk_ptr->header.length ;
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer = (char *)chunk_ptr ;
+			Nonblocking_Recv_ptr ->recv_ctl_info.offset =sizeof(chunk_header_t) ;
+			Nonblocking_Recv_ptr ->recv_ctl_info.total_len = chunk_ptr->header.length ;
+			Nonblocking_Recv_ptr ->recv_ctl_info.expect_len = chunk_ptr->header.length ;
+			Nonblocking_Recv_ptr ->recv_ctl_info.buffer = (char *)chunk_ptr ;
 
 //			printf("chunk_ptr->header.length = %d  seq = %d\n",chunk_ptr->header.length,chunk_ptr->header.sequence_number);
-			Recv_nonblocking_ctl_ptr->recv_packet_state = READ_PAYLOAD_READY ;
+			Nonblocking_Recv_ptr->recv_packet_state = READ_PAYLOAD_READY ;
 
-		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_PAYLOAD_READY){
+		}else if(Nonblocking_Recv_ptr->recv_packet_state == READ_PAYLOAD_READY){
 		
 			//do nothing
 //			printf("READ_PAYLOAD_READY not here\n");
 //			PAUSE
 
-		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_PAYLOAD_RUNNING){
+		}else if(Nonblocking_Recv_ptr->recv_packet_state == READ_PAYLOAD_RUNNING){
 	
 			//do nothing
 	
-		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_PAYLOAD_OK){
+		}else if(Nonblocking_Recv_ptr->recv_packet_state == READ_PAYLOAD_OK){
 		
 //			chunk_ptr =(chunk_t *)Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer;
 
@@ -286,7 +292,7 @@ int peer::handle_pkt_in(int sock)
 		
 		}
 
-		recv_byte =_net_ptr->nonblock_recv(sock,Recv_nonblocking_ctl_ptr);
+		recv_byte =_net_ptr->nonblock_recv(sock,Nonblocking_Recv_ptr);
 
 
 		if(recv_byte < 0) {
@@ -299,11 +305,11 @@ int peer::handle_pkt_in(int sock)
 
 	}
 
-	if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_PAYLOAD_OK){
+	if(Nonblocking_Recv_ptr->recv_packet_state == READ_PAYLOAD_OK){
 			
-		chunk_ptr =(chunk_t *)Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer;
+		chunk_ptr =(chunk_t *)Nonblocking_Recv_ptr ->recv_ctl_info.buffer;
 
-		Recv_nonblocking_ctl_ptr->recv_packet_state = READ_HEADER_READY ;
+		Nonblocking_Recv_ptr->recv_packet_state = READ_HEADER_READY ;
 	
 	}else{
 	
@@ -435,14 +441,39 @@ int peer::handle_pkt_in(int sock)
 
 		if(chunk_ptr->header.rsv_1 == REQUEST){
 
+
+			queue<struct chunk_t *> *queue_out_ctrl_ptr = NULL;
+			map<unsigned long, int>::iterator map_pid_fd_iter;
+			map<int, queue<struct chunk_t *> *>::iterator fd_queue_iter;
+
+
+
+			fd_queue_iter = map_fd_out_ctrl.find(sock);
+			if(fd_queue_iter !=  map_fd_out_ctrl.end()){
+				queue_out_ctrl_ptr =fd_queue_iter ->second;
+			}else{
+				printf("fd not here");
+				PAUSE
+					return RET_OK;
+			}
+
 			printf("CHNK_CMD_PEER_TEST_DELAY REQUEST\n");
 			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_PEER_TEST_DELAY REQUEST");
 
 
 			chunk_ptr->header.rsv_1 =REPLY;
-			_net_ptr->set_blocking(sock);
-			_net_ptr ->send (sock,(char*)chunk_ptr,sizeof(struct chunk_header_t) + chunk_ptr->header.length,0) ;
-			_net_ptr->set_nonblocking(sock);
+
+
+			queue_out_ctrl_ptr->push((struct chunk_t *)chunk_ptr);
+
+			if(queue_out_ctrl_ptr->size() != 0 ) {
+				_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
+			} 
+
+			return RET_OK;
+//			_net_ptr->set_blocking(sock);
+//			_net_ptr ->send (sock,(char*)chunk_ptr,sizeof(struct chunk_header_t) + chunk_ptr->header.length,0) ;
+//			_net_ptr->set_nonblocking(sock);
 
 		}else if(chunk_ptr->header.rsv_1 ==REPLY){
 
@@ -457,7 +488,9 @@ int peer::handle_pkt_in(int sock)
 
 			substream_first_reply_peer_iter = substream_first_reply_peer.find(replyManifest);
 			if(substream_first_reply_peer_iter == substream_first_reply_peer.end()){
-				substream_first_reply_peer[replyManifest] = true;
+				substream_first_reply_peer[replyManifest] = new manifest_timmer_flag ;
+				memset(substream_first_reply_peer[replyManifest] ,sizeof(manifest_timmer_flag),0);
+				substream_first_reply_peer[replyManifest] ->firstReplyFlag =true ;
 			}
 
 			substream_first_reply_peer_iter = substream_first_reply_peer.find(replyManifest);
@@ -467,7 +500,7 @@ int peer::handle_pkt_in(int sock)
 				exit(1);
 			}
 
-			if(substream_first_reply_peer_iter->second){
+			if(substream_first_reply_peer_iter->second->firstReplyFlag){
 
 				map_fd_pid_iter = map_fd_pid.find(sock);
 				if(map_fd_pid_iter != map_fd_pid.end()){
@@ -519,11 +552,35 @@ int peer::handle_pkt_in(int sock)
 								_pk_mgr_ptr ->send_parentToPK ( _pk_mgr_ptr ->SubstreamIDToManifest(substreamID) , PK_PID+1 );
 							}
 
-						}
+//							_pk_mgr_ptr ->send_rescueManifestToPKUpdate(0);
+
+						}/*else{
+							//如果這個 peer 來的chunk 裡的substream 從pk和這個peer都有來  (if rescue testing stream)
+							
+
+							
+								peerDownInfoPtr->outBuffCount = 0;
+								(_pk_mgr_ptr->ssDetect_ptr + _pk_mgr_ptr->manifestToSubstreamID(replyManifest)) ->isTesting =1 ;	//ture
+								printf("SSID = %d start testing stream\n",_pk_mgr_ptr->manifestToSubstreamID(replyManifest));
+								_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"start testing stream SSID = ",_pk_mgr_ptr->manifestToSubstreamID(replyManifest));
+
+								//這邊只是暫時改變PK的substream 實際上還是有串流下來
+								_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"PK old manifest",_pk_mgr_ptr->pkDownInfoPtr->peerInfo.manifest);
+								_pk_mgr_ptr->pkDownInfoPtr->peerInfo.manifest &= (~replyManifest);
+								_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"for tetsing stream PK manifest temp change to ",_pk_mgr_ptr->pkDownInfoPtr->peerInfo.manifest);
+
+								//開始testing 送topology
+								_pk_mgr_ptr->send_parentToPK ( _pk_mgr_ptr->SubstreamIDToManifest (_pk_mgr_ptr->manifestToSubstreamID(replyManifest)) , (_pk_mgr_ptr->ssDetect_ptr + temp_sub_id)->previousParentPID ); 
+
+								//testing function
+								_pk_mgr_ptr->reSet_detectionInfo();
+							
+						
+						} */
 
 
 						_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
-//						_pk_mgr_ptr->reSet_detectionInfo();
+						_pk_mgr_ptr->reSet_detectionInfo();
 
 						printf("sent to parent manifest = %d\n",peerDownInfoPtr ->peerInfo.manifest);
 						_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"first_reply_peer=",firstReplyPid,"manifest",peerDownInfoPtr ->peerInfo.manifest);
@@ -536,7 +593,7 @@ int peer::handle_pkt_in(int sock)
 							peerInfoPtr = pid_peer_info_iter->second;
 
 							if (peerInfoPtr->manifest == replyManifest){
-							//若是自己或是先前已經建立過連線的parent 則不close (會關到正常連線)  還有children (mesh會有問題!?)
+							//若是自己或是先前已經建立過連線的parent 則不close (會關到正常連線)  
 								if(pid_peer_info_iter ->first == _peer_mgr_ptr ->self_pid){
 									continue;
 								}else if(_pk_mgr_ptr ->map_pid_peerDown_info.find(pid_peer_info_iter ->first) != _pk_mgr_ptr ->map_pid_peerDown_info.end()){
@@ -574,7 +631,7 @@ int peer::handle_pkt_in(int sock)
 					}
 				}
 
-				substream_first_reply_peer_iter->second =false;
+				substream_first_reply_peer_iter->second->firstReplyFlag =false;
 			}
 
 		} // END ...  else if(chunk_ptr->header.rsv_1 ==REPLY){
@@ -584,6 +641,10 @@ int peer::handle_pkt_in(int sock)
 		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"CHNK_CMD_PEER_SET_MANIFEST");
 
 		_peer_mgr_ptr ->handle_manifestSet((struct chunk_manifest_set_t *)chunk_ptr); 
+
+		if(((struct chunk_manifest_set_t *)chunk_ptr) ->manifest ==0 ){
+			data_close(sock ,"close by Children SET Manifest = 0", CLOSE_PARENT);
+		}
 
 		_pk_mgr_ptr->send_capacity_to_pk(_pk_mgr_ptr->_sock);
 	
@@ -615,7 +676,7 @@ int peer::handle_pkt_out(int sock)
 	
 	map<int, queue<struct chunk_t *> *>::iterator fd_out_ctrl_iter;
 	map<int, queue<struct chunk_t *> *>::iterator fd_out_data_iter;
-	map<int , Recv_nonblocking_ctl * > ::iterator map_fd_nonblocking_ctl_iter;
+	map<int , Nonblocking_Buff * > ::iterator map_fd_nonblocking_ctl_iter;
 
 	map<int , unsigned long>::iterator map_fd_pid_iter;
 	map<unsigned long, int>::iterator map_pid_fd_in_iter;
@@ -624,8 +685,8 @@ int peer::handle_pkt_out(int sock)
 //	struct peer_connect_down_t* peerDownInfo ;
 	struct peer_info_t *peerInfoPtr =NULL;
 
-	Recv_nonblocking_ctl * Recv_nonblocking_ctl_ptr =NULL;
-
+	Nonblocking_Ctl * Nonblocking_Send_Data_ptr =NULL;
+	Nonblocking_Ctl * Nonblocking_Send_Ctrl_ptr =NULL;
 
 	fd_out_ctrl_iter = map_fd_out_ctrl.find(sock);
 	if(fd_out_ctrl_iter != map_fd_out_ctrl.end()) {
@@ -647,10 +708,11 @@ int peer::handle_pkt_out(int sock)
 
 	map_fd_nonblocking_ctl_iter = map_fd_nonblocking_ctl.find(sock);
 	if(map_fd_nonblocking_ctl_iter != map_fd_nonblocking_ctl.end()) {
-		Recv_nonblocking_ctl_ptr = map_fd_nonblocking_ctl_iter->second;
+		Nonblocking_Send_Data_ptr = &map_fd_nonblocking_ctl_iter->second->nonBlockingSendData;
+		Nonblocking_Send_Ctrl_ptr = &map_fd_nonblocking_ctl_iter->second->nonBlockingSendCtrl;
 	}else{
-		printf("Recv_nonblocking_ctl_ptr NOT FIND \n");
-		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"Recv_nonblocking_ctl_ptr NOT FIND");
+		printf("Nonblocking_Buff_ptr NOT FIND \n");
+		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"Nonblocking_Buff_ptr NOT FIND");
 		return RET_SOCK_ERROR;
 	}
 
@@ -680,40 +742,44 @@ int peer::handle_pkt_out(int sock)
 
 		if(queue_out_ctrl_ptr->size() != 0 && chunk_ptr == NULL) {
 
-			if(Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == READY ){
+			printf("queue_out_ctrl_ptr->size() = %d\n",queue_out_ctrl_ptr->size());
+
+			if(Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY ){
 
 				chunk_ptr = queue_out_ctrl_ptr->front();
 
-				Recv_nonblocking_ctl_ptr ->recv_ctl_info.offset =0 ;
-				Recv_nonblocking_ctl_ptr ->recv_ctl_info.total_len = chunk_ptr->header.length + sizeof(chunk_header_t) ;
-				Recv_nonblocking_ctl_ptr ->recv_ctl_info.expect_len = chunk_ptr->header.length + sizeof(chunk_header_t) ;
-				Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer = (char *)chunk_ptr ;
-				Recv_nonblocking_ctl_ptr ->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_ptr;
-				Recv_nonblocking_ctl_ptr ->recv_ctl_info.serial_num =  chunk_ptr->header.sequence_number;
+				Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.offset =0 ;
+				Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.total_len = chunk_ptr->header.length + sizeof(chunk_header_t) ;
+				Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.expect_len = chunk_ptr->header.length + sizeof(chunk_header_t) ;
+				Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.buffer = (char *)chunk_ptr ;
+				Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_ptr;
+				Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.serial_num =  chunk_ptr->header.sequence_number;
 
-				_send_byte = _net_ptr->nonblock_send(sock, & (Recv_nonblocking_ctl_ptr->recv_ctl_info ));
+				printf("cmd= %d total_len = %d\n",chunk_ptr->header.cmd,chunk_ptr->header.length );
+
+				_send_byte = _net_ptr->nonblock_send(sock, & (Nonblocking_Send_Ctrl_ptr->recv_ctl_info ));
 
 //				_send_byte = send(sock, (char *)chunk_ptr+_offset, _expect_len, 0);
 
 				if(_send_byte < 0) {
-					data_close(sock, "error occured in send queue_out_ctrl",DONT_CARE);
+					data_close(sock, "error occured in send  READY queue_out_ctrl",DONT_CARE);
 					return RET_SOCK_ERROR;
 
-				} else if(Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == READY ){
+				} else if(Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY ){
 						queue_out_ctrl_ptr->pop();
 						if(chunk_ptr)
 							delete chunk_ptr;
 						chunk_ptr = NULL;
 					}
 
-			}else if (Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == RUNNING ){
-				_send_byte = _net_ptr->nonblock_send(sock, & (Recv_nonblocking_ctl_ptr->recv_ctl_info ));
+			}else if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == RUNNING ){
+				_send_byte = _net_ptr->nonblock_send(sock, & (Nonblocking_Send_Ctrl_ptr->recv_ctl_info ));
 			
 				if(_send_byte < 0) {
-						data_close(sock, "error occured in send queue_out_data",DONT_CARE);
+						data_close(sock, "error occured in send RUNNING queue_out_data",DONT_CARE);
 						//PAUSE
 						return RET_SOCK_ERROR;
-				}else if (Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == READY){
+				}else if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY){
 					queue_out_data_ptr->pop();
 					if(chunk_ptr)
 						delete chunk_ptr;
@@ -724,7 +790,13 @@ int peer::handle_pkt_out(int sock)
 		// DATA
 		} else if(queue_out_data_ptr->size() != 0) {
 
-			if(Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == READY ){
+			if(queue_out_data_ptr->size() >100){
+				printf("queue_out_data_ptr->size() = %d",queue_out_data_ptr->size());
+				_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"queue_out_data_ptr->size() =",queue_out_data_ptr->size());
+
+			}
+
+			if(Nonblocking_Send_Data_ptr ->recv_ctl_info.ctl_state == READY ){
 
 				chunk_ptr = queue_out_data_ptr->front();
 
@@ -732,46 +804,55 @@ int peer::handle_pkt_out(int sock)
 //////////////////////////////////////////////////////////////////////////////
 
 				if(peerInfoPtr){
-					//如果現在manifest 的值已經沒有要送了  則略過這個
-					if (!(peerInfoPtr ->manifest & (_pk_mgr_ptr ->SubstreamIDToManifest ( (chunk_ptr->header.sequence_number % _pk_mgr_ptr ->sub_stream_num)) ) )){
-						if(queue_out_data_ptr->size() !=0)
-							queue_out_data_ptr ->pop() ;
-						chunk_ptr = queue_out_data_ptr->front();
-						//continue ;
-	//					PAUSE
+
+					while(1){
+						//如果現在manifest 的值已經沒有要送了  則略過這個
+						if (!(peerInfoPtr ->manifest & (_pk_mgr_ptr ->SubstreamIDToManifest ( (chunk_ptr->header.sequence_number % _pk_mgr_ptr ->sub_stream_num)) ) )){
+							if(queue_out_data_ptr->size() !=0){
+								queue_out_data_ptr ->pop() ;
+								chunk_ptr = queue_out_data_ptr->front();
+								continue ;
+							}else{
+								return RET_OK;
+							}
+
+							//有要送
+						}else{
+							break;
+						}
 					}
 				}
 
 //////////////////////////////////////////////////////////////////////////////
 
-				Recv_nonblocking_ctl_ptr ->recv_ctl_info.offset =0 ;
-				Recv_nonblocking_ctl_ptr ->recv_ctl_info.total_len = chunk_ptr->header.length + sizeof(chunk_header_t) ;
-				Recv_nonblocking_ctl_ptr ->recv_ctl_info.expect_len = chunk_ptr->header.length + sizeof(chunk_header_t) ;
-				Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer = (char *)chunk_ptr ;
-				Recv_nonblocking_ctl_ptr ->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_ptr;
-				Recv_nonblocking_ctl_ptr ->recv_ctl_info.serial_num =  chunk_ptr->header.sequence_number;
+				Nonblocking_Send_Data_ptr ->recv_ctl_info.offset =0 ;
+				Nonblocking_Send_Data_ptr ->recv_ctl_info.total_len = chunk_ptr->header.length + sizeof(chunk_header_t) ;
+				Nonblocking_Send_Data_ptr ->recv_ctl_info.expect_len = chunk_ptr->header.length + sizeof(chunk_header_t) ;
+				Nonblocking_Send_Data_ptr ->recv_ctl_info.buffer = (char *)chunk_ptr ;
+				Nonblocking_Send_Data_ptr ->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_ptr;
+				Nonblocking_Send_Data_ptr ->recv_ctl_info.serial_num =  chunk_ptr->header.sequence_number;
 
-				_send_byte = _net_ptr->nonblock_send(sock, & (Recv_nonblocking_ctl_ptr->recv_ctl_info ));
+				_send_byte = _net_ptr->nonblock_send(sock, & (Nonblocking_Send_Data_ptr->recv_ctl_info ));
 
 
 				if(_send_byte < 0) {
 					data_close(sock, "error occured in send queue_out_data",DONT_CARE);
 					//PAUSE
 					return RET_SOCK_ERROR;
-				} else if(Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == READY ){
+				} else if(Nonblocking_Send_Data_ptr ->recv_ctl_info.ctl_state == READY ){
 					queue_out_data_ptr->pop();
 					chunk_ptr = NULL;
 				}
 
-			}else if (Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == RUNNING){
+			}else if (Nonblocking_Send_Data_ptr ->recv_ctl_info.ctl_state == RUNNING){
 		
-				_send_byte = _net_ptr->nonblock_send(sock, & (Recv_nonblocking_ctl_ptr->recv_ctl_info ));
+				_send_byte = _net_ptr->nonblock_send(sock, & (Nonblocking_Send_Data_ptr->recv_ctl_info ));
 			
 				if(_send_byte < 0) {
 						data_close(sock, "error occured in send queue_out_data",DONT_CARE);
 						//PAUSE
 						return RET_SOCK_ERROR;
-				}else if (Recv_nonblocking_ctl_ptr ->recv_ctl_info.ctl_state == READY){
+				}else if (Nonblocking_Send_Data_ptr ->recv_ctl_info.ctl_state == READY){
 					queue_out_data_ptr->pop();
 					chunk_ptr = NULL;
 				}
@@ -819,7 +900,7 @@ void peer::data_close(int cfd, const char *reason ,int type)
 	map<int, queue<struct chunk_t *> *>::iterator map_fd_queue_iter;
 	map<int , unsigned long>::iterator map_fd_pid_iter;
 	map<unsigned long, int>::iterator map_pid_fd_iter;
-	map<int , Recv_nonblocking_ctl * > ::iterator map_fd_nonblocking_ctl_iter;
+	map<int , Nonblocking_Buff * > ::iterator map_fd_nonblocking_ctl_iter;
 //	multimap <unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 
@@ -840,7 +921,8 @@ void peer::data_close(int cfd, const char *reason ,int type)
 
 	unsigned long  testingManifest=0;
 	for(unsigned long i =0  ; i < _pk_mgr_ptr ->sub_stream_num;i++){
-		if(  ((_pk_mgr_ptr->ssDetect_ptr) + i) ->isTesting ){
+//		if(  ((_pk_mgr_ptr->ssDetect_ptr) + i) ->isTesting ){
+		if(!(_pk_mgr_ptr ->check_rescue_state(i,0))){
 			testingManifest |= _pk_mgr_ptr ->SubstreamIDToManifest(i);
 		}
 	}

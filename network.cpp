@@ -343,7 +343,7 @@ int network::close(int sock)
 
 //這邊的nonblocking recv 沿用rtmp 原本Recv_nonblocking_ctl的定義方式 重新刻的
 //狀態必須是READY or RUNNING 才能用這個function
-int network::nonblock_recv(int sock, Recv_nonblocking_ctl* send_info)
+int network::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 {
 	int recv_rt_val;
 
@@ -506,76 +506,6 @@ int network::nonblock_recv(int sock, Recv_nonblocking_ctl* send_info)
 }
 
 
-/*
-
-int network::nonblock_recv(int sock, Recv_nonblocking_ctl* send_info)
-{
-	int recv_rt_val;
-	if (send_info->recv_ctl_info.ctl_state == READY) {
-		recv_rt_val = recv(sock, send_info->recv_ctl_info.buffer + send_info->recv_ctl_info.offset, send_info->recv_ctl_info.expect_len, 0);
-		//DBG_PRINTF("%s: send_rt = %d, expect_len = %d", __FUNCTION__, send_rt_val, send_info->expect_len);
-	
-		if (recv_rt_val < 0) {
-			if (errno == EINTR || errno == EAGAIN) {		 //這邊寫得怪怪的
-				send_info->recv_ctl_info.ctl_state = RUNNING;
-				return RET_OK;
-			} else {
-				return RET_SOCK_ERROR;
-			}
-		} else if (recv_rt_val == 0) {
-			cout << "recv 0 byte from sock: " << sock << ", expect len = " << send_info->recv_ctl_info.expect_len << endl;
-			if (send_info->recv_ctl_info.expect_len == 0) {
-				send_info->recv_ctl_info.ctl_state = READY;
-				return RET_OK;
-			} else {
-				send_info->recv_ctl_info.ctl_state = RUNNING;
-				return RET_OK;
-			}
-		}
-		else if (recv_rt_val == send_info->recv_ctl_info.expect_len) {
-			return recv_rt_val;
-		} else {	
-			send_info->recv_ctl_info.expect_len -= recv_rt_val;
-			send_info->recv_ctl_info.offset += recv_rt_val;
-			send_info->recv_ctl_info.ctl_state = RUNNING;
-			return recv_rt_val;
-		}
-	} else { //_send_ctl_info._send_ctl_state is RUNNING
-		//DBG_PRINTF("In RUNNING state\n");
-		recv_rt_val = recv(sock, send_info->recv_ctl_info.buffer + send_info->recv_ctl_info.offset, send_info->recv_ctl_info.expect_len, 0);
-		
-		//Log(LOGDEBUG, "%s: offset = %d, send_rt_val = %d, expect_len = %d", __FUNCTION__, _send_ctl_info.offset, send_rt_val, _send_ctl_info.expect_len);
-		if (recv_rt_val < 0) {
-			if ( errno == EINTR || errno == EAGAIN) {
-				send_info->recv_ctl_info.ctl_state = RUNNING;
-				return RET_OK;
-			} else {
-				return RET_SOCK_ERROR;
-			}
-		} else if (recv_rt_val == 0) {
-			cout << "recv 0 byte from sock: " << sock << ", expect len = " << send_info->recv_ctl_info.expect_len << endl;
-			if (send_info->recv_ctl_info.expect_len == 0) {
-				send_info->recv_ctl_info.ctl_state = READY;
-				return RET_OK;
-			} else {
-				send_info->recv_ctl_info.ctl_state = RUNNING;
-				return RET_OK;
-			}
-		}
-		else if (recv_rt_val == send_info->recv_ctl_info.expect_len) {
-			send_info->recv_ctl_info.ctl_state = READY;
-			return recv_rt_val;
-		} else {	
-			send_info->recv_ctl_info.expect_len -= recv_rt_val;
-			send_info->recv_ctl_info.offset += recv_rt_val;
-			send_info->recv_ctl_info.ctl_state = RUNNING;
-			return recv_rt_val;
-		}
-	}
-}
-
-
-*/
 
 int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 {
@@ -667,22 +597,3 @@ void network::handle_rtmp_error(int sock)
 	_error_cfd->push(sock);
 }
 
-/*
-void network::set_recv_packet_state(int sock) 
-{
-			if(send_info ->recv_packet_state == READ_HEADER_READY){
-			
-			}else if(send_info ->recv_packet_state == READ_HEADER_RUNNING){
-			
-			}else if(send_info ->recv_packet_state ==READ_HEADER_OK){
-
-			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_RUNNING){
-
-			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_READY){
-
-			}else(send_info ->recv_packet_state ==READ_PAYLOAD_OK){
-
-			}
-
-}
-*/

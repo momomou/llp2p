@@ -1,25 +1,29 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+//handle stream buff(少一兩個), check state(unknow states) , rescue testing states 2 to 1 ,lose packet rescue
 
 #define FD_SETSIZE		2048
 ////resuce PARAMETER////
-#define PARAMETER_X		25
+#define PARAMETER_X		5
 #define PK_PID			999999
 #define BIG_CHUNK	512
 
+//ms
+#define CONNECT_TIME_OUT 5000
+
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
 #define PARAMETER_M		8
-#define PARAMETER_N		4
-#define PARAMETER_P		2
+#define PARAMETER_N		5
+#define PARAMETER_P		3
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
-#define BUFF_SIZE		400
+#define BUFF_SIZE		800
 #define CHUNK_LOSE		30
 
 //source delay PARAMETER
-#define MAX_DELAY 2000
-#define SOURCE_DELAY_CONTINUOUS 5
+#define MAX_DELAY 4000
+#define SOURCE_DELAY_CONTINUOUS 10
 
 //p
 //#define mode mode_HTTP // mode_BitStream
@@ -523,11 +527,18 @@ typedef struct {
 	network_nonblocking_ctl_state ctl_state;
 } Network_nonblocking_ctl;
 
-typedef struct {
+typedef struct nonblocking_ctrl{
 //	unsigned char recv_packet_state;
 	pkg_nonblocking_ctl_state recv_packet_state;
 	Network_nonblocking_ctl recv_ctl_info;
-} Recv_nonblocking_ctl;
+} Nonblocking_Ctl;
+
+
+ typedef struct nonblocking_buff{
+	struct nonblocking_ctrl nonBlockingRecv;
+	struct nonblocking_ctrl nonBlockingSendData;
+	struct nonblocking_ctrl nonBlockingSendCtrl;
+ } Nonblocking_Buff;
 
 struct chunk_level_msg_t {
 	struct chunk_header_t header;
@@ -676,8 +687,17 @@ struct update_topology_info{
 };
 
 struct update_stream_header{
-	unsigned int len;
+	int len;
 	unsigned char header[0];
+};
+
+
+struct manifest_timmer_flag{
+	unsigned long	firstReplyFlag;
+	unsigned long	networkTimeOutFlag;
+	unsigned long	connectTimeOutFlag;
+	LARGE_INTEGER	networkTimeOut;
+	LARGE_INTEGER	connectTimeOut;
 };
 
 

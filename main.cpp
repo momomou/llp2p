@@ -274,7 +274,8 @@ int main(int argc, char **argv)
 //		Sleep(1);
 
 //		pk_mgr_ptr->threadFree(MAIN_LOCKER);
-
+		
+		pk_mgr_ptr->time_handle();
 	}
 
 	net_ptr->garbage_collection();

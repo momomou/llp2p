@@ -15,8 +15,8 @@ class peer:public basic_class {
 public:
 
 
-	map<unsigned long, bool> substream_first_reply_peer;
-	map<unsigned long, bool>::iterator substream_first_reply_peer_iter;
+	map<unsigned long, manifest_timmer_flag *> substream_first_reply_peer;
+	map<unsigned long, manifest_timmer_flag *>::iterator substream_first_reply_peer_iter;
 	unsigned long firstReplyPid;
 	unsigned int leastSeq_set_childrenPID;
 
@@ -28,7 +28,7 @@ public:
 	map<unsigned long, int> map_in_pid_fd;
 	map<unsigned long, int> map_out_pid_fd;
 	map<int , unsigned long> map_fd_pid;
-	map<int , Recv_nonblocking_ctl * > map_fd_nonblocking_ctl;
+	map<int , Nonblocking_Buff * > map_fd_nonblocking_ctl;
 //	set<unsigned long> set_childrenPID;
 
 	list<int> *fd_list_ptr;
@@ -74,7 +74,7 @@ private:
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 	map<unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
 //	set<unsigned long>::iterator set_childrenPID_iter;
-	map<int , Recv_nonblocking_ctl * > ::iterator map_fd_nonblocking_ctl_iter;
+	map<int , Nonblocking_Buff * > ::iterator map_fd_nonblocking_ctl_iter;
 
 	struct peer_info_t *peerInfoPtr ;
 	struct peer_connect_down_t *peerDownInfoPtr;

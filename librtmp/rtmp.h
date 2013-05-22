@@ -311,7 +311,7 @@ public:
 	bool RTMP_Connect1(RTMP *r, RTMPPacket *cp);
 	bool RTMP_Serve(RTMP *r);
 
-	int non_block_readpkg(network * net_ptr, RTMP * r, RTMPPacket * packet, Recv_nonblocking_ctl * recv_pkg_info);
+	int non_block_readpkg(network * net_ptr, RTMP * r, RTMPPacket * packet, Nonblocking_Ctl * recv_pkg_info);
 
 	bool RTMP_ReadPacket(RTMP * r, RTMPPacket * packet);
 	bool RTMP_SendPacket(RTMP * r, RTMPPacket * packet, bool queue);

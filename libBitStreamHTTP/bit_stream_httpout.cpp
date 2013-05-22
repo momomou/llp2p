@@ -7,8 +7,8 @@
 
 
 const	char httpHeader[]=	"HTTP/1.1 200 OK\r\n" \
-							"Date: Mon, 22 Oct 2012 18:46:42 GMT"\
-							"Server: Apache/2.2.8 (Win32) PHP/5.2.6"\
+							"Date: Mon, 22 Oct 2012 18:46:42 GMT\r\n"\
+							"Server: Apache/2.2.8 (Win32) PHP/5.2.6\r\n"\
 							"Connection: close\r\n"\
 							"Content-Type: application/octet-stream\r\n"\
 							"\r\n";
@@ -132,9 +132,17 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 		}
 		cout << "send_FLVHeaderBytes=" << sendHeaderBytes<<endl;
 
+
+		printf("protocol_header ->len %d \n",protocol_header ->len);
+		if(protocol_header ->len >0){
+
 		sendHeaderBytes = _net_ptr ->send(sock,(char *)protocol_header->header,protocol_header ->len,0);
 		cout << "send_FLVHeaderBytes=" << sendHeaderBytes<<endl;
+		}
+
 		first_HTTP_Header =false;
+
+
 	}
 
 

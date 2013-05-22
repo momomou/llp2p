@@ -42,7 +42,7 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 	full_manifest =0 ;
 	threadLockKey = FREE ;
 	Xcount =100;
-
+	pkSendCapacity =false;
 	//
 //	pkmgrfile_ptr = fopen("./HEREin" , "wb");
 	//	 _log_measureDataPtr =new 
@@ -202,15 +202,18 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 			//			printf("differ : %ld source_delay_detection sub id : %d\n",diff_temp,sub_id);
 
 			if(diff_temp < 0){
+
+				if(totalMod >= (syn_round_time /*/2*/)){
+					printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+				}else{
 				printf("diff error in source_delay_detection\n");
 				printf("differ : %ld ",diff_temp);
 				printf("syn_round : %ld\n",syn_round_time);
 				printf("syn_table.client_abs_start_time : %ld\n",syn_table.client_abs_start_time);
 				syn_table.client_abs_start_time = syn_table.client_abs_start_time + (unsigned long)abs(diff_temp);
 				totalMod +=  (unsigned long)abs(diff_temp) ;
-				if(totalMod >= (syn_round_time /2)){
-					printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 				}
+
 				printf("syn_table.client_abs_start_time : %ld\n",syn_table.client_abs_start_time);
 				delay_table_iter->second->delay_beyond_count = 0;
 				//PAUSE
@@ -226,14 +229,15 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 
 					//找出所有正在測試的substream
 					for(unsigned long i =0  ; i < sub_stream_num;i++){
-						if ((ssDetect_ptr + i) ->isTesting ){
+//						if ((ssDetect_ptr + i) ->isTesting ){
+						if(!(check_rescue_state(i,0))){
 							testingManifest |= SubstreamIDToManifest(i);
 						}
 					}
 					//找出這個peer 所有正在testing 的substream ID
 					peerTestingManifest = (testingManifest & pid_peerDown_info_iter->second->peerInfo.manifest);
 
-					_log_ptr->write_log_format("s =>u s u s u s \n", __FUNCTION__,__LINE__,"pid ",pid_peerDown_info_iter->second->peerInfo.pid ," need cut",sub_id,"substream id and need rescue");
+					_log_ptr->write_log_format("s =>u s u s u s \n", __FUNCTION__,__LINE__,"pid ",pid_peerDown_info_iter->second->peerInfo.pid ," need cut substream id",sub_id," and need rescue");
 
 
 
@@ -242,13 +246,13 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 						_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"Provider is PK can not rescue");
 
 
-					}else if(peerTestingManifest){
+					}else if(peerTestingManifest & SubstreamIDToManifest(sub_id)){
 						printf("differ : %ld need to rescue source_delay_detection\n",diff_temp);
 						printf("sub stream : %ld pid : %d need to rescue source_delay_detection\n",sub_id,pid_peerDown_info_iter->second->peerInfo.pid);
-						printf("The substream is testing!!!!!\n",sub_id,pid_peerDown_info_iter->second->peerInfo.pid);
+		//				printf("The substream is testing!!!!!\n",sub_id,pid_peerDown_info_iter->second->peerInfo.pid);
 						//若有多個正在測試中一次只選擇一個substream cut(最右邊的)  並且重設全部記數器的count
-						testingSubStreamID = manifestToSubstreamID (peerTestingManifest);
-						_log_ptr->write_log_format("s =>u s u s u s u \n", __FUNCTION__,__LINE__,"stream testing fail peerTestingManifest ",peerTestingManifest,"select manifest = ", manifestToSubstreamID (peerTestingManifest),"testingSubStreamID",testingSubStreamID);
+						testingSubStreamID =sub_id ; //manifestToSubstreamID (peerTestingManifest);
+						_log_ptr->write_log_format("s =>u s u s u s u \n", __FUNCTION__,__LINE__,"stream testing fail peerTestingManifest ",peerTestingManifest,"select manifest (SBID)= ", manifestToSubstreamID (peerTestingManifest),"testingSubStreamID",testingSubStreamID);
 
 						(ssDetect_ptr + testingSubStreamID) ->isTesting =0 ;  //false  
 
@@ -289,22 +293,24 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 						}
 
 						printf("stream testing fail \n");
-						//_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"stream testing fail ");
+						_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"stream testing fail ");
+
+						//normal rescue
 						}else{
 						printf("differ : %ld need to rescue source_delay_detection\n",diff_temp);
 						printf("sub stream : %ld pid : %d need to rescue source_delay_detection\n",sub_id,pid_peerDown_info_iter->second->peerInfo.pid);
 						printf("normal rescue \n");
 						_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"normal rescue ");
 
-						afterManifest = manifestFactory (pid_peerDown_info_iter->second->peerInfo.manifest , 1);
+						afterManifest = (pid_peerDown_info_iter->second->peerInfo.manifest & (~SubstreamIDToManifest(sub_id))) ;//manifestFactory (pid_peerDown_info_iter->second->peerInfo.manifest , 1);
 						pkDownInfoPtr ->peerInfo.manifest |=(pid_peerDown_info_iter->second->peerInfo.manifest &(~afterManifest) );
 
 						//這邊可能因為有些stream 正在testing 而沒有flag 因此傳出去的需要再跟testing 的合起來
-						_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__," old PK manifest ",pkDownInfoPtr ->peerInfo.manifest);
+						_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"  PK manifest ",pkDownInfoPtr ->peerInfo.manifest);
 						send_rescueManifestToPK(pkDownInfoPtr ->peerInfo.manifest | testingManifest);
 						_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"PK manifest +testing manifest sent to PK ",pkDownInfoPtr ->peerInfo.manifest);
 
-						printf("original manifest %d after cut manifest %d  PK manifest=%d \n",pid_peerDown_info_iter->second->peerInfo.manifest,afterManifest,pkDownInfoPtr ->peerInfo.manifest );
+						printf("peer original manifest %d after cut, manifest %d  PK manifest=%d \n",pid_peerDown_info_iter->second->peerInfo.manifest,afterManifest,pkDownInfoPtr ->peerInfo.manifest );
 						_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__,"original manifest",pid_peerDown_info_iter->second->peerInfo.manifest,"after cut manifest",afterManifest," PK manifest= ",pkDownInfoPtr ->peerInfo.manifest);
 
 						tempManifest =(pid_peerDown_info_iter->second->peerInfo.manifest &(~afterManifest)) ;
@@ -544,9 +550,9 @@ void pk_mgr::init()
 	_peer_ptr ->map_fd_out_ctrl[_sock] = queue_out_ctrl_ptr;
 	_peer_ptr ->map_fd_out_data[_sock] = queue_out_data_ptr;
 
-	Recv_nonblocking_ctl * Recv_nonblocking_ctl_ptr = new Recv_nonblocking_ctl ;
-	memset(Recv_nonblocking_ctl_ptr, 0x0 , sizeof(Recv_nonblocking_ctl));
-	_peer_ptr ->map_fd_nonblocking_ctl[_sock] = Recv_nonblocking_ctl_ptr ;
+	Nonblocking_Buff * Nonblocking_Buff_ptr = new Nonblocking_Buff ;
+	memset(Nonblocking_Buff_ptr, 0x0 , sizeof(Nonblocking_Buff));
+	_peer_ptr ->map_fd_nonblocking_ctl[_sock] = Nonblocking_Buff_ptr ;
 
 	if (handle_register(svc_tcp_port, svc_udp_port)) {
 		cout << "pk_mgr handle_ register() success" << endl;
@@ -710,7 +716,8 @@ while(1){
 
 	int offset = 0;
 	int recv_byte=0;
-	Recv_nonblocking_ctl * Recv_nonblocking_ctl_ptr =NULL;
+	Nonblocking_Ctl * Nonblocking_Recv_Ctl_ptr =NULL;
+
 	struct chunk_header_t* chunk_header_ptr = NULL;
 	struct chunk_t* chunk_ptr = NULL;
 	unsigned long buf_len=0;
@@ -721,18 +728,18 @@ while(1){
 	struct peer_info_t *new_peer = NULL;
 	struct peer_info_t *child_peer = NULL;
 
-	map<int , Recv_nonblocking_ctl * > ::iterator map_fd_nonblocking_ctl_iter;
+	map<int , Nonblocking_Buff * > ::iterator map_fd_nonblocking_ctl_iter;
 
 	map_fd_nonblocking_ctl_iter = _peer_ptr->map_fd_nonblocking_ctl.find(sock);
 	if(map_fd_nonblocking_ctl_iter !=  _peer_ptr->map_fd_nonblocking_ctl.end()) {
-		Recv_nonblocking_ctl_ptr = map_fd_nonblocking_ctl_iter->second;
-		if(Recv_nonblocking_ctl_ptr ->recv_packet_state == 0){
-			Recv_nonblocking_ctl_ptr ->recv_packet_state =READ_HEADER_READY ;
+		Nonblocking_Recv_Ctl_ptr = &(map_fd_nonblocking_ctl_iter->second ->nonBlockingRecv);
+		if(Nonblocking_Recv_Ctl_ptr ->recv_packet_state == 0){
+			Nonblocking_Recv_Ctl_ptr ->recv_packet_state =READ_HEADER_READY ;
 		}
 
 	}else{
-		printf("Recv_nonblocking_ctl_ptr NOT FIND \n");
-		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"Recv_nonblocking_ctl_ptr NOT FIND");
+		printf("Nonblocking_Recv_Ctl_ptr NOT FIND \n");
+		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"Nonblocking_Recv_Ctl_ptr NOT FIND");
 		PAUSE
 			return RET_SOCK_ERROR;
 	}
@@ -741,53 +748,53 @@ while(1){
 		for(int i =0;i<5;i++){
 
 
-		if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_HEADER_READY){
+		if(Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_HEADER_READY){
 	
 		
 			chunk_header_ptr = (struct chunk_header_t *)new unsigned char[sizeof(chunk_header_t)];
 			memset(chunk_header_ptr, 0x0, sizeof(struct chunk_header_t));
 
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.offset =0 ;
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.total_len = sizeof(chunk_header_t) ;
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.expect_len = sizeof(chunk_header_t) ;
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer = (char *)chunk_header_ptr ;
+			Nonblocking_Recv_Ctl_ptr ->recv_ctl_info.offset =0 ;
+			Nonblocking_Recv_Ctl_ptr ->recv_ctl_info.total_len = sizeof(chunk_header_t) ;
+			Nonblocking_Recv_Ctl_ptr ->recv_ctl_info.expect_len = sizeof(chunk_header_t) ;
+			Nonblocking_Recv_Ctl_ptr ->recv_ctl_info.buffer = (char *)chunk_header_ptr ;
 
 
-		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_HEADER_RUNNING){
+		}else if(Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_HEADER_RUNNING){
 
 			//do nothing
 
-		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_HEADER_OK){
+		}else if(Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_HEADER_OK){
 
-			buf_len = sizeof(chunk_header_t)+ ((chunk_t *)(Recv_nonblocking_ctl_ptr->recv_ctl_info.buffer)) ->header.length ;
+			buf_len = sizeof(chunk_header_t)+ ((chunk_t *)(Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer)) ->header.length ;
 			chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
 
 //			printf("buf_len %d \n",buf_len);
 
 			memset(chunk_ptr, 0x0, buf_len);
 
-			memcpy(chunk_ptr,Recv_nonblocking_ctl_ptr->recv_ctl_info.buffer,sizeof(chunk_header_t));
+			memcpy(chunk_ptr,Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer,sizeof(chunk_header_t));
 
-			if (Recv_nonblocking_ctl_ptr->recv_ctl_info.buffer)
-			delete [] (unsigned char*)Recv_nonblocking_ctl_ptr->recv_ctl_info.buffer ;
+			if (Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer)
+			delete [] (unsigned char*)Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer ;
 
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.offset =sizeof(chunk_header_t) ;
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.total_len = chunk_ptr->header.length ;
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.expect_len = chunk_ptr->header.length ;
-			Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer = (char *)chunk_ptr ;
+			Nonblocking_Recv_Ctl_ptr ->recv_ctl_info.offset =sizeof(chunk_header_t) ;
+			Nonblocking_Recv_Ctl_ptr ->recv_ctl_info.total_len = chunk_ptr->header.length ;
+			Nonblocking_Recv_Ctl_ptr ->recv_ctl_info.expect_len = chunk_ptr->header.length ;
+			Nonblocking_Recv_Ctl_ptr ->recv_ctl_info.buffer = (char *)chunk_ptr ;
 
 //			printf("chunk_ptr->header.length = %d  seq = %d\n",chunk_ptr->header.length,chunk_ptr->header.sequence_number);
-			Recv_nonblocking_ctl_ptr->recv_packet_state = READ_PAYLOAD_READY ;
+			Nonblocking_Recv_Ctl_ptr->recv_packet_state = READ_PAYLOAD_READY ;
 
-		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_PAYLOAD_READY){
+		}else if(Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_PAYLOAD_READY){
 		
 			//do nothing
 
-		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_PAYLOAD_RUNNING){
+		}else if(Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_PAYLOAD_RUNNING){
 	
 			//do nothing
 	
-		}else if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_PAYLOAD_OK){
+		}else if(Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_PAYLOAD_OK){
 		
 //			chunk_ptr =(chunk_t *)Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer;
 
@@ -798,7 +805,7 @@ while(1){
 		}
 
 
-		recv_byte =_net_ptr->nonblock_recv(sock,Recv_nonblocking_ctl_ptr);
+		recv_byte =_net_ptr->nonblock_recv(sock,Nonblocking_Recv_Ctl_ptr);
 
 
 		if(recv_byte < 0) {
@@ -814,11 +821,11 @@ while(1){
 			
 
 
-	if(Recv_nonblocking_ctl_ptr->recv_packet_state == READ_PAYLOAD_OK){
+	if(Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_PAYLOAD_OK){
 			
-		chunk_ptr =(chunk_t *)Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer;
+		chunk_ptr =(chunk_t *)Nonblocking_Recv_Ctl_ptr ->recv_ctl_info.buffer;
 
-		Recv_nonblocking_ctl_ptr->recv_packet_state = READ_HEADER_READY ;
+		Nonblocking_Recv_Ctl_ptr->recv_packet_state = READ_HEADER_READY ;
 
 		buf_len =  sizeof(struct chunk_header_t) +  chunk_ptr->header.length ;
 	
@@ -1003,11 +1010,24 @@ while(1){
 		send_capacity_init();
 		syn_table_init(_sock);
 
+		_peer_ptr->substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer.find(full_manifest);
+		if(_peer_ptr->substream_first_reply_peer_iter == _peer_ptr->substream_first_reply_peer.end()){
+			_peer_ptr->substream_first_reply_peer[full_manifest] = new manifest_timmer_flag;
+			memset(_peer_ptr->substream_first_reply_peer[full_manifest] ,0x0 ,sizeof(struct manifest_timmer_flag));
+		}
+
+		_peer_ptr->substream_first_reply_peer[full_manifest] ->connectTimeOutFlag =true ;
+		_peer_ptr->substream_first_reply_peer[full_manifest] ->firstReplyFlag =true ;
+		_peer_ptr->substream_first_reply_peer[full_manifest] ->networkTimeOutFlag =true;
+
+		
+
 		//和lane 每個peer 先建立好連線 
 		if(lane_member >= 1){
 			_peer_mgr_ptr->connect_peer(level_msg_ptr, level_msg_ptr->pid);
 
-			_peer_mgr_ptr->handle_test_delay(tempManifes);
+		_log_ptr ->getTickTime(&_peer_ptr->substream_first_reply_peer[full_manifest]->connectTimeOut ) ;
+//			_peer_mgr_ptr->handle_test_delay(tempManifes);
 		}
 
 
@@ -1055,6 +1075,8 @@ while(1){
 		set_rescue_state(temp_rescue_sub_id,2);
 
 
+
+
 		lane_member = (buf_len - sizeof(struct chunk_header_t) - sizeof(unsigned long) - sizeof(unsigned long)) / sizeof(struct level_info_t);
 		level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + lane_member * sizeof(struct level_info_t *);
 
@@ -1066,6 +1088,10 @@ while(1){
 
 		printf("list peer num %d",lane_member);
 		_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"lane_member ",lane_member);
+
+		if(lane_member == 0 ){
+			set_rescue_state(temp_rescue_sub_id,0);
+		}
 
 		for (i = 0; i < lane_member; i++) {
 			level_msg_ptr->level_info[i] = new struct level_info_t;
@@ -1088,11 +1114,14 @@ while(1){
 
 		_peer_ptr->substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer.find(((struct chunk_rescue_list*)chunk_ptr) ->manifest);
 		if(_peer_ptr->substream_first_reply_peer_iter == _peer_ptr->substream_first_reply_peer.end()){
-			_peer_ptr->substream_first_reply_peer[((struct chunk_rescue_list*)chunk_ptr) ->manifest] = true;
+			_peer_ptr->substream_first_reply_peer[((struct chunk_rescue_list*)chunk_ptr) ->manifest] = new manifest_timmer_flag;
+			memset(_peer_ptr->substream_first_reply_peer[((struct chunk_rescue_list*)chunk_ptr) ->manifest] ,0x0 ,sizeof(struct manifest_timmer_flag));
 		}
-		else{
-			_peer_ptr->substream_first_reply_peer_iter->second =true;
-		}
+
+		_peer_ptr->substream_first_reply_peer[((struct chunk_rescue_list*)chunk_ptr) ->manifest] ->connectTimeOutFlag =true ;
+		_peer_ptr->substream_first_reply_peer[((struct chunk_rescue_list*)chunk_ptr) ->manifest] ->firstReplyFlag =true ;
+		_peer_ptr->substream_first_reply_peer[((struct chunk_rescue_list*)chunk_ptr) ->manifest] ->networkTimeOutFlag =true;
+
 
 
 		//和lane 每個peer 先建立好連線	
@@ -1100,9 +1129,13 @@ while(1){
 		if(lane_member >= 1){
 			_peer_mgr_ptr->connect_peer(level_msg_ptr, level_msg_ptr->pid);
 			//			printf("rescue manifest : %d\n",((struct chunk_rescue_list*)chunk_ptr)->manifest);
-			_peer_mgr_ptr->handle_test_delay( ((struct chunk_rescue_list*)chunk_ptr) ->manifest);
+//			_peer_mgr_ptr->handle_test_delay( ((struct chunk_rescue_list*)chunk_ptr) ->manifest);
 
 			_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"all peer connect  and sent handle_test_delay ok");
+
+//get LIST
+			_log_ptr ->getTickTime(&_peer_ptr->substream_first_reply_peer[((struct chunk_rescue_list*)chunk_ptr) ->manifest]->connectTimeOut ) ;
+
 
 		}
 
@@ -1178,7 +1211,8 @@ while(1){
 
 		unsigned long  testingManifest=0;
 		for(unsigned long i =0  ; i < sub_stream_num;i++){
-			if(  ((ssDetect_ptr) + i) ->isTesting ){
+//			if(  ((ssDetect_ptr) + i) ->isTesting ){
+			if(!( check_rescue_state(i,0))){
 				testingManifest |= SubstreamIDToManifest(i);
 			}
 		}
@@ -1192,9 +1226,11 @@ while(1){
 
 		_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"new manifest ",pkDownInfoPtr ->peerInfo.manifest );
 
-		pkDownInfoPtr ->peerInfo.manifest &= (~testingManifest) ;
+//忘記這行在衝沙小 覺得有bug先註解掉(在收到list是空的時候) 
+//在handle stream 才會對manifest 做隱藏的動作,在這邊先隱藏掉的話可能在handstream那邊不會進去
+//		pkDownInfoPtr ->peerInfo.manifest &= (~testingManifest) ;
 
-		_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__," new manifest -testing manifest",pkDownInfoPtr ->peerInfo.manifest );
+//		_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__," new manifest -testing manifest",pkDownInfoPtr ->peerInfo.manifest );
 		//join
 		//跟PK的拓樸全權交給PK 不做任何送拓樸的動作
 		
@@ -1229,12 +1265,12 @@ while(1){
 	// for each stream this protocol (only use to  decode to flv )  or (other protocol need some header)  
 	// light | streamID_1 (int) | stream_header_1 len (unsigned int) | protocol_1 header | streamID_2 ...... 
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_CHN_UPDATA_DATA){
-		printf("CHNK_CMD_CHN_UPDATA_DATA");
+		printf("CHNK_CMD_CHN_UPDATA_DATA\n");
 
 		int *streamID_ptr = NULL ;
-		unsigned int *len_ptr= NULL;
+		int *len_ptr= NULL;
 		unsigned char * header=NULL;
-		unsigned char * protocol_len_header =NULL ;
+		update_stream_header * protocol_len_header =NULL ;
 		int exxpect_len= chunk_ptr->header.length;
 		int ooffset=0;
 		
@@ -1244,17 +1280,27 @@ while(1){
 				break;
 
 			streamID_ptr = (int *) ((char*)chunk_ptr ->buf + ooffset );
-			len_ptr = (unsigned int *) ( (char *)chunk_ptr ->buf + sizeof(int) +ooffset );
+			len_ptr = ( int *) ( (char *)chunk_ptr ->buf + sizeof(int) +ooffset );
+
 			if (*len_ptr ==0 ){
-				ooffset += sizeof(int) + sizeof(unsigned int) ;
+				ooffset += sizeof(int) + sizeof( int) ;
 				continue ;
-			}else{
-				protocol_len_header = new unsigned char[*len_ptr + sizeof(unsigned int)] ;
-				header = ( (unsigned char *)chunk_ptr ->buf + sizeof(int) +ooffset );
-				memcpy(protocol_len_header,header,*len_ptr + sizeof(unsigned int));
+			}else if (*len_ptr == -1){
+
+//				ooffset += sizeof(int) + sizeof( int) ;
+				protocol_len_header = new update_stream_header;
+				protocol_len_header ->len = *len_ptr;
 				map_streamID_header [*streamID_ptr] = (update_stream_header*)protocol_len_header ;
 				printf("streamID = %d  *len_ptr =%d  \n",*streamID_ptr,*len_ptr) ;
-				ooffset += sizeof(int) + sizeof(unsigned int) + *len_ptr;
+				ooffset += sizeof(int) + sizeof( int) ;
+
+			}else{
+				protocol_len_header = (update_stream_header *)new unsigned char[*len_ptr + sizeof( int)] ;
+				header = ( (unsigned char *)chunk_ptr ->buf + sizeof(int) +ooffset );
+				memcpy(protocol_len_header,header,*len_ptr + sizeof( int));
+				map_streamID_header [*streamID_ptr] = (update_stream_header*)protocol_len_header ;
+				printf("streamID = %d  *len_ptr =%d  \n",*streamID_ptr,*len_ptr) ;
+				ooffset += sizeof(int) + sizeof( int) + *len_ptr;
 
 			}
 		}
@@ -1408,6 +1454,8 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	//↓↓↓↓↓↓↓↓↓↓↓↓任何chunk 都會run↓↓↓↓↓↓↓↓↓↓↓↓↓
 
 
+
+
 	temp_sub_id = (chunk_ptr ->header.sequence_number) % sub_stream_num;
 
 	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
@@ -1450,7 +1498,8 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 
 
-	//如果這個 peer 來的chunk 裡的substream 從pk和這個peer都有來  (if rescue testing stream)
+
+	//如果這個 peer 來的chunk 裡的substream 從pk和這個peer都有來 且在rescue的狀態  (if rescue testing stream)
 	if ( (SubstreamIDToManifest (temp_sub_id) & parentPeerPtr ->peerInfo.manifest)  &&  (SubstreamIDToManifest (temp_sub_id) & pkDownInfoPtr->peerInfo.manifest) && (parentPid != PK_PID) && (check_rescue_state(temp_sub_id,2))){
 
 		parentPeerPtr->outBuffCount = 0;
@@ -1468,7 +1517,16 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 		//testing function
 		reSet_detectionInfo();
+
+	//如果這個 peer 來的chunk 裡的substream 從pk和這個peer都有來 且在join的狀態
+	}else if( (SubstreamIDToManifest (temp_sub_id) & parentPeerPtr ->peerInfo.manifest)  &&  (SubstreamIDToManifest (temp_sub_id) & pkDownInfoPtr->peerInfo.manifest) && (parentPid != PK_PID) && (check_rescue_state(temp_sub_id,0))){
+	
+		pkDownInfoPtr->peerInfo.manifest =0;
+		send_rescueManifestToPKUpdate ( 0 );
+
 	}
+
+
 
 
 	//如果這個substream正在測試中 且不是從PK來 ( 從peer 來)
@@ -1498,7 +1556,8 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 			//找出所有正在測試的substream
 			for(unsigned long i =0  ; i < sub_stream_num;i++){
-				if ((ssDetect_ptr + i) ->isTesting ){
+//				if ((ssDetect_ptr + i) ->isTesting ){
+				if(!( check_rescue_state(i,0))){
 					testingManifest |= SubstreamIDToManifest(i);
 				}
 			}
@@ -1572,9 +1631,9 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 	pkt_count++;
 
-	if(_log_ptr->diffTime_ms(start,end) >=10000){
+	if(_log_ptr->diffTime_ms(start,end) >=20000){
 
-		Xcount = ((double)pkt_count / (10*10));
+		Xcount = ((double)pkt_count / (PARAMETER_X*20));
 		printf("Xcount = %d \n",Xcount);
 //		printf("%f\n",(double)totalbyte / ((double)(_log_ptr->diffTime_ms(start,end))));
 //		fprintf(fp,"%f\n",(double)totalbyte / ( (double)(_log_ptr->diffTime_ms(start,end))));
@@ -1619,19 +1678,63 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		//正常串流在此進入  (非teting)
 	}else if ( !((ssDetect_ptr + temp_sub_id) ->isTesting)  &&  (check_rescue_state(temp_sub_id,0)) ){          
 		//丟給rescue_detecion一定是有方向性的
-//p
-		rescue_detecion(chunk_ptr);
+
+//		rescue_detecion(chunk_ptr);
 
 		if(syn_table.init_flag == 2){
+//p
+			rescue_detecion(chunk_ptr);
 
 			delay_table_iter->second->end_seq_abs_time = chunk_ptr ->header.timestamp;
 			_log_ptr -> getTickTime(&(delay_table_iter->second->client_end_time));
 //p
 			source_delay_detection(sockfd,temp_sub_id,chunk_ptr ->header.sequence_number);
 		}
+
+
+		//pk
+		if(parentPid == PK_PID){
+			
+			if(pkSendCapacity){
+				if((!(delay_table_iter->second->first_pkt_recv))&&(syn_table.init_flag == 2)){
+
+					if(chunk_ptr ->header.sequence_number > syn_table.start_seq){
+						peer_start_delay_count++;
+						delay_table_iter->second->first_pkt_recv = 1;
+						delay_table_iter->second->end_seq_num = chunk_ptr ->header.sequence_number;
+						if(peer_start_delay_count == sub_stream_num){
+							send_capacity_to_pk(_sock);
+						}
+					}
+				}
+			
+			}
+			
+
+		//peers
+		}else{
+		
+			if((!(delay_table_iter->second->first_pkt_recv))&&(syn_table.init_flag == 2)){
+
+				if(chunk_ptr ->header.sequence_number > syn_table.start_seq){
+					peer_start_delay_count++;
+					delay_table_iter->second->first_pkt_recv = 1;
+					delay_table_iter->second->end_seq_num = chunk_ptr ->header.sequence_number;
+					if(peer_start_delay_count == sub_stream_num){
+						send_capacity_to_pk(_sock);
+					}
+				}
+			}
+
+
+		}
+
+
 	}
 
 	//若SYN完了
+
+/*
 	if((!(delay_table_iter->second->first_pkt_recv))&&(syn_table.init_flag == 2)){
 
 		if(chunk_ptr ->header.sequence_number > syn_table.start_seq){
@@ -1643,9 +1746,10 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 			}
 		}
 	}
+*/
 
 
-
+//p
 
 	//差值在BUFF_SIZE 之外可能某個些seq都不到 ,跳過那些seq直到差值在BUFF_SIZE內
 	leastCurrDiff = (int)( (int)_least_sequence_number - (int)_current_send_sequence_number);
@@ -1683,7 +1787,8 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 							//找出所有正在測試的substream
 							for(unsigned long i =0  ; i < sub_stream_num;i++){
-								if ((ssDetect_ptr + i) ->isTesting ){
+//								if ((ssDetect_ptr + i) ->isTesting ){
+								if(!( check_rescue_state(i,0))){
 									testingManifest |= SubstreamIDToManifest(i);
 								}
 							}
@@ -1698,7 +1803,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 								loseParentInfo->outBuffCount = 0;
 
 							//testing fail
-							}else if(((testingManifest | loseParentInfo ->peerInfo.manifest) | loseManifest)){
+							}else if(((testingManifest & loseParentInfo ->peerInfo.manifest) & loseManifest)){
 								printf("this lose manifest is in testing it should from PK and peer why lose\n");
 								_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"this lose manifest is in testing it should from PK and peer why lose");
 								loseParentInfo->outBuffCount = 0;
@@ -1885,11 +1990,11 @@ int pk_mgr::check_rescue_state(unsigned long sub_id,int state){
 	}
 
 	if(delay_table_iter->second->rescue_state == state){
-		_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__," rescue substream id : ",sub_id," state(0 normal 1 rescue trigger 2 testing) =",delay_table_iter->second->rescue_state," check ok",state);
+	//	_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__," rescue substream id : ",sub_id," state(0 normal 1 rescue trigger 2 testing) =",delay_table_iter->second->rescue_state," check ok",state);
 		return 1;
 	}
 	else{
-		_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__," rescue substream id : ",sub_id," state(0 normal 1 rescue trigger 2 testing) =",delay_table_iter->second->rescue_state," check fail",state);
+	//	_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__," rescue substream id : ",sub_id," state(0 normal 1 rescue trigger 2 testing) =",delay_table_iter->second->rescue_state," check fail",state);
 		return 0;
 	}
 }
@@ -2219,16 +2324,17 @@ void pk_mgr::measure()
 			//i=substreamID 
 			if(  ((tempManifest) & 1<<i)  ){
 
+//0507 這邊如果遇到substream 不同步就會停止偵測				
 				//printf("( i=%d) ->measure_N =%d ( peerHighestSSID=%d)->measure_N=%d\n",i,(ssDetect_ptr + i) ->measure_N  ,peerHighestSSID,(ssDetect_ptr + peerHighestSSID)->measure_N);
 				//等到最後一個substream 到期再做加總
-				if((ssDetect_ptr + i) ->measure_N  == (ssDetect_ptr + peerHighestSSID)->measure_N){
+//0507				if((ssDetect_ptr + i) ->measure_N  == (ssDetect_ptr + peerHighestSSID)->measure_N){
 					totalSourceBitrate += (ssDetect_ptr + i) ->last_sourceBitrate ;
 					totalLocalBitrate  += (ssDetect_ptr + i) ->last_localBitrate ;
 
-				}else{
+//0507				}else{
 					//還沒等到最後一個substream 到期 提前結束不做運算
-					return ;
-				}
+//0507					return ;
+//0507				}
 
 			}
 		}
@@ -2332,60 +2438,67 @@ void pk_mgr::measure()
 				printf("stream testing fail \n");
 				//若有多個正在測試中一次只選擇一個substream cut(最右邊的)  並且重設全部記數器的count
 
-				testingSubStreamID = manifestToSubstreamID (peerTestingManifest);
-				_log_ptr->write_log_format("s =>u s u s u s u \n", __FUNCTION__,__LINE__,"stream testing fail peerTestingManifest ",peerTestingManifest,"select manifest = ", manifestToSubstreamID (peerTestingManifest),"testingSubStreamID",testingSubStreamID);
+//				if( (ssDetect_ptr +manifestToSubstreamID (peerTestingManifest)) ->isTesting){
 
-				(ssDetect_ptr + testingSubStreamID) ->isTesting =0 ;  //false  
+					testingSubStreamID = manifestToSubstreamID (peerTestingManifest);
+					_log_ptr->write_log_format("s =>u s u s u s u \n", __FUNCTION__,__LINE__,"stream testing fail peerTestingManifest ",peerTestingManifest,"select manifest = ", manifestToSubstreamID (peerTestingManifest),"testingSubStreamID",testingSubStreamID);
 
-				//set recue stat true
-				set_rescue_state(testingSubStreamID,0);
+					(ssDetect_ptr + testingSubStreamID) ->isTesting =0 ;  //false  
 
-				//should sent to PK select PK ,再把testing 取消偵測的 pk_manifest 設回來
-				_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__," old PK manifest ",pkDownInfoPtr ->peerInfo.manifest);
-				pkDownInfoPtr ->peerInfo.manifest |=  SubstreamIDToManifest (testingSubStreamID ) ;
-				_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"PK manifest set back to",pkDownInfoPtr ->peerInfo.manifest);
+					//set recue stat true
+					set_rescue_state(testingSubStreamID,0);
 
-				//should sent to peer cut stream
-				_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__," old Peer manifest ",connectPeerInfo ->peerInfo.manifest);
-				connectPeerInfo ->peerInfo.manifest &= (~ SubstreamIDToManifest (testingSubStreamID )) ;
-				_peer_mgr_ptr -> send_manifest_to_parent(connectPeerInfo ->peerInfo.manifest ,connectPeerInfo ->peerInfo.pid);
-				_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"after cut stream manifest",connectPeerInfo ->peerInfo.manifest);
+					//should sent to PK select PK ,再把testing 取消偵測的 pk_manifest 設回來
+					_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__," old PK manifest ",pkDownInfoPtr ->peerInfo.manifest);
+					pkDownInfoPtr ->peerInfo.manifest |=  SubstreamIDToManifest (testingSubStreamID ) ;
+					_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"PK manifest set back to",pkDownInfoPtr ->peerInfo.manifest);
 
-				if(pid_peerDown_info_iter->second->peerInfo.manifest == 0 ){
-					map_out_pid_fd_iter = _peer_ptr ->map_in_pid_fd.find(pid_peerDown_info_iter ->first) ;
-					if(map_out_pid_fd_iter !=_peer_ptr ->map_in_pid_fd.end()){
-						_peer_ptr ->data_close(_peer_ptr ->map_in_pid_fd[pid_peerDown_info_iter ->first],"manifest=0",CLOSE_PARENT) ;
-						pid_peerDown_info_iter = map_pid_peerDown_info.begin() ;
-						if(pid_peerDown_info_iter ==map_pid_peerDown_info.end()){
-							break;
-						}
+					//should sent to peer cut stream
+					_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__," old Peer manifest ",connectPeerInfo ->peerInfo.manifest);
+					connectPeerInfo ->peerInfo.manifest &= (~ SubstreamIDToManifest (testingSubStreamID )) ;
+					_peer_mgr_ptr -> send_manifest_to_parent(connectPeerInfo ->peerInfo.manifest ,connectPeerInfo ->peerInfo.pid);
+					_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"after cut stream manifest",connectPeerInfo ->peerInfo.manifest);
+
+					if(pid_peerDown_info_iter->second->peerInfo.manifest == 0 ){
+						map_out_pid_fd_iter = _peer_ptr ->map_in_pid_fd.find(pid_peerDown_info_iter ->first) ;
+						if(map_out_pid_fd_iter !=_peer_ptr ->map_in_pid_fd.end()){
+							_peer_ptr ->data_close(_peer_ptr ->map_in_pid_fd[pid_peerDown_info_iter ->first],"manifest=0",CLOSE_PARENT) ;
+							pid_peerDown_info_iter = map_pid_peerDown_info.begin() ;
+							if(pid_peerDown_info_iter ==map_pid_peerDown_info.end()){
+								break;
+							}
 						}else{
 							printf("pkmgr2016"); //PAUSE
 						}
-				}
+//					}
 
 
-				send_parentToPK ( SubstreamIDToManifest (testingSubStreamID ) ,PK_PID+1 ) ;
+					send_parentToPK ( SubstreamIDToManifest (testingSubStreamID ) ,PK_PID+1 ) ;
 
-				peerTestingManifest &= ( ~SubstreamIDToManifest(testingSubStreamID) );
-
-				//重設其他正在testing 的substream
-				while(peerTestingManifest){
-					testingSubStreamID = manifestToSubstreamID (peerTestingManifest);
-					(ssDetect_ptr + testingSubStreamID) ->testing_count =0;
 					peerTestingManifest &= ( ~SubstreamIDToManifest(testingSubStreamID) );
+
+					//重設其他正在testing 的substream
+					while(peerTestingManifest){
+						testingSubStreamID = manifestToSubstreamID (peerTestingManifest);
+						(ssDetect_ptr + testingSubStreamID) ->testing_count =0;
+						peerTestingManifest &= ( ~SubstreamIDToManifest(testingSubStreamID) );
+
+					}
+
+					reSet_detectionInfo();
+
 				}
-
-				reSet_detectionInfo();
-
-
 
 
 				//PID 是其他peer
-			}else{
+			}else {
+
 
 				printf("normal rescue \n");
 				_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"normal rescue ");
+
+//p
+//if(	check_rescue_state(testingSubStreamID,1))
 
 
 				afterManifest = manifestFactory (connectPeerInfo ->peerInfo.manifest , rescueSS);
@@ -2429,6 +2542,8 @@ void pk_mgr::measure()
 				}
 
 				reSet_detectionInfo();
+			
+			
 			}
 
 
@@ -2514,20 +2629,26 @@ void pk_mgr::clear_map_pid_peer_info(){
 void pk_mgr::clear_map_pid_peer_info(unsigned long manifest){
 
 	multimap <unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
+	multimap <unsigned long, struct peer_info_t *>::iterator temp_pid_peer_info_iter;
 	struct peer_info_t *peerInfoPtr =NULL;
 
 
-	for(pid_peer_info_iter =map_pid_peer_info.begin();pid_peer_info_iter!=map_pid_peer_info.end(); pid_peer_info_iter++){
+	for(pid_peer_info_iter =map_pid_peer_info.begin();pid_peer_info_iter!=map_pid_peer_info.end(); ){
 		peerInfoPtr=pid_peer_info_iter ->second;
 
 		if(peerInfoPtr ->manifest == manifest){
 			delete peerInfoPtr;
 
-			map_pid_peer_info.erase(pid_peer_info_iter);
-			pid_peer_info_iter =map_pid_peer_info.begin() ;
+			temp_pid_peer_info_iter =pid_peer_info_iter;
+			pid_peer_info_iter ++;
+
+			map_pid_peer_info.erase(temp_pid_peer_info_iter);
+//			pid_peer_info_iter =map_pid_peer_info.begin() ;
 			if(pid_peer_info_iter == map_pid_peer_info.end())
 				break;
 
+		}else{
+		pid_peer_info_iter++ ;
 		}
 	}
 
@@ -2633,7 +2754,8 @@ void pk_mgr::threadTimeout()
 
 				//找出所有正在測試的substream
 				for(unsigned long i =0  ; i < sub_stream_num;i++){
-					if ((ssDetect_ptr + i) ->isTesting ){
+//					if ((ssDetect_ptr + i) ->isTesting ){
+					if(!( check_rescue_state(i,0))){
 						testingManifest |= SubstreamIDToManifest(i);
 					}
 				}
@@ -2995,6 +3117,47 @@ void pk_mgr::reSet_detectionInfo()
 			pid_peerDown_info_iter ->second ->rescueStatsArry [i] = 0 ;
 
 	}
+
+
+}
+
+
+// handle timeout  connect time out
+void pk_mgr::time_handle()
+{
+
+	LARGE_INTEGER new_timme;
+//	_log_ptr->write_log_format("\ns =>u s \n", __FUNCTION__,__LINE__,"************************************ a while round ***********************************") ;
+
+	_log_ptr ->getTickTime (&new_timme);
+
+
+	//all fail send topology
+
+	//for connect timeout
+	for(_peer_ptr->substream_first_reply_peer_iter =_peer_ptr->substream_first_reply_peer.begin();_peer_ptr->substream_first_reply_peer_iter !=_peer_ptr->substream_first_reply_peer.end();_peer_ptr->substream_first_reply_peer_iter++){
+
+		if(_peer_ptr->substream_first_reply_peer_iter ->second->connectTimeOutFlag == true){
+
+			if(_log_ptr ->diffTime_ms(_peer_ptr->substream_first_reply_peer_iter ->second->connectTimeOut,new_timme) >= CONNECT_TIME_OUT){
+
+				pkSendCapacity =true;
+				_peer_ptr->substream_first_reply_peer_iter ->second->connectTimeOutFlag=false ;
+				_peer_mgr_ptr->handle_test_delay(_peer_ptr->substream_first_reply_peer_iter ->first);
+
+
+			}
+
+		}
+
+
+	}
+
+
+
+	//for stream timeout
+//	for
+
 
 
 }

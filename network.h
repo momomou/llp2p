@@ -55,7 +55,7 @@ public:
 	int recvfrom(int s, char *buf, size_t len, int flags, struct sockaddr *from, socklen_t *fromlen);
 	void peer_set(peer *peer_ptr);
 	int close(int sock);
-	int nonblock_recv(int sock, Recv_nonblocking_ctl* send_info);
+	int nonblock_recv(int sock, Nonblocking_Ctl* send_info);
 	int nonblock_send(int sock, Network_nonblocking_ctl* send_info);
 	
 	network();

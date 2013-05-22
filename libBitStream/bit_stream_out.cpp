@@ -20,6 +20,7 @@ bit_stream_out::bit_stream_out(int stream_id,network *net_ptr, logger *log_ptr,b
 		_reqStreamID =0 ;
 		_queue_out_data_ptr = new std::queue<struct chunk_t *>;
 		memset(&_send_ctl_info, 0x00, sizeof(_send_ctl_info));
+		first_Header=true;
 
 		file_ptr = fopen("./FILEOUT" , "wb");
 
@@ -40,6 +41,43 @@ int bit_stream_out::handle_pkt_out(int sock){
 
 	int send_rt_val; //send return value
 	send_rt_val=0;
+
+	if(first_Header){
+	cout << "============= Acceppt New 127.0.0.1 ============"<<endl;
+//	int sendHeaderBytes = _net_ptr->send(sock,httpHeader,sizeof(httpHeader) -1 ,0);  //-1 to subtract '\0'
+//		cout << "send_HttpHeaderBytes=" << sendHeaderBytes<<endl;
+//		sendHeaderBytes = _net_ptr->send(sock,(char *)FLV_Header,sizeof(FLV_Header),0);
+//	sendHeaderBytes = _net_ptr->send(sock,(char *)flvHeader,sizeof(flvHeader),0);
+
+	map<int, struct update_stream_header *>::iterator  map_streamID_header_iter;
+	struct update_stream_header *protocol_header =NULL;
+	map_streamID_header_iter =_pk_mgr_ptr ->map_streamID_header.find(_reqStreamID);
+
+	if(map_streamID_header_iter !=_pk_mgr_ptr ->map_streamID_header.end()){
+		protocol_header = map_streamID_header_iter ->second ;
+	}else{
+		PAUSE
+	}
+
+
+
+	printf("protocol_header ->len %d \n",protocol_header ->len);
+	if(protocol_header ->len >0){
+
+	int sendHeaderBytes = _net_ptr ->send(sock,(char *)protocol_header->header,protocol_header ->len,0);
+	cout << "send_FLVHeaderBytes=" << sendHeaderBytes<<endl;
+	}
+
+	first_Header =false;
+
+
+	}
+
+
+
+
+
+
 
 //	while(true){
 
