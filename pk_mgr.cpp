@@ -376,7 +376,7 @@ void pk_mgr::send_capacity_to_pk(int sock){
 	chunk_capacity_ptr->header.rsv_1 = REPLY;
 	chunk_capacity_ptr->header.length = send_size - sizeof(struct chunk_header_t);
 	chunk_capacity_ptr->content_integrity = 1;
-	chunk_capacity_ptr->NAT_status = 1;
+//	chunk_capacity_ptr->NAT_status = 1;
 	chunk_capacity_ptr->rescue_num = rescueNumAccumulate();
 	for(unsigned long i=0;i<sub_stream_num;i++){
 		if(syn_table.init_flag != 2){
@@ -1308,6 +1308,10 @@ while(1){
 		stream_number = map_streamID_header.size();
 		
 //		PAUSE
+	}else if(chunk_ptr->header.cmd == CHNK_CMD_PARENT_PEER){
+			printf("CHNK_CMD_PARENT_PEER\n");
+
+
 
 	}else {
 		printf("cmd =%d else\n", chunk_ptr->header.cmd);
@@ -1875,7 +1879,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		}
 		printf("here3 least CurrDiff =%d\n",leastCurrDiff);
 		_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__,"here3 least CurrDiff =",leastCurrDiff,"_current=",_current_send_sequence_number,"SSID =",_current_send_sequence_number%sub_stream_num);
-
+		PAUSE
 
 		//可能某個subtream 追過_bucket_size,直接跳到最後一個 (應該不會發生)
 	}else if (leastCurrDiff > _bucket_size) {
@@ -2470,7 +2474,7 @@ void pk_mgr::measure()
 						}else{
 							printf("pkmgr2016"); //PAUSE
 						}
-//					}
+					}
 
 
 					send_parentToPK ( SubstreamIDToManifest (testingSubStreamID ) ,PK_PID+1 ) ;
@@ -2487,7 +2491,7 @@ void pk_mgr::measure()
 
 					reSet_detectionInfo();
 
-				}
+//				}
 
 
 				//PID 是其他peer

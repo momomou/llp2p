@@ -247,10 +247,10 @@ struct peer_info_t {
 	unsigned short tcp_port;
 	unsigned short udp_port;
 //////////NAT////////////
-//	unsigned short public_port;
-//	unsigned short private_port;
-//	unsigned long upnp_acess;	//yes1 no0 
-//	unsigned long NAT_type;	//from 1 to 4 (4 cannot punch)
+	unsigned short public_port;
+	unsigned short private_port;
+	unsigned long upnp_acess;	//yes1 no0 
+	unsigned long NAT_type;	//from 1 to 4 (4 cannot punch)
 //////////NAT////////////
 	unsigned long manifest;
 //	int rescueStatsArry[PARAMETER_M];
@@ -265,6 +265,12 @@ struct level_info_t {
 	unsigned long private_ip;
 	unsigned short tcp_port;
 	unsigned short udp_port;
+	//////////NAT////////////
+	unsigned short public_port;
+	unsigned short private_port;
+	unsigned long upnp_acess;	//yes1 no0 
+	unsigned long NAT_type;	//from 1 to 4 (4 cannot punch)
+//////////NAT////////////
 };
 
 struct request_info_t {
@@ -646,7 +652,7 @@ struct rescue_peer_capacity_measurement{
 	struct chunk_header_t header;
 	unsigned int rescue_num;
 	//int rescue_condition;
-	char NAT_status;
+//	char NAT_status;
 	char content_integrity;
 	unsigned long *source_delay_measur[0];
 };
