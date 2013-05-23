@@ -6,12 +6,23 @@
 #include <sstream>
 
 
-const	char httpHeader[]=	"HTTP/1.1 200 OK\r\n" \
-							"Date: Mon, 22 Oct 2012 18:46:42 GMT\r\n"\
+const	char httpHeader[]=	"HTTP/1.1·200·OK\r\n" \
+							"Server:·Apache-Coyote/1.1"\
 							"Server: Apache/2.2.8 (Win32) PHP/5.2.6\r\n"\
-							"Connection: close\r\n"\
-							"Content-Type: application/octet-stream\r\n"\
+							"Last-Modified:·Thu,·23·May·2013·06:58:16·GMT\r\n"\
+							"Content-Type:·video/x-flv\r\n"\
+							"Date:·Thu,·23·May·2013·07:23:03·GMT\r\n"\
+							"Connection:·close\r\n"\
 							"\r\n";
+
+
+const char crossdomain[]= "<?xml version=\"1.0\"?>\r\n"\
+							"<!DOCTYPE cross-domain-policy SYSTEM \"http://www.adobe.com/xml/dtds/cross-domain-policy.dtd\">\r\n"\
+							"<cross-domain-policy>\r\n"\
+							   "<allow-access-from domain=\"*\"  to-ports=\"*\" secure=\"false\" />\r\n"\
+							"</cross-domain-policy>\r\n" ;
+
+
 
 static const char flvHeader[] =			{ 'F', 'L', 'V', 0x01,
 										0x00,	 /* 0x04 == audio, 0x01 == video */
@@ -67,7 +78,7 @@ bit_stream_httpout::bit_stream_httpout(int stream_id,network *net_ptr, logger *l
 //		file_ptr = fopen("./here.flv" , "wb");
 //		file_ptr_test = fopen("./metadata" , "rb");
 //		fwrite(FLV_Header,1,sizeof(FLV_Header),file_ptr);
-//		fwrite(flvHeader,1,sizeof(flvHeader),file_ptr);
+
 
 	}
 bit_stream_httpout::~bit_stream_httpout(){
@@ -90,8 +101,18 @@ int bit_stream_httpout::handle_pkt_in(int sock){
 
 		recv_byte = _net_ptr ->recv(sock, HTTPrequestBuffer,  sizeof(HTTPrequestBuffer), 0);
 
-		_reqStreamID= getStreamID_FromHTTP_Request(HTTPrequestBuffer,sizeof(HTTPrequestBuffer));
+
+//		Sleep(1000);
+//		for(int i =0 ; i <512 ;i++)
+//		printf("%c",HTTPrequestBuffer[i]);
+//		printf("\n");
+
+
+		_reqStreamID= getStreamID_FromHTTP_Request(sock,HTTPrequestBuffer,sizeof(HTTPrequestBuffer));
 		printf("\n HTTP  _reqStreamID =%d\n",_reqStreamID);
+
+
+
 
 		if(isStreamID_inChannel(_reqStreamID)){						//得到streamID 並關掉監聽
 			_net_ptr->epoll_control(sock, EPOLL_CTL_DEL,EPOLLIN);	
@@ -120,6 +141,9 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 //		cout << "send_HttpHeaderBytes=" << sendHeaderBytes<<endl;
 //		sendHeaderBytes = _net_ptr->send(sock,(char *)FLV_Header,sizeof(FLV_Header),0);
 		sendHeaderBytes = _net_ptr->send(sock,(char *)flvHeader,sizeof(flvHeader),0);
+//debug
+//		fwrite(flvHeader,1,sizeof(flvHeader),file_ptr);
+
 
 		map<int, struct update_stream_header *>::iterator  map_streamID_header_iter;
 		struct update_stream_header *protocol_header =NULL;
@@ -137,6 +161,9 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 		if(protocol_header ->len >0){
 
 		sendHeaderBytes = _net_ptr ->send(sock,(char *)protocol_header->header,protocol_header ->len,0);
+//debug
+//		fwrite((char *)protocol_header->header,1,protocol_header ->len,file_ptr);
+
 		cout << "send_FLVHeaderBytes=" << sendHeaderBytes<<endl;
 		}
 
@@ -353,14 +380,71 @@ bool bit_stream_httpout::isKeyFrame(struct chunk_t *chunk_ptr)
 
 //return  StreamID  ,streamID >0 ,bufferSize 暫時保留沒用到(習慣上會將陣列的大小一起傳進function)
 //example http://127.0.0.1:3000/8877.flv  streamID= 8877
-int  bit_stream_httpout::getStreamID_FromHTTP_Request(char *httpBuffer,unsigned long bufferSize )
+int  bit_stream_httpout::getStreamID_FromHTTP_Request(int sock,char *httpBuffer,unsigned long bufferSize )
 {
 	char *ptr=NULL;
 	int streamID;
+	
+	ptr = strstr(httpBuffer ,"cros");
+	
+//request a crossdomain	
+	if(ptr){
+		printf("a crossdomain request");
+
+		char crossDomainHttpHeader[]=			"HTTP/1.1·200·OK\r\n" \
+												"Server:·Apache-Coyote/1.1"\
+												"Server: Apache/2.2.8 (Win32) PHP/5.2.6\r\n"\
+												"Last-Modified:·Thu,·23·May·2013·06:58:16·GMT\r\n"\
+												"Content-Type:·application/xml\r\n"\
+												"Date:·Thu,·23·May·2013·07:23:03·GMT\r\n"\
+												"Connection:·close\r\n" \
+												"Content-Lnegth:·";
+
+
+		char crlf_crlf[] = "\r\n\r\n" ;
+
+		char crossdomain[]=			"<?xml version=\"1.0\"?>\r\n"\
+									"<!DOCTYPE cross-domain-policy SYSTEM \"http://www.adobe.com/xml/dtds/cross-domain-policy.dtd\">\r\n"\
+									"<cross-domain-policy>\r\n"\
+										"<allow-access-from domain=\"*\"  to-ports=\"*\" secure=\"false\" />\r\n"\
+									"</cross-domain-policy>\r\n" ;
+
+		int crossdomainHeaderSize = (sizeof(crossdomain)-1) ;
+
+		char conten_length[20] ;
+		itoa((sizeof(crossdomain)-1),conten_length,10);
+
+		int len =0 ;	
+		while(crossdomainHeaderSize){
+
+			crossdomainHeaderSize = crossdomainHeaderSize/10;
+			len ++ ;
+		}
+
+		int sendHeaderBytes = _net_ptr->send(sock,crossDomainHttpHeader,sizeof(crossDomainHttpHeader) -1 ,0);
+//		printf("Send crossdomain HTTP Byte= %d \n",sendHeaderBytes);
+		sendHeaderBytes += _net_ptr->send(sock,conten_length,len,0);
+//		printf("Send crossdomain HTTP Byte= %d \n",sendHeaderBytes);
+		sendHeaderBytes += _net_ptr->send(sock,crlf_crlf,sizeof(crlf_crlf)-1,0);
+
+//		printf("Send crossdomain HTTP Byte= %d \n",sendHeaderBytes);
+
+
+		_net_ptr->set_blocking(sock);
+		sendHeaderBytes = _net_ptr->send(sock,crossdomain,sizeof(crossdomain) -1 ,0);
+
+		printf("Send Byte= %d \n",sendHeaderBytes);
+		_net_ptr->set_nonblocking(sock);
+
+		return -1 ;
+	}
+	
+	
+	
 	ptr = strstr(httpBuffer ,"GET /");
-	if(!ptr)
+	if(!ptr){
 	return -1;//return undefine ID
-	else{
+	}else{
 	ptr+=5;
 	char temp[5]={'0x0','0x0','0x0','0x0','\0'};
 	memcpy(temp,ptr,4);

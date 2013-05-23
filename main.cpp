@@ -208,7 +208,7 @@ int main(int argc, char **argv)
 	sin.sin_addr.s_addr = INADDR_ANY;
 	sin.sin_port = htons((unsigned short)atoi(svc_tcp_port.c_str()));
 	
-	if (bind(svc_fd_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == -1) {
+	if (net_ptr->bind(svc_fd_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == -1) {
 		cout << "TCP PORT :" << svc_tcp_port << "bind error! " << endl;
 		return -1;
 	} else {

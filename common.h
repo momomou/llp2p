@@ -5,7 +5,7 @@
 
 #define FD_SETSIZE		2048
 ////resuce PARAMETER////
-#define PARAMETER_X		5
+#define PARAMETER_X		10
 #define PK_PID			999999
 #define BIG_CHUNK	512
 
@@ -152,6 +152,7 @@ using std::bitset;
 //////////////////////////////////////////////////////////////////////////////////
 #define CHNK_CMD_PEER_SEED				0X1B
 #define CHNK_CMD_PEER_MEASURE_DATA		0X1C
+#define CHNK_CMD_PARENT_PEER			0X1D
 //#define CHNK_CMD_PEER_START_DELAY_UPDATE			0X1C
 //#define CHNK_CMD_PEER_PARENT_CHILDREN	0xF0	//¼È®É¤£¥Î
 #define CHNK_CMD_TOPO_INFO				0x1E
@@ -245,6 +246,12 @@ struct peer_info_t {
 	unsigned long private_ip;
 	unsigned short tcp_port;
 	unsigned short udp_port;
+//////////NAT////////////
+//	unsigned short public_port;
+//	unsigned short private_port;
+//	unsigned long upnp_acess;	//yes1 no0 
+//	unsigned long NAT_type;	//from 1 to 4 (4 cannot punch)
+//////////NAT////////////
 	unsigned long manifest;
 //	int rescueStatsArry[PARAMETER_M];
 };

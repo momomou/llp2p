@@ -58,7 +58,7 @@ private:
 
 	void data_close(int cfd, const char *reason);
 	bool isStreamID_inChannel(int streamid);
-	int getStreamID_FromHTTP_Request(char *httpBuffer,unsigned long BufferSize );
+	int getStreamID_FromHTTP_Request(int sock,char *httpBuffer,unsigned long BufferSize );
 	bool isKeyFrame(struct chunk_t *chunk_ptr);
 	unsigned int getFlvTimeStamp(struct chunk_t *chunk_ptr);
 
