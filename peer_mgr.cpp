@@ -7,6 +7,7 @@
 #include "network.h"
 #include "logger.h"
 #include "pk_mgr.h"
+#include "peer_communication.h"
 
 using namespace std;
 
@@ -17,6 +18,7 @@ peer_mgr::peer_mgr(list<int> *fd_list)
 	fd_list_ptr = fd_list;
 	_peer_list_member = 0;
     self_public_ip = 0;
+	peer_com_ptr =NULL;
 }
 
 peer_mgr::~peer_mgr() 
@@ -36,6 +38,9 @@ void peer_mgr::peer_mgr_set(network *net_ptr , logger *log_ptr , configuration *
 	_pk_mgr_ptr = pk_mgr_ptr;
 
 	peer_ptr = new peer(fd_list_ptr);
+
+	peer_com_ptr =new peer_communication(net_ptr,log_ptr,prep,this,peer_ptr,pk_mgr_ptr);
+
 	_pk_mgr_ptr ->peer_set(peer_ptr);
 	peer_ptr->peer_set(_net_ptr, _log_ptr, _prep, _pk_mgr_ptr, this);		
 }

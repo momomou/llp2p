@@ -11,6 +11,7 @@
 #include "peer_mgr.h"
 #include "peer.h"
 #include "librtsp/rtsp_viewer.h"
+#include "peer_communication.h"
 
 using namespace std;
 
@@ -43,6 +44,7 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 	threadLockKey = FREE ;
 	Xcount =100;
 	pkSendCapacity =false;
+	_peer_com_ptr =NULL ;
 	//
 //	pkmgrfile_ptr = fopen("./HEREin" , "wb");
 	//	 _log_measureDataPtr =new 
@@ -512,6 +514,8 @@ void pk_mgr::init()
 	_prep->read_key("channel_id", _channel_id);
 	_prep->read_key("svc_tcp_port", svc_tcp_port);
 	_prep->read_key("svc_udp_port", svc_udp_port);
+
+	_peer_com_ptr = _peer_mgr_ptr ->peer_com_ptr ;
 
 	cout << "pk_ip=" << pk_ip << endl;
 	cout << "pk_port=" << pk_port << endl;
@@ -1024,7 +1028,9 @@ while(1){
 
 		//和lane 每個peer 先建立好連線 
 		if(lane_member >= 1){
-			_peer_mgr_ptr->connect_peer(level_msg_ptr, level_msg_ptr->pid);
+//			_peer_mgr_ptr->connect_peer(level_msg_ptr, level_msg_ptr->pid);
+			_peer_com_ptr ->set_candidates_handler(full_manifest,level_msg_ptr,lane_member,0);
+
 
 		_log_ptr ->getTickTime(&_peer_ptr->substream_first_reply_peer[full_manifest]->connectTimeOut ) ;
 //			_peer_mgr_ptr->handle_test_delay(tempManifes);
@@ -1127,9 +1133,10 @@ while(1){
 		//和lane 每個peer 先建立好連線	
 		//
 		if(lane_member >= 1){
-			_peer_mgr_ptr->connect_peer(level_msg_ptr, level_msg_ptr->pid);
+//			_peer_mgr_ptr->connect_peer(level_msg_ptr, level_msg_ptr->pid);
 			//			printf("rescue manifest : %d\n",((struct chunk_rescue_list*)chunk_ptr)->manifest);
 //			_peer_mgr_ptr->handle_test_delay( ((struct chunk_rescue_list*)chunk_ptr) ->manifest);
+			_peer_com_ptr ->set_candidates_handler(((struct chunk_rescue_list*)chunk_ptr) ->manifest,level_msg_ptr,lane_member,0);
 
 			_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"all peer connect  and sent handle_test_delay ok");
 
@@ -3136,7 +3143,8 @@ void pk_mgr::time_handle()
 	_log_ptr ->getTickTime (&new_timme);
 
 
-	//all fail send topology
+	
+//////!!!!!!all fail should send topology
 
 	//for connect timeout
 	for(_peer_ptr->substream_first_reply_peer_iter =_peer_ptr->substream_first_reply_peer.begin();_peer_ptr->substream_first_reply_peer_iter !=_peer_ptr->substream_first_reply_peer.end();_peer_ptr->substream_first_reply_peer_iter++){
@@ -3145,8 +3153,10 @@ void pk_mgr::time_handle()
 
 			if(_log_ptr ->diffTime_ms(_peer_ptr->substream_first_reply_peer_iter ->second->connectTimeOut,new_timme) >= CONNECT_TIME_OUT){
 
+
 				pkSendCapacity =true;
 				_peer_ptr->substream_first_reply_peer_iter ->second->connectTimeOutFlag=false ;
+				_peer_com_ptr ->stop_attempt_connect (_peer_ptr->substream_first_reply_peer_iter ->first);
 				_peer_mgr_ptr->handle_test_delay(_peer_ptr->substream_first_reply_peer_iter ->first);
 
 

@@ -19,6 +19,8 @@ in main should init sock to listen to listen other peer connected
 #include "librtmp/rtmp.h"
 #include "librtmp/rtmp_supplement.h"
 #include "bit_stream_server.h"
+#include "peer_communication.h"
+#include "io_accept.h"
 
 
 using namespace std;
@@ -253,7 +255,7 @@ int main(int argc, char **argv)
 	
 	net_ptr->epoll_control(svc_fd_tcp, EPOLL_CTL_ADD, EPOLLIN);
 	 
-	net_ptr->set_fd_bcptr_map(svc_fd_tcp, dynamic_cast<basic_class *>(peer_mgr_ptr));
+	net_ptr->set_fd_bcptr_map(svc_fd_tcp, dynamic_cast<basic_class *>(peer_mgr_ptr->peer_com_ptr->get_io_accept_handler() ));
 
 
 	fd_list.push_back(svc_fd_tcp);

@@ -156,7 +156,7 @@ using std::bitset;
 //#define CHNK_CMD_PEER_START_DELAY_UPDATE			0X1C
 //#define CHNK_CMD_PEER_PARENT_CHILDREN	0xF0	//¼È®É¤£¥Î
 #define CHNK_CMD_TOPO_INFO				0x1E
-
+#define CHNK_CMD_ROLE					0x1F
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
@@ -704,13 +704,28 @@ struct update_stream_header{
 	unsigned char header[0];
 };
 
+struct role_struct{
+	struct chunk_header_t header;
+	int flag;	//flag 0 another is rescue peer, flag 1 another is candidate
+	unsigned long manifest;
+	unsigned long pid;
+};
+
+struct peer_com_info{
+	int peer_num;
+	struct chunk_level_msg_t *list_info;
+};
+
+
 
 struct manifest_timmer_flag{
 	unsigned long	firstReplyFlag;
 	unsigned long	networkTimeOutFlag;
 	unsigned long	connectTimeOutFlag;
+	unsigned long	candidateTimeOutFlag;
 	LARGE_INTEGER	networkTimeOut;
 	LARGE_INTEGER	connectTimeOut;
+	LARGE_INTEGER	candidateTimeOut;
 };
 
 

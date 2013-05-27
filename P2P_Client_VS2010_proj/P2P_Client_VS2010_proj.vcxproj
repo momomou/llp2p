@@ -112,6 +112,8 @@
     <ClInclude Include="..\common.h" />
     <ClInclude Include="..\configuration.h" />
     <ClInclude Include="..\EpollFake.h" />
+    <ClInclude Include="..\io_accept.h" />
+    <ClInclude Include="..\io_connect.h" />
     <ClInclude Include="..\libBitStreamHTTP\bit_stream_httpout.h" />
     <ClInclude Include="..\libBitStream\bit_stream_out.h" />
     <ClInclude Include="..\librtmp\amf.h" />
@@ -128,6 +130,7 @@
     <ClInclude Include="..\logger.h" />
     <ClInclude Include="..\network.h" />
     <ClInclude Include="..\peer.h" />
+    <ClInclude Include="..\peer_communication.h" />
     <ClInclude Include="..\peer_mgr.h" />
     <ClInclude Include="..\pk_mgr.h" />
     <ClInclude Include="..\stream.h" />
@@ -144,6 +147,8 @@
     <ClCompile Include="..\bit_stream_server.cpp" />
     <ClCompile Include="..\configuration.cpp" />
     <ClCompile Include="..\EpollFake.cpp" />
+    <ClCompile Include="..\io_accept.cpp" />
+    <ClCompile Include="..\io_connect.cpp" />
     <ClCompile Include="..\libBitStreamHTTP\bit_stream_httpout.cpp" />
     <ClCompile Include="..\libBitStream\bit_stream_out.cpp" />
     <ClCompile Include="..\librtmp\amf.cpp" />
@@ -159,6 +164,7 @@
     <ClCompile Include="..\main.cpp" />
     <ClCompile Include="..\network.cpp" />
     <ClCompile Include="..\peer.cpp" />
+    <ClCompile Include="..\peer_communication.cpp" />
     <ClCompile Include="..\peer_mgr.cpp" />
     <ClCompile Include="..\pk_mgr.cpp" />
     <ClCompile Include="..\stream.cpp" />

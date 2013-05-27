@@ -88,6 +88,7 @@ void peer::peer_set(network *net_ptr , logger *log_ptr , configuration *prep, pk
 	_prep = prep;
 	_pk_mgr_ptr = pk_mgr_ptr;
 	_peer_mgr_ptr = peer_mgr_ptr;
+	_peer_com_ptr = peer_mgr_ptr->peer_com_ptr ;
 	_net_ptr->peer_set(this);
 }
 
