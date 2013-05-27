@@ -8,7 +8,6 @@
 #include "logger.h"
 #include "pk_mgr.h"
 #include "peer_communication.h"
-
 using namespace std;
 
 
@@ -18,7 +17,6 @@ peer_mgr::peer_mgr(list<int> *fd_list)
 	fd_list_ptr = fd_list;
 	_peer_list_member = 0;
     self_public_ip = 0;
-	peer_com_ptr =NULL;
 }
 
 peer_mgr::~peer_mgr() 
@@ -27,6 +25,10 @@ peer_mgr::~peer_mgr()
 	if(peer_ptr)
 		delete peer_ptr;
 
+}
+
+void peer_mgr::peer_communication_set(peer_communication *peer_communication_ptr){
+	_peer_communication_ptr = peer_communication_ptr;
 }
 
 //初始化基本參數
@@ -38,13 +40,19 @@ void peer_mgr::peer_mgr_set(network *net_ptr , logger *log_ptr , configuration *
 	_pk_mgr_ptr = pk_mgr_ptr;
 
 	peer_ptr = new peer(fd_list_ptr);
-
-	peer_com_ptr =new peer_communication(net_ptr,log_ptr,prep,this,peer_ptr,pk_mgr_ptr);
-
 	_pk_mgr_ptr ->peer_set(peer_ptr);
 	peer_ptr->peer_set(_net_ptr, _log_ptr, _prep, _pk_mgr_ptr, this);		
 }
 
+peer * peer_mgr::get_peer_object(){
+	if(peer_ptr == NULL){
+		cout<<"peer object not init in get_peer_object"<<endl;
+		exit(1);
+	}
+	else{
+		return peer_ptr;
+	}
+}
 //除自己之外和所有在同個lane 下的member做連線要求 呼叫build_connection連線
 //只有註冊時收到peer list 才會呼叫
 void peer_mgr::connect_peer(struct chunk_level_msg_t *level_msg_ptr, unsigned long pid)
@@ -193,7 +201,7 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 //只用來接收 CHNK_CMD_PEER_CON的資訊  並把fd 加入監聽
 int peer_mgr::handle_pkt_in(int sock)
 {
-	int recv_byte;	
+	/*int recv_byte;	
 	int expect_len;
 	int offset = 0;
 	unsigned long buf_len;
@@ -325,8 +333,9 @@ int peer_mgr::handle_pkt_in(int sock)
 	}
 
 	if(chunk_ptr)
-		delete chunk_ptr;
-
+		delete chunk_ptr;*/
+	printf("cannot inside this scope in peer_mgr::handle_pkt_in\n");
+	exit(1);
 	return RET_OK;
 }
 

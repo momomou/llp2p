@@ -156,7 +156,7 @@ void network::epoll_dispatcher(void)
 			if (events[i].events & (EPOLLRDHUP | EPOLLERR)) {
 				//printf("%d sock error\n",cfd);
 				// EPOLLRDHUP => This socket is closed by client (client has sent a FIN), we have to close it.
-				cout << "something wrong: fd = " << cfd << endl;
+				cout << "something wrong: fd = " << cfd << " error:"<<WSAGetLastError()<< endl;
 				//PAUSE
 				_map_fd_del_hdl_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
 				_peer_ptr->data_close(cfd, "This socket is closed by client (client has sent a FIN)",DONT_CARE);

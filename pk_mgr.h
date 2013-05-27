@@ -4,7 +4,6 @@
 #include "common.h"
 #include "basic_class.h"
 #include "stream_udp.h"
-//#include "peer_communication.h"
 #include <iostream>
 #include <map>
 
@@ -14,7 +13,7 @@ class peer_mgr;
 class rtsp_viewer;
 class stream;
 class peer;
-class peer_communication;
+
 
 
 class pk_mgr:public basic_class {
@@ -30,7 +29,6 @@ public:
 	struct peer_connect_down_t *pkDownInfoPtr;
 	LARGE_INTEGER start,end;
 	volatile int Xcount ;
-	peer_communication * peer_com_ptr ; 
 
 	LARGE_INTEGER teststart,testend;
 
@@ -172,8 +170,7 @@ private:
 	peer_mgr * _peer_mgr_ptr;
 	peer *_peer_ptr;
 	rtsp_viewer *_rtsp_viewer_ptr;
-	peer_communication *_peer_com_ptr;
-
+	
 	FILE *pkmgrfile_ptr ;
 	FILE *performance_filePtr ;
 

@@ -7,6 +7,7 @@
 #include "logger.h"
 #include "pk_mgr.h"
 #include "peer_mgr.h"
+#include "peer_communication.h"
 
 using namespace std;
 
@@ -88,7 +89,6 @@ void peer::peer_set(network *net_ptr , logger *log_ptr , configuration *prep, pk
 	_prep = prep;
 	_pk_mgr_ptr = pk_mgr_ptr;
 	_peer_mgr_ptr = peer_mgr_ptr;
-	_peer_com_ptr = peer_mgr_ptr->peer_com_ptr ;
 	_net_ptr->peer_set(this);
 }
 
@@ -437,6 +437,12 @@ int peer::handle_pkt_in(int sock)
 		return RET_OK;
 
 //	just send return
+	}else if(chunk_ptr->header.cmd == CHNK_CMD_PARENT_PEER){
+		printf("CHNK_CMD_PARENT_PEER\n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_PARENT_PEER ");
+
+		exit(1);
+		//cmd == CHNK_CMD_PEER_DATA	
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_TEST_DELAY ){
 
 
@@ -487,14 +493,12 @@ int peer::handle_pkt_in(int sock)
 
 			//第一個回覆的peer 放入peer_connect_down_t加入測量 並關閉其他連線和清除所有相關table
 
-			substream_first_reply_peer_iter = substream_first_reply_peer.find(replyManifest);
-			if(substream_first_reply_peer_iter == substream_first_reply_peer.end()){
-				substream_first_reply_peer[replyManifest] = new manifest_timmer_flag ;
-				memset(substream_first_reply_peer[replyManifest] ,sizeof(manifest_timmer_flag),0);
-				substream_first_reply_peer[replyManifest] ->firstReplyFlag =true ;
+			for(substream_first_reply_peer_iter = substream_first_reply_peer.begin();substream_first_reply_peer_iter != substream_first_reply_peer.end();substream_first_reply_peer_iter++){
+				if((substream_first_reply_peer_iter->second->rescue_manifest == replyManifest)&&(substream_first_reply_peer_iter->second->peer_role == 0)){
+					break;
+				}
 			}
-
-			substream_first_reply_peer_iter = substream_first_reply_peer.find(replyManifest);
+			
 			if(substream_first_reply_peer_iter == substream_first_reply_peer.end()){
 				printf("error : can not find subid_replyManifest in CHNK_CMD_PEER_TEST_DELAY  REPLY\n");
 				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"error : can not find subid_replyManifest in CHNK_CMD_PEER_TEST_DELAY  REPLY");

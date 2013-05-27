@@ -270,7 +270,7 @@ struct level_info_t {
 	unsigned short private_port;
 	unsigned long upnp_acess;	//yes1 no0 
 	unsigned long NAT_type;	//from 1 to 4 (4 cannot punch)
-//////////NAT////////////
+	//////////NAT////////////
 };
 
 struct request_info_t {
@@ -556,7 +556,7 @@ typedef struct nonblocking_ctrl{
 struct chunk_level_msg_t {
 	struct chunk_header_t header;
 	unsigned long pid;
-	unsigned long level;
+	unsigned long manifest;
 	struct level_info_t *level_info[0];	
 };
 
@@ -708,25 +708,32 @@ struct role_struct{
 	struct chunk_header_t header;
 	int flag;	//flag 0 another is rescue peer, flag 1 another is candidate
 	unsigned long manifest;
-	unsigned long pid;
+	unsigned long send_pid;
+	unsigned long recv_pid;
 };
 
 struct peer_com_info{
 	int peer_num;
+	int role;	// 0 rescue peer; 1 candidate
+	unsigned long manifest;
 	struct chunk_level_msg_t *list_info;
 };
-
-
 
 struct manifest_timmer_flag{
 	unsigned long	firstReplyFlag;
 	unsigned long	networkTimeOutFlag;
 	unsigned long	connectTimeOutFlag;
-	unsigned long	candidateTimeOutFlag;
+	unsigned long	rescue_manifest;	//may be rescue peer or candidates
+	int peer_role;	//0 rescue peer 1 candidate
 	LARGE_INTEGER	networkTimeOut;
 	LARGE_INTEGER	connectTimeOut;
-	LARGE_INTEGER	candidateTimeOut;
 };
 
+struct chunk_child_info {
+	struct chunk_header_t header;
+	unsigned long pid;
+	unsigned long manifest;	//rescue peer
+	struct level_info_t child_level_info;	
+};
 
 #endif

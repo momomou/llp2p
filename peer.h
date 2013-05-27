@@ -10,7 +10,6 @@ class network;
 class logger;
 class pk_mgr;
 class peer_mgr;
-class peer_communication;
 
 class peer:public basic_class {
 public:
@@ -59,12 +58,9 @@ private:
 	configuration *_prep;
 	pk_mgr * _pk_mgr_ptr;
 	peer_mgr * _peer_mgr_ptr;
-	peer_communication *_peer_com_ptr;
-
 	int _send_byte;
 	int _expect_len;
 	int _offset;
-
 //	int _time_start;
 //	unsigned long _recv_byte_count;
     unsigned long _recv_parent_byte_count;

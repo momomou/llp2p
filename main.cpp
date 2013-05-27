@@ -20,8 +20,8 @@ in main should init sock to listen to listen other peer connected
 #include "librtmp/rtmp_supplement.h"
 #include "bit_stream_server.h"
 #include "peer_communication.h"
+#include "io_connect.h"
 #include "io_accept.h"
-
 
 using namespace std;
 
@@ -96,6 +96,7 @@ int main(int argc, char **argv)
 	amf *amf_ptr = NULL;
 	rtmp_supplement *rtmp_supplement_ptr = NULL;
 	bit_stream_server *bit_stream_server_ptr =NULL;
+	peer_communication *peer_communication_ptr = NULL;
 	
     config_file = "config.ini";
 	
@@ -124,6 +125,8 @@ int main(int argc, char **argv)
 	//peer_mgr_ptr->pk_mgr_set(pk_mgr_ptr);
 	pk_mgr_ptr->peer_mgr_set(peer_mgr_ptr);
 
+	peer_communication_ptr = new peer_communication(net_ptr,log_ptr,prep,peer_mgr_ptr,peer_mgr_ptr->get_peer_object(),pk_mgr_ptr);
+	peer_mgr_ptr->peer_communication_set(peer_communication_ptr);
 //	_beginthread(pk_mgr::threadTimeout, 0,NULL );
 //	_beginthread(pk_mgr_ptr ->threadTimeout, 0,NULL );
 
@@ -210,15 +213,15 @@ int main(int argc, char **argv)
 	sin.sin_addr.s_addr = INADDR_ANY;
 	sin.sin_port = htons((unsigned short)atoi(svc_tcp_port.c_str()));
 	
+	if ( setsockopt(svc_fd_tcp, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval , sizeof(optval)) == -1)
+		return -1;
+
 	if (net_ptr->bind(svc_fd_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == -1) {
 		cout << "TCP PORT :" << svc_tcp_port << "bind error! " << endl;
 		return -1;
 	} else {
 		cout << "Server bind at TCP port: " << svc_tcp_port << endl;
 	}
-
-	if ( setsockopt(svc_fd_tcp, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval , sizeof(optval)) == -1)
-		return -1;
 
 	if (listen(svc_fd_tcp, MAX_POLL_EVENT) == -1) {
 		cout << "TCP PORT :" << svc_tcp_port << " listen error! " << endl;
@@ -255,7 +258,7 @@ int main(int argc, char **argv)
 	
 	net_ptr->epoll_control(svc_fd_tcp, EPOLL_CTL_ADD, EPOLLIN);
 	 
-	net_ptr->set_fd_bcptr_map(svc_fd_tcp, dynamic_cast<basic_class *>(peer_mgr_ptr->peer_com_ptr->get_io_accept_handler() ));
+	net_ptr->set_fd_bcptr_map(svc_fd_tcp, dynamic_cast<basic_class *>(peer_communication_ptr->get_io_accept_handler()));
 
 
 	fd_list.push_back(svc_fd_tcp);

@@ -16,18 +16,18 @@ class peer_mgr:public basic_class {
 public:
 
 	peer *peer_ptr;
-	peer_communication *peer_com_ptr;
 	list<int> *fd_list_ptr;
 //	list<unsigned long> rescue_pid_list;
 //	map<int, int> map_rescue_fd_count;	// <fd, count>
 //	map<int, unsigned long> map_fd_pid;	// <fd, pid>
 //	map<int, queue<struct chunk_t *> *> _map_fd_downstream;		// <downstream_fd, downstream_out_data_queue>
 	unsigned long self_pid;
-	unsigned long self_public_ip;
 	
 	peer_mgr(list<int> *fd_list);
 	~peer_mgr();
 	void peer_mgr_set(network *net_ptr , logger *log_ptr , configuration *prep, pk_mgr * pk_mgr_ptr);
+	void peer_communication_set(peer_communication *peer_communication_ptr);
+	peer * get_peer_object();	//call after peer_mgr_set
 	//void pk_mgr_set(pk_mgr * pk_mgr_ptr);
 	
 	void connect_peer(struct chunk_level_msg_t *level_msg_ptr, unsigned long pid);
@@ -63,6 +63,8 @@ public:
 
 	void data_close(int cfd, const char *reason); 
 
+	peer_communication *_peer_communication_ptr;
+
 private:
 	
 	int _sock;
@@ -71,6 +73,7 @@ private:
 	configuration *_prep;
 	pk_mgr *_pk_mgr_ptr;
 	unsigned long _peer_list_member;
+    unsigned long self_public_ip;
 
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 
