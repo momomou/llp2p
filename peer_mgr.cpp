@@ -47,6 +47,7 @@ void peer_mgr::peer_mgr_set(network *net_ptr , logger *log_ptr , configuration *
 peer * peer_mgr::get_peer_object(){
 	if(peer_ptr == NULL){
 		cout<<"peer object not init in get_peer_object"<<endl;
+		PAUSE
 		exit(1);
 	}
 	else{
@@ -335,6 +336,7 @@ int peer_mgr::handle_pkt_in(int sock)
 	if(chunk_ptr)
 		delete chunk_ptr;*/
 	printf("cannot inside this scope in peer_mgr::handle_pkt_in\n");
+	PAUSE
 	exit(1);
 	return RET_OK;
 }
@@ -352,7 +354,8 @@ void peer_mgr::handle_pkt_error(int sock)
 
 void peer_mgr::handle_sock_error(int sock, basic_class *bcptr)
 {
-
+	_net_ptr->fd_bcptr_map_delete(sock);
+	data_close(sock, "peer_mgr handle_sock_error!!");
 }
 
 void peer_mgr::handle_job_realtime()
@@ -502,12 +505,13 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 
 
 //select_peer test delay
-void peer_mgr::handle_test_delay(unsigned long manifest)
+int peer_mgr::handle_test_delay(unsigned long manifest)
 {
 	multimap <unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 	map<unsigned long, int> ::iterator map_pid_fd_iter;
 	int sock;
 	int pid;
+	int sockOKcount=0;
 
 	for(pid_peer_info_iter = (_pk_mgr_ptr ->map_pid_peer_info).begin(); pid_peer_info_iter != (_pk_mgr_ptr ->map_pid_peer_info).end(); pid_peer_info_iter++) {
 
@@ -521,10 +525,30 @@ void peer_mgr::handle_test_delay(unsigned long manifest)
 //				_log_ptr->write_log_format("s =>u s u s d s u \n", __FUNCTION__,__LINE__,"pid",pid,"sock",sock,map_pid_fd_iter->second,"manifest",manifest);
 
 				send_test_delay (sock,manifest);
+				sockOKcount++;
+
 			}
 		}
-
+	
 	}
+
+	//all fail send topology
+	unsigned long tempManifest =manifest ;
+	unsigned long sendSubStreamID;
+	if(sockOKcount == 0){
+
+		while(tempManifest){
+				sendSubStreamID = _pk_mgr_ptr->manifestToSubstreamID (tempManifest);
+				_pk_mgr_ptr->send_parentToPK( _pk_mgr_ptr->SubstreamIDToManifest(sendSubStreamID) ,PK_PID +1);
+				tempManifest &=  (~ _pk_mgr_ptr->SubstreamIDToManifest(sendSubStreamID)) ;
+		}
+	}
+
+
+
+	return sockOKcount;
+
+
 }
 
 

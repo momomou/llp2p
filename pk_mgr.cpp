@@ -252,6 +252,7 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 		//				printf("The substream is testing!!!!!\n",sub_id,pid_peerDown_info_iter->second->peerInfo.pid);
 						//若有多個正在測試中一次只選擇一個substream cut(最右邊的)  並且重設全部記數器的count
 						testingSubStreamID =sub_id ; //manifestToSubstreamID (peerTestingManifest);
+
 						_log_ptr->write_log_format("s =>u s u s u s u \n", __FUNCTION__,__LINE__,"stream testing fail peerTestingManifest ",peerTestingManifest,"select manifest (SBID)= ", manifestToSubstreamID (peerTestingManifest),"testingSubStreamID",testingSubStreamID);
 
 						(ssDetect_ptr + testingSubStreamID) ->isTesting =0 ;  //false  
@@ -689,15 +690,7 @@ int pk_mgr::handle_register(string svc_tcp_port, string svc_udp_port)
 
 int pk_mgr::handle_pkt_in(int sock)
 {
-/*
-	unsigned char BUFF[10000] ={0} ;
-	printf("%d",sizeof(BUFF));
-while(1){
 
-	recv(sock,(char*)BUFF,sizeof(BUFF),0);
-
-}
-*/
 
 
 	unsigned long i;
@@ -837,98 +830,7 @@ while(1){
 	}
 
 //	printf("len = %d seq = %d X_count =%d\n",chunk_ptr->header.length,chunk_ptr->header.sequence_number,Xcount);
-/*
 
-	chunk_header_ptr = new struct chunk_header_t;
-	memset(chunk_header_ptr, 0x0, sizeof(struct chunk_header_t));
-
-	expect_len = sizeof(struct chunk_header_t) ;
-
-	//	printf("expect_len %d\n");
-	//	PAUSE
-	//expect recv light header
-	while (1) {
-		recv_byte = recv(sock, (char *)chunk_header_ptr + offset, expect_len, 0);
-		if (recv_byte < 0) {
-#ifdef _WIN32 
-			if (WSAGetLastError() == WSAEWOULDBLOCK) {
-#else
-			if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-#endif
-				continue;
-			} else {
-				data_close(sock, "recv error in pk_mgr::handle_pkt_in");
-				printf("recv error in pk_mgr::handle_pkt_in\n");
-				PAUSE
-					_log_ptr->exit(0, "recv error in pk_mgr::handle_pkt_in");\
-			}
-		}
-		else if(recv_byte == 0){
-			printf("sock closed\n");
-			data_close(sock, "recv error in pk_mgr::handle_pkt_in");
-			//PAUSE
-			return RET_SOCK_ERROR;
-		}
-		expect_len -= recv_byte;
-		offset += recv_byte;
-
-		if (!expect_len)
-			break;
-	}
-
-
-	expect_len = chunk_header_ptr->length;
-	buf_len = sizeof(struct chunk_header_t) + expect_len;
-
-	chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
-
-	if (!chunk_ptr) {
-		data_close(sock, "memory not enough");
-		printf("memory not enough\n");
-		_log_ptr->exit(0, "memory not enough");
-		return RET_SOCK_ERROR;
-	}
-
-	memset(chunk_ptr, 0x0, buf_len);
-
-	memcpy(chunk_ptr, chunk_header_ptr, sizeof(struct chunk_header_t));
-
-	if(chunk_header_ptr)
-		delete chunk_header_ptr;
-
-	while (1) {
-		recv_byte = recv(sock, (char *)chunk_ptr + offset, expect_len, 0);
-		if (recv_byte < 0) {
-#ifdef _WIN32 
-			if (WSAGetLastError() == WSAEWOULDBLOCK) {
-#else
-			if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-#endif
-				continue;
-			} else {
-				data_close(sock, "recv error in pk_mgr::handle_pkt_in");
-				printf("recv error in pk_mgr::handle_pkt_in\n");
-				DBG_PRINTF("here\n");
-				PAUSE
-			}
-		}
-		else if(recv_byte == 0){
-			printf("sock closed\n");
-			data_close(sock, "recv error in pk_mgr::handle_pkt_in");
-			//				PAUSE
-			return RET_SOCK_ERROR;
-		}
-		expect_len -= recv_byte;
-		offset += recv_byte;
-		if (expect_len == 0)
-			break;
-	}
-
-	//recv whole packet to chunk_ptr done (size is buf_len),packet include (light header + content ) 
-
-	offset = 0;
-
-*/
 
 
 	//handle CHNK_CMD_PEER_ REG, expect recv  chunk_register_reply_t    from  PK
@@ -1017,7 +919,7 @@ while(1){
 		if(lane_member >= 1){
 
 			session_id = _peer_mgr_ptr->_peer_communication_ptr->set_candidates_handler(tempManifes,level_msg_ptr,lane_member, 0);
-
+			_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"session_id_start = ",session_id);
 			_peer_ptr->substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer.find(session_id);
 			if(_peer_ptr->substream_first_reply_peer_iter == _peer_ptr->substream_first_reply_peer.end()){
 				_peer_ptr->substream_first_reply_peer[session_id] = new manifest_timmer_flag;
@@ -1025,12 +927,13 @@ while(1){
 			}
 			else{
 				printf("this id is already exist in pk_mgr::handle_pkt_in in register\n");
+				PAUSE
 				exit(1);
 			}
 
-			_peer_ptr->substream_first_reply_peer[session_id]->connectTimeOutFlag =true ;
-			_peer_ptr->substream_first_reply_peer[session_id]->firstReplyFlag =true ;
-			_peer_ptr->substream_first_reply_peer[session_id]->networkTimeOutFlag =true;
+			_peer_ptr->substream_first_reply_peer[session_id]->connectTimeOutFlag =TRUE ;
+			_peer_ptr->substream_first_reply_peer[session_id]->firstReplyFlag =TRUE ;
+			_peer_ptr->substream_first_reply_peer[session_id]->networkTimeOutFlag =TRUE;
 			_peer_ptr->substream_first_reply_peer[session_id]->peer_role = 0;
 			_peer_ptr->substream_first_reply_peer[session_id]->rescue_manifest = tempManifes;
 
@@ -1039,7 +942,11 @@ while(1){
 
 			_log_ptr ->getTickTime(&_peer_ptr->substream_first_reply_peer[session_id]->connectTimeOut ) ;
 //			_peer_mgr_ptr->handle_test_delay(tempManifes);
+		}else if(lane_member == 0){
+			pkSendCapacity = true;
+		
 		}
+/*
 		else if(lane_member == 0){
 			session_id = _peer_mgr_ptr->_peer_communication_ptr->set_candidates_handler(tempManifes,level_msg_ptr,lane_member, 0);
 
@@ -1064,6 +971,7 @@ while(1){
 
 			_log_ptr ->getTickTime(&_peer_ptr->substream_first_reply_peer[session_id]->connectTimeOut ) ;
 		}
+*/
 
 
 		for (i = 0; i < lane_member; i++) {
@@ -1152,7 +1060,7 @@ while(1){
 		if(lane_member >= 1){
 
 			session_id = _peer_mgr_ptr->_peer_communication_ptr->set_candidates_handler(level_msg_ptr->manifest,level_msg_ptr,lane_member, 0);
-
+			_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"session_id_start = ",session_id);
 			_peer_ptr->substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer.find(session_id);
 			if(_peer_ptr->substream_first_reply_peer_iter == _peer_ptr->substream_first_reply_peer.end()){
 				_peer_ptr->substream_first_reply_peer[session_id] = new manifest_timmer_flag;
@@ -1160,12 +1068,13 @@ while(1){
 			}
 			else{
 				printf("this id is already exist in pk_mgr::handle_pkt_in in rescue\n");
+				PAUSE
 				exit(1);
 			}
 
-			_peer_ptr->substream_first_reply_peer[session_id]->connectTimeOutFlag =true ;
-			_peer_ptr->substream_first_reply_peer[session_id]->firstReplyFlag =true ;
-			_peer_ptr->substream_first_reply_peer[session_id]->networkTimeOutFlag =true;
+			_peer_ptr->substream_first_reply_peer[session_id]->connectTimeOutFlag =TRUE ;
+			_peer_ptr->substream_first_reply_peer[session_id]->firstReplyFlag =TRUE ;
+			_peer_ptr->substream_first_reply_peer[session_id]->networkTimeOutFlag =TRUE;
 			_peer_ptr->substream_first_reply_peer[session_id]->rescue_manifest = level_msg_ptr->manifest;
 			_peer_ptr->substream_first_reply_peer[session_id]->peer_role = 0;
 
@@ -1182,6 +1091,7 @@ while(1){
 
 
 		}
+/*
 		else if(lane_member == 0){
 
 			session_id = _peer_mgr_ptr->_peer_communication_ptr->set_candidates_handler(level_msg_ptr->manifest,level_msg_ptr,lane_member, 0);
@@ -1215,6 +1125,8 @@ while(1){
 
 
 		}
+
+*/
 
 
 		for (i = 0; i < lane_member; i++) {
@@ -1302,8 +1214,7 @@ while(1){
 
 		_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"new manifest ",pkDownInfoPtr ->peerInfo.manifest );
 
-//忘記這行在衝沙小 覺得有bug先註解掉(在收到list是空的時候) 
-//在handle stream 才會對manifest 做隱藏的動作,在這邊先隱藏掉的話可能在handstream那邊不會進去
+
 //		pkDownInfoPtr ->peerInfo.manifest &= (~testingManifest) ;
 
 //		_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__," new manifest -testing manifest",pkDownInfoPtr ->peerInfo.manifest );
@@ -1329,13 +1240,6 @@ while(1){
 //		}
 		
 
-		//CHNK_CMD_PEER_PARENT_CHILDREN
-		//	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_PARENT_CHILDREN){
-		//		printf("cmd =recv CHNK_CMD_PEER_PARENT_CHILDREN\n");
-
-
-
-		//other 
 	
 
 	// for each stream this protocol (only use to  decode to flv )  or (other protocol need some header)  
@@ -1439,6 +1343,7 @@ while(1){
 		_log_ptr->write_log_format("\n");
 
 		session_id = _peer_mgr_ptr->_peer_communication_ptr->set_candidates_handler(level_msg_ptr->manifest,level_msg_ptr,list_number, 1);
+		_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"session_id_start = ",session_id);
 		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"call set_candidates_handler\n");
 		/*substream_first_reply_peer_iter = substream_first_reply_peer.find(((struct chunk_rescue_list*)chunk_ptr) ->manifest);
 		if(_peer_ptr->substream_first_reply_peer_iter == _peer_ptr->substream_first_reply_peer.end()){
@@ -1459,11 +1364,12 @@ while(1){
 			exit(1);
 		}
 
-		_peer_ptr->substream_first_reply_peer[session_id]->connectTimeOutFlag =true ;
-		_peer_ptr->substream_first_reply_peer[session_id]->firstReplyFlag =false ;
-		_peer_ptr->substream_first_reply_peer[session_id]->networkTimeOutFlag =true;
+		_peer_ptr->substream_first_reply_peer[session_id]->connectTimeOutFlag =TRUE ;
+		_peer_ptr->substream_first_reply_peer[session_id]->firstReplyFlag =FALSE ;
+		_peer_ptr->substream_first_reply_peer[session_id]->networkTimeOutFlag =TRUE;
 		_peer_ptr->substream_first_reply_peer[session_id]->rescue_manifest = child_info_ptr->manifest;
 		_peer_ptr->substream_first_reply_peer[session_id]->peer_role = 1;
+		_peer_ptr->substream_first_reply_peer[session_id]->pid =child_info_ptr->child_level_info.pid;
 
 		_log_ptr ->getTickTime(&_peer_ptr->substream_first_reply_peer[session_id]->connectTimeOut ) ;
 		//和lane 每個peer 先建立好連線	
@@ -1646,6 +1552,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	delay_table_iter = delay_table.find(temp_sub_id);
 	if(delay_table_iter == delay_table.end()){
 		printf("error : can not find source struct in table in send_capacity_to_pk\n");
+		PAUSE
 		exit(1);
 	}
 
@@ -1814,9 +1721,9 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 	pkt_count++;
 
-	if(_log_ptr->diffTime_ms(start,end) >=20000){
+	if(_log_ptr->diffTime_ms(start,end) >=10000){
 
-		Xcount = ((double)pkt_count / (PARAMETER_X*20));
+		Xcount = ((double)pkt_count / (PARAMETER_X*10));
 		printf("Xcount = %d \n",Xcount);
 //		printf("%f\n",(double)totalbyte / ((double)(_log_ptr->diffTime_ms(start,end))));
 //		fprintf(fp,"%f\n",(double)totalbyte / ( (double)(_log_ptr->diffTime_ms(start,end))));
@@ -1877,7 +1784,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 		//pk
 		if(parentPid == PK_PID){
-			
+			//若SYN完了
 			if(pkSendCapacity){
 				if((!(delay_table_iter->second->first_pkt_recv))&&(syn_table.init_flag == 2)){
 
@@ -1887,6 +1794,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 						delay_table_iter->second->end_seq_num = chunk_ptr ->header.sequence_number;
 						if(peer_start_delay_count == sub_stream_num){
 							send_capacity_to_pk(_sock);
+
 						}
 					}
 				}
@@ -1896,7 +1804,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 		//peers
 		}else{
-		
+			//若SYN完了
 			if((!(delay_table_iter->second->first_pkt_recv))&&(syn_table.init_flag == 2)){
 
 				if(chunk_ptr ->header.sequence_number > syn_table.start_seq){
@@ -1915,21 +1823,6 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 	}
 
-	//若SYN完了
-
-/*
-	if((!(delay_table_iter->second->first_pkt_recv))&&(syn_table.init_flag == 2)){
-
-		if(chunk_ptr ->header.sequence_number > syn_table.start_seq){
-			peer_start_delay_count++;
-			delay_table_iter->second->first_pkt_recv = 1;
-			delay_table_iter->second->end_seq_num = chunk_ptr ->header.sequence_number;
-			if(peer_start_delay_count == sub_stream_num){
-				send_capacity_to_pk(_sock);
-			}
-		}
-	}
-*/
 
 
 //p
@@ -2058,7 +1951,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		}
 		printf("here3 least CurrDiff =%d\n",leastCurrDiff);
 		_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__,"here3 least CurrDiff =",leastCurrDiff,"_current=",_current_send_sequence_number,"SSID =",_current_send_sequence_number%sub_stream_num);
-		PAUSE
+//		PAUSE
 
 		//可能某個subtream 追過_bucket_size,直接跳到最後一個 (應該不會發生)
 	}else if (leastCurrDiff > _bucket_size) {
@@ -2593,7 +2486,7 @@ void pk_mgr::measure()
 
 			//找出所有正在測試的substream
 			for(unsigned long i =0  ; i < sub_stream_num;i++){
-				if ((ssDetect_ptr + i) ->isTesting ){
+				if (!( check_rescue_state(i,0))){
 					testingManifest |= SubstreamIDToManifest(i);
 				}
 			}
@@ -2653,7 +2546,7 @@ void pk_mgr::measure()
 						}else{
 							printf("pkmgr2016"); //PAUSE
 						}
-//					}
+					}
 
 
 					send_parentToPK ( SubstreamIDToManifest (testingSubStreamID ) ,PK_PID+1 ) ;
@@ -2670,7 +2563,7 @@ void pk_mgr::measure()
 
 					reSet_detectionInfo();
 
-				}
+//				}
 
 
 				//PID 是其他peer
@@ -2680,8 +2573,6 @@ void pk_mgr::measure()
 				printf("normal rescue \n");
 				_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"normal rescue ");
 
-//p
-//if(	check_rescue_state(testingSubStreamID,1))
 
 
 				afterManifest = manifestFactory (connectPeerInfo ->peerInfo.manifest , rescueSS);
@@ -2729,14 +2620,6 @@ void pk_mgr::measure()
 			
 			}
 
-
-			//PARAMETER_M 觸發區間最少是再經過PARAMETER_M次 測量
-			//			}else{
-			//				connectPeerInfo->lastTriggerCount ++ ;
-			//				if (connectPeerInfo ->lastTriggerCount   >= PARAMETER_M)
-			//					connectPeerInfo ->lastTriggerCount  = 0 ;
-
-			//			}
 
 		}else{
 
@@ -3105,14 +2988,6 @@ unsigned int pk_mgr::rescueNumAccumulate(){
 
 }
 
-//include sent functiom
-//  void pk_mgr::handleAppenSelfdPid(struct chunk_t *chunk_ptr )
-
-
-
-// | header | manifest | pif |pid  | ... 
-//void pk_mgr::storeChildrenToSet(struct chunk_t *chunk_ptr )
-
 
 
 //若對應到多個則只會回傳最小的(最右邊 最低位的)
@@ -3309,29 +3184,87 @@ void pk_mgr::reSet_detectionInfo()
 void pk_mgr::time_handle()
 {
 
-	LARGE_INTEGER new_timme;
+	LARGE_INTEGER new_timer;
 //	_log_ptr->write_log_format("\ns =>u s \n", __FUNCTION__,__LINE__,"************************************ a while round ***********************************") ;
-
-	_log_ptr ->getTickTime (&new_timme);
-
-
-	//all fail send topology
+	_log_ptr ->getTickTime (&new_timer);
+	map<unsigned long, manifest_timmer_flag *>::iterator temp_substream_first_reply_peer_iter;
 
 	//for connect timeout
-	for(_peer_ptr->substream_first_reply_peer_iter =_peer_ptr->substream_first_reply_peer.begin();_peer_ptr->substream_first_reply_peer_iter !=_peer_ptr->substream_first_reply_peer.end();_peer_ptr->substream_first_reply_peer_iter++){
+	for(_peer_ptr->substream_first_reply_peer_iter =_peer_ptr->substream_first_reply_peer.begin();_peer_ptr->substream_first_reply_peer_iter !=_peer_ptr->substream_first_reply_peer.end();){
 
-		if(_peer_ptr->substream_first_reply_peer_iter ->second->connectTimeOutFlag == true){
+		if(_peer_ptr->substream_first_reply_peer_iter ->second->connectTimeOutFlag == TRUE){
 
-			if(_log_ptr ->diffTime_ms(_peer_ptr->substream_first_reply_peer_iter ->second->connectTimeOut,new_timme) >= CONNECT_TIME_OUT){
-
-				pkSendCapacity =true;
-				_peer_ptr->substream_first_reply_peer_iter ->second->connectTimeOutFlag=false ;
-				_peer_mgr_ptr->_peer_communication_ptr->stop_attempt_connect(_peer_ptr->substream_first_reply_peer_iter->first);
-				_peer_mgr_ptr->handle_test_delay(_peer_ptr->substream_first_reply_peer_iter ->second->rescue_manifest);
+			if(_log_ptr ->diffTime_ms(_peer_ptr->substream_first_reply_peer_iter ->second->connectTimeOut,new_timer) >= CONNECT_TIME_OUT){
 
 
+				if(_peer_ptr->substream_first_reply_peer_iter ->second->peer_role == 0){
+
+					_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"session manifest timeout",_peer_ptr->substream_first_reply_peer_iter ->second->rescue_manifest) ;
+					pkSendCapacity =true;
+					_peer_ptr->substream_first_reply_peer_iter ->second->connectTimeOutFlag=FALSE ;
+					_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"session_id_stop = ",_peer_ptr->substream_first_reply_peer_iter->first);
+					_peer_mgr_ptr->_peer_communication_ptr->stop_attempt_connect(_peer_ptr->substream_first_reply_peer_iter->first);
+
+					
+					if ( _peer_mgr_ptr->handle_test_delay(_peer_ptr->substream_first_reply_peer_iter ->second->rescue_manifest ) >0){
+						_peer_ptr->substream_first_reply_peer_iter++;					
+					
+
+					//connect all fail 
+					}else{
+
+						_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"manifest timeout and all connect fail",_peer_ptr->substream_first_reply_peer_iter ->second->rescue_manifest) ;
+
+						temp_substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer_iter ;
+					
+						_peer_ptr->substream_first_reply_peer_iter++;
+
+						clear_map_pid_peer_info(temp_substream_first_reply_peer_iter ->second->rescue_manifest);
+
+						delete [] (unsigned char*)temp_substream_first_reply_peer_iter ->second;
+
+						_peer_ptr ->substream_first_reply_peer.erase(temp_substream_first_reply_peer_iter);
+
+						if(_peer_ptr->substream_first_reply_peer_iter ==_peer_ptr->substream_first_reply_peer.end()){
+							break;
+						}					
+					
+					}
+
+
+
+				}else if (_peer_ptr->substream_first_reply_peer_iter ->second->peer_role == 1){
+
+					_peer_ptr->substream_first_reply_peer_iter ->second->connectTimeOutFlag=FALSE ;
+					_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"session_id_stop = ",_peer_ptr->substream_first_reply_peer_iter->first);
+					_peer_mgr_ptr->_peer_communication_ptr->stop_attempt_connect(_peer_ptr->substream_first_reply_peer_iter->first);
+
+
+					temp_substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer_iter ;
+					
+					_peer_ptr->substream_first_reply_peer_iter++;
+
+					delete [] (unsigned char*)temp_substream_first_reply_peer_iter ->second;
+
+					_peer_ptr ->substream_first_reply_peer.erase(temp_substream_first_reply_peer_iter);
+				
+					if(_peer_ptr->substream_first_reply_peer_iter ==_peer_ptr->substream_first_reply_peer.end()){
+						break;
+					}
+				
+				
+				}else{
+					printf("what !?");
+					PAUSE
+				}
+
+
+			}else{
+				_peer_ptr->substream_first_reply_peer_iter++;
 			}
 
+		}else{
+			_peer_ptr->substream_first_reply_peer_iter++;
 		}
 
 
@@ -3339,8 +3272,129 @@ void pk_mgr::time_handle()
 
 
 
-	//for stream timeout
-//	for
+	//for streaming timeout
+
+	
+	map<unsigned long, int>::iterator map_pid_fd_iter;
+	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
+	map<unsigned long, struct peer_connect_down_t *>::iterator temp_pid_peerDown_info_iter;
+	static LARGE_INTEGER LastTimer;
+
+	struct peer_connect_down_t *parentPeerPtr=NULL;
+	unsigned long parentPid=-1;
+	unsigned long testingManifest = 0;
+	unsigned long tempManifest=0;
+	unsigned long testingSubStreamID = -1 ;
+	int sock=-1;
+	static bool firstIn =true;
+	unsigned long peerTestingManifest=0;
+
+	if(firstIn){
+		_log_ptr->getTickTime(&LastTimer);
+		firstIn =false;
+	}
+
+	if(_log_ptr ->diffTime_ms(LastTimer,new_timer) >= NETWORK_TIMEOUT){
+
+
+		LastTimer=new_timer ;
+
+		for(pid_peerDown_info_iter =map_pid_peerDown_info.begin(); pid_peerDown_info_iter!= map_pid_peerDown_info.end() ;)	{
+
+			parentPeerPtr = pid_peerDown_info_iter ->second;	//get parent peer info 
+			parentPid = parentPeerPtr ->peerInfo.pid;			//get parent pid
+
+			map_pid_fd_iter = _peer_ptr ->map_in_pid_fd.find(parentPid);
+			if(map_pid_fd_iter!= _peer_ptr ->map_in_pid_fd.end()){
+				sock=map_pid_fd_iter ->second;					//get parent sock
+			}else{
+				printf("map_in_pid_fd not find ");
+				PAUSE
+			}
+
+			//timeout 發生
+			if( parentPeerPtr ->timeOutLastSeq == parentPeerPtr->timeOutNewSeq && parentPeerPtr->peerInfo.manifest!=0){
+
+
+				//找出所有正在測試的substream
+				for(unsigned long i =0  ; i < sub_stream_num;i++){
+					//					if ((ssDetect_ptr + i) ->isTesting ){
+					if(!( check_rescue_state(i,0))){
+						testingManifest |= SubstreamIDToManifest(i);
+					}
+				}
+
+				peerTestingManifest =testingManifest & parentPeerPtr->peerInfo.manifest ;
+
+
+				if(parentPid==PK_PID){
+			
+					printf("Tihis peer TimeOut\n");
+					_log_ptr->write_log_format("\ns =>u s \n", __FUNCTION__,__LINE__,"Tihis peer TimeOut") ;
+					pid_peerDown_info_iter++ ;
+
+				}else{
+			
+					printf("Pid =%d Time out\n",parentPid);
+					_log_ptr->write_log_format("\ns =>u s u\n", __FUNCTION__,__LINE__,"Parent  TimeOut  Parent PID=",parentPid) ;
+					pkDownInfoPtr->peerInfo.manifest |= parentPeerPtr->peerInfo.manifest ;
+					send_rescueManifestToPK ( pkDownInfoPtr->peerInfo.manifest | testingManifest );
+
+					tempManifest =  parentPeerPtr->peerInfo.manifest ;
+			
+					parentPeerPtr->peerInfo.manifest = 0;
+
+					while(tempManifest){
+						testingSubStreamID = manifestToSubstreamID (tempManifest);
+
+						//set recue stat true
+						if(check_rescue_state(testingSubStreamID,0)){
+							set_rescue_state(testingSubStreamID,1);
+						}else if (check_rescue_state(testingSubStreamID,2)){
+							set_rescue_state(testingSubStreamID,0);
+							set_rescue_state(testingSubStreamID,1);
+							send_parentToPK(SubstreamIDToManifest(testingSubStreamID),PK_PID +1);
+						}else if (check_rescue_state(testingSubStreamID,1)){
+							//do nothing
+						}
+
+						(ssDetect_ptr + testingSubStreamID) ->previousParentPID = parentPid;
+						tempManifest &=  (~SubstreamIDToManifest(testingSubStreamID) );
+					}
+
+					reSet_detectionInfo();
+
+					temp_pid_peerDown_info_iter = pid_peerDown_info_iter ;
+
+					pid_peerDown_info_iter++ ;
+
+					_peer_ptr ->data_close(sock ,"time out data_close ",CLOSE_PARENT);
+
+					if(pid_peerDown_info_iter ==map_pid_peerDown_info.end()){
+						break;
+					}
+
+
+				}
+
+
+				//更新timeOutNewSeq
+			}else{
+
+
+				parentPeerPtr ->timeOutLastSeq =parentPeerPtr ->timeOutNewSeq ;
+				pid_peerDown_info_iter++ ;
+			}
+
+		}
+
+	}
+
+
+
+	
+
+
 
 
 

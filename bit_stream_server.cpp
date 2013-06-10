@@ -162,7 +162,7 @@ void bit_stream_server::handle_pkt_error(int sock)
 void bit_stream_server::handle_sock_error(int sock, basic_class *bcptr)
 {
 	delete dynamic_cast<bit_stream_out *> (bcptr);
-	_net_ptr->fd_del_hdl_map_delete(sock);
+	_net_ptr->fd_bcptr_map_delete(sock);
 	del_seed(sock);
 	data_close(sock, "client closed!!");
 	_pk_mgr_ptr->del_stream(sock,(stream *)bcptr, STRM_TYPE_MEDIA);

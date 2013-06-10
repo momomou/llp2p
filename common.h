@@ -11,6 +11,7 @@
 
 //ms
 #define CONNECT_TIME_OUT 5000
+#define NETWORK_TIMEOUT  5000
 
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
 #define PARAMETER_M		8
@@ -25,10 +26,17 @@
 #define MAX_DELAY 4000
 #define SOURCE_DELAY_CONTINUOUS 10
 
+//io_accept fd remain period
+#define FD_REMAIN_PERIOD	1000
 //p
 //#define mode mode_HTTP // mode_BitStream
 #define mode mode_HTTP
 
+//nat part
+#define MAX_ID_LEN	31					//Max Client ID Length
+#define DEF_TIMEOUT 15
+#define TEST_TIME
+#define LISTEN_TIMEOUT	1000	//MUST less than  CONNECT_TIME_OUT
 
 #include "configuration.h"
 
@@ -714,12 +722,13 @@ struct role_struct{
 
 struct peer_com_info{
 	int peer_num;
-	int role;	// 0 rescue peer; 1 candidate
-	unsigned long manifest;
+	int role;	//caller's role : 0 rescue peer; 1 candidate
+	unsigned long manifest;	//caller's manifest
 	struct chunk_level_msg_t *list_info;
 };
 
 struct manifest_timmer_flag{
+	unsigned long	pid;
 	unsigned long	firstReplyFlag;
 	unsigned long	networkTimeOutFlag;
 	unsigned long	connectTimeOutFlag;
@@ -735,5 +744,47 @@ struct chunk_child_info {
 	unsigned long manifest;	//rescue peer
 	struct level_info_t child_level_info;	
 };
+
+struct fd_information {
+	int flag;	//flag 0 rescue peer, flag 1 candidates, and delete in stop
+	unsigned long manifest;	//must be store before io_connect, and delete in stop
+	unsigned long pid;	//must be store before io_connect, and delete in stop
+	unsigned long session_id;	//must be store before io_connect, and delete in stop
+};
+
+typedef struct _XconnInfo
+{
+	SOCKET sServer;
+	SOCKET sPeer;
+	char myId[MAX_ID_LEN + 1];
+	char peerId[MAX_ID_LEN + 1];
+	int flag;
+} XconnInfo;
+
+struct nat_con_thread_struct {
+	HANDLE hThread;
+	unsigned threadID;
+	unsigned long manifest;
+	unsigned long pid;
+	int role;
+	void *net_object;
+	void *nat_interface_object;
+	void *peer_mgr_object;
+	XconnInfo Xconn;
+};
+
+typedef struct _Msg
+{
+	INT32 nType;
+	union
+	{
+		struct 
+		{
+			CHAR chSrcID[MAX_ID_LEN + 1];		//ID of the source client
+			CHAR chDstID[MAX_ID_LEN + 1];		//ID of the destination client 
+		} Connection;
+		CHAR chID[MAX_ID_LEN + 1];		//ID for deregierster
+	}Data;
+} Msg;
 
 #endif

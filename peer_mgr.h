@@ -57,7 +57,7 @@ public:
 	
 	///2013/01/23
 	void send_test_delay(int _sock,unsigned long manifest);
-	void handle_test_delay(unsigned long manifest);
+	int handle_test_delay(unsigned long manifest);
 	void send_manifest_to_parent(unsigned long manifestValue,unsigned long parentPid);
 	void handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr);
 

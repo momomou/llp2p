@@ -47,18 +47,24 @@ void logger::start_log_record(int time)
 	_fp = fopen(LOGFILE, "w");
 	if(!_fp) {
 		cout << "Cannot write log file" << endl;
-		::exit(0);
+//		::exit(0);
 	}
 
 	_binary_fp = fopen(LOGBINARYFILE, "wb");
 	if(_binary_fp==NULL) {
 		cout << "Cannot write binary log file" << endl;
-		::exit(0);
+//		::exit(0);
 	}
 }
 
 void logger::stop_log_record() 
 {
+
+	if(_fp== NULL)
+		return;
+	if(_binary_fp== NULL)
+		return;
+
 	fprintf(_fp, "===================================================================================================\n");
 	fflush(_fp);
 	fclose(_fp);
@@ -74,6 +80,12 @@ void logger::write_log_format(const char* fmt, ...)
 	char *s;
 	unsigned long long int llu;
 	struct in_addr pip;
+
+	if(_fp== NULL)
+		return;
+	if(_binary_fp== NULL)
+		return;
+
 
 	fprintf(_fp,"[%s] ", get_now_time());
 
@@ -130,6 +142,8 @@ void logger::exit(int status, const char *action)
 	write_log_format("s => s (s)\n", "log Terminate", "exit()", action);
 	stop_log_record();
 	_net_ptr->garbage_collection();
+	printf("logger error");
+	PAUSE
 	::exit(status);
 }
 

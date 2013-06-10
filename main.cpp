@@ -57,6 +57,7 @@ void signal_handler(int sig)
 			MessageBox(NULL, _T("SIGSEGV"), _T("EXIT"), MB_OK | MB_ICONSTOP);
 #else
 			printf("SIGSEGV\n");
+			PAUSE
 			exit(0);		// it must exit on linux			
 #endif
 			break;
@@ -66,6 +67,7 @@ void signal_handler(int sig)
 			MessageBox(NULL, _T("SIGABRT"), _T("EXIT"), MB_OK | MB_ICONSTOP);
 #else
 			printf("SIGABRT\n");
+			PAUSE
 			exit(0);		// it must exit on linux
 #endif			
 			break;	
@@ -236,6 +238,7 @@ int main(int argc, char **argv)
 	  
 	if(!log_ptr->check_arch_compatible()) {
 		cout << "Hardware Architecture is not support." << endl;
+		PAUSE
 		log_ptr->exit(0, "Hardware Architecture is not support.");
 	}
 

@@ -128,7 +128,7 @@ void network::epoll_waiter(int timeout, list<int> *fd_list)
 			if (_map_fd_bc_tbl_iter != _map_fd_bc_tbl.end()) {
                 //printf("handle sock error\n");
 				bc_ptr = _map_fd_bc_tbl_iter->second;
-				_map_fd_del_hdl_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
+				_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
 			}
 		}
 	}
@@ -167,8 +167,8 @@ void network::epoll_dispatcher(void)
 				//printf("%d sock in\n",cfd);
 				if (bc_ptr->handle_pkt_in(cfd) == RET_SOCK_ERROR) {		// readable
                     printf("%s,handle in sock error\n",__FUNCTION__);
-					if(_map_fd_del_hdl_tbl.find(cfd) != _map_fd_del_hdl_tbl.end()){
-						_map_fd_del_hdl_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
+					if(_map_fd_bc_tbl.find(cfd) != _map_fd_bc_tbl.end()){
+						_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
 					}
 					close(cfd);
                 }
@@ -177,8 +177,8 @@ void network::epoll_dispatcher(void)
 				//printf("%d sock out\n",cfd);
 				if (bc_ptr->handle_pkt_out(cfd) == RET_SOCK_ERROR) {		// writable
 					printf("%s,handle out sock error\n",__FUNCTION__);
-					if(_map_fd_del_hdl_tbl.find(cfd) != _map_fd_del_hdl_tbl.end()){
-						_map_fd_del_hdl_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
+					if(_map_fd_bc_tbl.find(cfd) != _map_fd_bc_tbl.end()){
+						_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
 					}
 					close(cfd);
 				}

@@ -120,6 +120,21 @@
     <ClInclude Include="..\peer_communication.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
+    <ClInclude Include="..\Client.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ClientAPI.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ClientMacro.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\io_nat_punch.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nat_interface.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\config.ini">
@@ -212,6 +227,18 @@
       <Filter>原始程式檔</Filter>
     </ClCompile>
     <ClCompile Include="..\peer_communication.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Sample.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Client.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\io_nat_punch.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nat_interface.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
   </ItemGroup>
