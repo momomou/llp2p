@@ -1016,11 +1016,7 @@ int pk_mgr::handle_pkt_in(int sock)
 		unsigned long temp_rescue_sub_id = 0;
 		int session_id;
 		temp_rescue_sub_id = manifestToSubstreamID(((struct chunk_rescue_list*)chunk_ptr) ->manifest);
-		set_rescue_state(temp_rescue_sub_id,2);
-
-
-
-
+		
 		lane_member = (buf_len - sizeof(struct chunk_header_t) - sizeof(unsigned long) - sizeof(unsigned long)) / sizeof(struct level_info_t);
 		level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + lane_member * sizeof(struct level_info_t *);
 
@@ -1032,6 +1028,13 @@ int pk_mgr::handle_pkt_in(int sock)
 
 		printf("list peer num %d",lane_member);
 		_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"lane_member ",lane_member);
+
+		if(chunk_ptr->header.rsv_1 ==REQUEST){
+			set_rescue_state(temp_rescue_sub_id,1);
+			set_rescue_state(temp_rescue_sub_id,2);
+		}else{
+			set_rescue_state(temp_rescue_sub_id,2);
+		}
 
 		if(lane_member == 0 ){
 			set_rescue_state(temp_rescue_sub_id,0);

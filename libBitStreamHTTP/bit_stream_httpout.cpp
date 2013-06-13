@@ -190,7 +190,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 
 	//pop until get the first keyframe
-/*
+
 
 			while(first_pkt){
 				if(_queue_out_data_ptr ->size() >=10){
@@ -211,57 +211,57 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 					return RET_OK;
 			}
 
-*/
+
 
 	//here is to down-sampling (這邊可能有些bug 可能會去pop一個空的_queue_out_data_ptr!?)
 
-/*
-			int baseCount= _pk_mgr_ptr ->Xcount*4 ;
+
+			int baseCount= _pk_mgr_ptr ->Xcount*PARAMETER_X ;
 			int sentSequenceNumber = chunk_ptr ->header.sequence_number ;
 			int differenceValue = (_pk_mgr_ptr ->_current_send_sequence_number -sentSequenceNumber);
 			if (differenceValue > (baseCount+1)){ //if (recv -sent)diff >100 pkt pop until  queue <30 and continuance pop until last key frame
-				while(_queue_out_data_ptr ->size() >=(baseCount *0.3)+1){
+				while(_queue_out_data_ptr ->size() >=(baseCount *0.3)+2){
 					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "POP queue ", _queue_out_data_ptr ->size());
 					_queue_out_data_ptr->pop();
 				}
 				chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();
 				while(! isKeyFrame(chunk_ptr )){
-					if( _queue_out_data_ptr ->size()<=1)
+					if( _queue_out_data_ptr ->size()<=2)
 						return RET_OK;
 					_queue_out_data_ptr->pop();
 					_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "POP queue ", _queue_out_data_ptr ->size());
 					chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();
-					if(_queue_out_data_ptr ->size() <=(baseCount *0.1)+1))
+					if(_queue_out_data_ptr ->size() <=(baseCount *0.1)+2)
 						break;
 					}
 			}
 
-			else if(differenceValue <=((baseCount)+1) && differenceValue >((baseCount *0.4)+1)){  
+			else if(differenceValue <=((baseCount)+1) && differenceValue >((baseCount *0.4)+2)){  
 			  		if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 3 == 0) ){   //not key frame &&  sampling by 1/3
 						_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/3", chunk_ptr ->header.sequence_number);
-						if( _queue_out_data_ptr ->size()<=1)
+						if( _queue_out_data_ptr ->size()<=2)
 							return RET_OK;
 						_queue_out_data_ptr->pop();
 						chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();			 //ignore and not send
 						}
-			}else if(differenceValue <=((baseCount *0.4)+1) && differenceValue >((baseCount *0.2)+1)){
+			}else if(differenceValue <=((baseCount *0.4)+1) && differenceValue >((baseCount *0.2)+2)){
 					if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 5 == 0) ){   //not key frame &&  sampling by 1/5
-						if( _queue_out_data_ptr ->size()<=1)
+						if( _queue_out_data_ptr ->size()<=2)
 							return RET_OK;
 						_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/5", chunk_ptr ->header.sequence_number);
 						_queue_out_data_ptr->pop();
 						chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();			 //ignore and not send
 						}
-			}else if (differenceValue <=((baseCount *0.2)+1) && differenceValue >((baseCount *0.05)+1)){
+			}else if (differenceValue <=((baseCount *0.2)+2) && differenceValue >((baseCount *0.05)+2)){
 					if(! isKeyFrame(chunk_ptr) &&  (sentSequenceNumber % 7 == 0) ){   //not key frame &&  sampling by 1/7
-						if( _queue_out_data_ptr ->size()<=1)
+						if( _queue_out_data_ptr ->size()<=2)
 							return RET_OK;
 						_log_ptr->write_log_format("s => s d\n", __FUNCTION__, "pkt discard 1/7", chunk_ptr ->header.sequence_number);
 						_queue_out_data_ptr->pop();
 						chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();			 //ignore and not send
 						}	
 			}
-*/
+
 
 
 	//for debug
@@ -273,7 +273,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 //			memset( chunk_ptr->buf + (chunk_ptr->header.length) -4 ,0x0,4);
 
 	//		unsigned int stamp=getFlvTimeStamp(chunk_ptr);
-
+			if(_queue_out_data_ptr ->size() == 0){  return RET_OK;}
 			_queue_out_data_ptr->pop();
 			send_size = chunk_ptr->header.length;
 		

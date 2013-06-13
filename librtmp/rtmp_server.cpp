@@ -108,7 +108,7 @@ int rtmp_server::handle_pkt_in(int sock)
 	_net_ptr->epoll_control(new_fd, EPOLL_CTL_ADD, EPOLLIN);
 	printf("Rtmp_server epoll new_fd=>%d\n", new_fd);
 	_net_ptr->fd_bcptr_map_set(new_fd, dynamic_cast<basic_class *> (_rtmp_viewer));
-	_net_ptr->fd_del_hdl_map_set(new_fd, dynamic_cast<basic_class *> (this));
+//	_net_ptr->fd_del_hdl_map_set(new_fd, dynamic_cast<basic_class *> (this));
 	fd_list_ptr->push_back(new_fd);
 
 	return RET_OK;
@@ -128,7 +128,7 @@ void rtmp_server::handle_pkt_error(int sock)
 void rtmp_server::handle_sock_error(int sock, basic_class *bcptr)
 {
 	delete dynamic_cast<rtmp_viewer *> (bcptr);
-	_net_ptr->fd_del_hdl_map_delete(sock);
+//	_net_ptr->fd_del_hdl_map_delete(sock);
 	del_seed(sock);
 	data_close(sock, "client closed!!");
 	_pk_mgr_ptr->del_stream(sock,(stream *)bcptr, STRM_TYPE_MEDIA);

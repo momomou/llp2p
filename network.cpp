@@ -24,11 +24,14 @@ void network::setall_fd_epollout()
 void network::garbage_collection() 
 {
 	
-	//if (_map_fd_bc_tbl.size()) {
+	if (_map_fd_bc_tbl.size()) {
 		for(_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin() ; _map_fd_bc_tbl_iter != _map_fd_bc_tbl.end() ; _map_fd_bc_tbl_iter++) {
 			close(_map_fd_bc_tbl_iter->first);
+			_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin();
 		}
-	//}
+	}
+
+	_map_fd_bc_tbl.clear();
 
 #ifdef _WIN32
 	::closesocket(epfd);
@@ -98,6 +101,7 @@ void network::fd_bcptr_map_delete(int sock)
 {
 	_map_fd_bc_tbl.erase(sock);
 }
+/*
 void network::fd_del_hdl_map_set(int sock, basic_class *bcptr)
 {
 	_map_fd_del_hdl_tbl[sock] = bcptr;
@@ -106,6 +110,7 @@ void network::fd_del_hdl_map_delete(int sock)
 {
 	_map_fd_del_hdl_tbl.erase(sock);
 }
+*/
 
 void network::epoll_creater(void) 
 {
@@ -121,6 +126,7 @@ void network::epoll_waiter(int timeout, list<int> *fd_list)
 	nfds = epoll_wait(epfd, events, EVENTSIZE, timeout, fd_list);
 	if(nfds == -1){
         //printf("epoll_wait failed\n");
+		if(_error_cfd ->size() == 0 ){ return ;}
 		cfd = _error_cfd->front();
 		_error_cfd->pop();
 		if(cfd != 0){
@@ -158,7 +164,7 @@ void network::epoll_dispatcher(void)
 				// EPOLLRDHUP => This socket is closed by client (client has sent a FIN), we have to close it.
 				cout << "something wrong: fd = " << cfd << " error:"<<WSAGetLastError()<< endl;
 				//PAUSE
-				_map_fd_del_hdl_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
+				_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
 				_peer_ptr->data_close(cfd, "This socket is closed by client (client has sent a FIN)",DONT_CARE);
 				continue;
 			}
