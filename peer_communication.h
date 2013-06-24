@@ -49,7 +49,7 @@ public:
 	map<int, unsigned long> map_fd_manifest;	//must be store before io_connect, and delete in stop*/
 	//map<int, int>::iterator map_fd_flag_iter;
 
-	FILE *peer_com_log;
+//	FILE *peer_com_log;
 	network *_net_ptr;
 	logger *_log_ptr;
 	configuration *_prep;

@@ -215,8 +215,9 @@ int main(int argc, char **argv)
 	sin.sin_addr.s_addr = INADDR_ANY;
 	sin.sin_port = htons((unsigned short)atoi(svc_tcp_port.c_str()));
 	
-	if ( setsockopt(svc_fd_tcp, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval , sizeof(optval)) == -1)
+	if ( setsockopt(svc_fd_tcp, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval , sizeof(optval)) == -1){
 		return -1;
+	}
 
 	if (net_ptr->bind(svc_fd_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == -1) {
 		cout << "TCP PORT :" << svc_tcp_port << "bind error! " << endl;
@@ -267,6 +268,23 @@ int main(int argc, char **argv)
 	fd_list.push_back(svc_fd_tcp);
 	pk_mgr_ptr->init();
 
+	bit_stream_server_ptr->_map_seed_out_data
+
+	while(1){
+		int testServerfd = pk_mgr_ptr ->build_connection("127.0.0.1",stream_local_port);
+		if(testServerfd){
+		
+		printf("connect ok \n");
+		shutdown(testServerfd, SHUT_RDWR);
+//		closesocket(testServerfd);
+		closesocket(testServerfd);
+		break ;
+		}else{
+		
+		printf("fail ");
+		}
+	}
+
 
 	while(!srv_shutdown) {
 		
@@ -285,7 +303,8 @@ int main(int argc, char **argv)
 		
 		pk_mgr_ptr->time_handle();
 	}
-
+//	printf("srv_shutdown");
+//	PAUSE
 	net_ptr->garbage_collection();
 	log_ptr->write_log_format("s => s (s)\n", (char*)__PRETTY_FUNCTION__, "PF", "graceful exit!!");
 	log_ptr->stop_log_record();

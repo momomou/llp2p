@@ -541,6 +541,7 @@ int peer_mgr::handle_test_delay(unsigned long manifest)
 				sendSubStreamID = _pk_mgr_ptr->manifestToSubstreamID (tempManifest);
 				_pk_mgr_ptr->send_parentToPK( _pk_mgr_ptr->SubstreamIDToManifest(sendSubStreamID) ,PK_PID +1);
 				tempManifest &=  (~ _pk_mgr_ptr->SubstreamIDToManifest(sendSubStreamID)) ;
+//				PAUSE
 		}
 	}
 

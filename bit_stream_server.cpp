@@ -49,20 +49,25 @@ void bit_stream_server::init(int stream_id, unsigned short bitStreamServerPort)
 	sin.sin_port = htons(bitStreamServerPort);
 
 	if (::bind(_sock_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == -1) {
-		throw "can't bind socket: _sock_tcp";
+		
+		printf("CNANOT bitStreamServer bind at TCP port: %d\n", bitStreamServerPort);
+		PAUSE
+//		throw "can't bind socket: _sock_tcp";
 	} else {
 		printf("bitStreamServer bind at TCP port: %d\n", bitStreamServerPort);
 	}	 
 
 	if (::listen(_sock_tcp, MAX_POLL_EVENT) == -1) {
 		printf("bitStreamServer :%d   listen error! \n",bitStreamServerPort);
-		throw "can't listen socket: _sock_tcp";
+
+//		throw "can't listen socket: _sock_tcp";
 	}
 
 // for windows
 #ifdef _WIN32
 	if (::ioctlsocket(_sock_tcp,FIONBIO,(u_long FAR*)&iMode) == SOCKET_ERROR){
-		throw "socket error: _sock_tcp";
+//		throw "socket error: _sock_tcp";
+		printf("socket error: _sock_tcp: %d\n", _sock_tcp);
 	}
 #endif
 

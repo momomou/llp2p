@@ -532,7 +532,7 @@ void pk_mgr::init()
 	//web_ctrl_sever_ptr = new web_ctrl_sever(_net_ptr, _log_ptr, fd_list_ptr, &map_stream_name_id); 
 	//web_ctrl_sever_ptr->init();
 
-	if (build_connection(pk_ip, pk_port)) {
+	if (_sock = build_connection(pk_ip, pk_port)) {
 		cout << "pk_mgr build_connection() success" << endl;
 	} else {
 		cout << "pk_mgr build_connection() fail" << endl;
@@ -578,7 +578,7 @@ void pk_mgr::init()
 // build_connection to (string ip , string port) ,if failure return 0,else return 1
 int pk_mgr::build_connection(string ip, string port)
 {
-
+	int _sock;
 	if((_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
 		cout << "init create socket failure" << endl;
 #ifdef _WIN32
@@ -628,7 +628,7 @@ int pk_mgr::build_connection(string ip, string port)
 
 	}
 
-	return 1;
+	return _sock;
 
 }
 
@@ -1029,9 +1029,21 @@ int pk_mgr::handle_pkt_in(int sock)
 		printf("list peer num %d",lane_member);
 		_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"lane_member ",lane_member);
 
-		if(chunk_ptr->header.rsv_1 ==REQUEST){
+		if(chunk_ptr->header.rsv_1 ==REQUEST  ){
+
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"LIST_REQUEST");
+
+
+			if(check_rescue_state(temp_rescue_sub_id,0)){
+
+			
 			set_rescue_state(temp_rescue_sub_id,1);
 			set_rescue_state(temp_rescue_sub_id,2);
+			}else{
+				printf("why not status 0 in REQUEST\n");
+				PAUSE
+			}
+		
 		}else{
 			set_rescue_state(temp_rescue_sub_id,2);
 		}
@@ -1265,9 +1277,12 @@ int pk_mgr::handle_pkt_in(int sock)
 			streamID_ptr = (int *) ((char*)chunk_ptr ->buf + ooffset );
 			len_ptr = ( int *) ( (char *)chunk_ptr ->buf + sizeof(int) +ooffset );
 
+			//wait  header 
 			if (*len_ptr ==0 ){
+				printf("wait header streamID = %d ",*streamID_ptr);
 				ooffset += sizeof(int) + sizeof( int) ;
 				continue ;
+			//no header
 			}else if (*len_ptr == -1){
 
 //				ooffset += sizeof(int) + sizeof( int) ;
@@ -1277,6 +1292,7 @@ int pk_mgr::handle_pkt_in(int sock)
 				printf("streamID = %d  *len_ptr =%d  \n",*streamID_ptr,*len_ptr) ;
 				ooffset += sizeof(int) + sizeof( int) ;
 
+			//have header
 			}else{
 				protocol_len_header = (update_stream_header *)new unsigned char[*len_ptr + sizeof( int)] ;
 				header = ( (unsigned char *)chunk_ptr ->buf + sizeof(int) +ooffset );
@@ -1611,7 +1627,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		//testing function
 		reSet_detectionInfo();
 
-	//如果這個 peer 來的chunk 裡的substream 從pk和這個peer都有來 且在join的狀態
+	//如果這個 peer 來的chunk 裡的substream 從pk和這個peer都有來 且在join的狀態  //狀態 0
 	}else if( (SubstreamIDToManifest (temp_sub_id) & parentPeerPtr ->peerInfo.manifest)  &&  (SubstreamIDToManifest (temp_sub_id) & pkDownInfoPtr->peerInfo.manifest) && (parentPid != PK_PID) && (check_rescue_state(temp_sub_id,0))){
 	
 		pkDownInfoPtr->peerInfo.manifest =0;
@@ -2069,11 +2085,11 @@ int pk_mgr::check_rescue_state(unsigned long sub_id,int state){
 	}
 
 	if(delay_table_iter->second->rescue_state == state){
-	//	_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__," rescue substream id : ",sub_id," state(0 normal 1 rescue trigger 2 testing) =",delay_table_iter->second->rescue_state," check ok",state);
+		_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__," rescue substream id : ",sub_id," state(0 normal 1 rescue trigger 2 testing) =",delay_table_iter->second->rescue_state," check ok",state);
 		return 1;
 	}
 	else{
-	//	_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__," rescue substream id : ",sub_id," state(0 normal 1 rescue trigger 2 testing) =",delay_table_iter->second->rescue_state," check fail",state);
+		_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__," rescue substream id : ",sub_id," state(0 normal 1 rescue trigger 2 testing) =",delay_table_iter->second->rescue_state," check fail",state);
 		return 0;
 	}
 }
@@ -3068,7 +3084,7 @@ void pk_mgr::send_rescueManifestToPKUpdate(unsigned long manifestValue)
 }
 
 
-// 這邊的 manifestValue 只會有一個 sunstream ID
+// 這邊的 manifestValue 只會有一個 sunstream ID  // 若送一個空的list 給PK 代表選PK當PARENT
 // header  | manifest | parent_num  |pareentPID  | pareentPID | ... 
 // if (oldPID == PK_PID+1 )  沒有舊的parent  for testing stream
 void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){

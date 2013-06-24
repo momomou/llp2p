@@ -141,7 +141,7 @@ int io_accept::handle_pkt_in(int sock)
 		if (chunk_ptr->header.cmd == CHNK_CMD_ROLE) {
 			cout << "CHNK_CMD_ROLE" << endl;
 			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_ROLE ");
-			fprintf(_peer_communication_ptr->peer_com_log,"CHNK_CMD_ROLE in io_accept::handle_pkt_in\n",new_fd);
+//			fprintf(_peer_communication_ptr->peer_com_log,"CHNK_CMD_ROLE in io_accept::handle_pkt_in\n",new_fd);
 			/*
 			this part shows the roleof this fd (rescue peer or candidate).
 			save it to the table,and bind to peer_com~
@@ -206,7 +206,7 @@ int io_accept::handle_pkt_in(int sock)
 				
 				if(exist_flag == 0){
 					printf("fd : %d cannot find list information in io_accept::handle_pkt_in\n",new_fd);
-					fprintf(_peer_communication_ptr->peer_com_log,"fd : %d cannot find list information in io_accept::handle_pkt_in\n",new_fd);
+//					fprintf(_peer_communication_ptr->peer_com_log,"fd : %d cannot find list information in io_accept::handle_pkt_in\n",new_fd);
 
 					_peer_communication_ptr->map_fd_info[new_fd] = new struct fd_information;
 
@@ -243,7 +243,7 @@ int io_accept::handle_pkt_in(int sock)
 					/*
 					bind to peer_com~ object
 					*/
-					fprintf(_peer_communication_ptr->peer_com_log,"fd : %d find list information in io_accept::handle_pkt_in\n",new_fd);
+//					fprintf(_peer_communication_ptr->peer_com_log,"fd : %d find list information in io_accept::handle_pkt_in\n",new_fd);
 
 					_net_ptr->set_nonblocking(new_fd);
 
@@ -252,7 +252,7 @@ int io_accept::handle_pkt_in(int sock)
 					_peer_mgr_ptr->fd_list_ptr->push_back(new_fd);
 				}
 
-				fflush(_peer_communication_ptr->peer_com_log);
+//				fflush(_peer_communication_ptr->peer_com_log);
 			}
 		} else{
 			cout << "error : unknow or cannot handle cmd :"<<chunk_ptr->header.cmd<< endl;

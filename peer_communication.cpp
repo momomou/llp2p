@@ -23,7 +23,7 @@ peer_communication::peer_communication(network *net_ptr,logger *log_ptr,configur
 	_io_accept_ptr = new io_accept(net_ptr,log_ptr,prep_ptr,peer_mgr_ptr,peer_ptr,pk_mgr_ptr,this);
 	_io_connect_ptr = new io_connect(net_ptr,log_ptr,prep_ptr,peer_mgr_ptr,peer_ptr,pk_mgr_ptr,this);
 
-	peer_com_log = fopen("./peer_com_log.txt","wb");
+//	peer_com_log = fopen("./peer_com_log.txt","wb");
 }
 
 void peer_communication::set_self_info(unsigned long public_ip){
@@ -33,17 +33,17 @@ void peer_communication::set_self_info(unsigned long public_ip){
 
 int peer_communication::set_candidates_handler(unsigned long rescue_manifest,struct chunk_level_msg_t *testing_info,unsigned int candidates_num,int flag){	//flag 0 rescue peer, flag 1 candidate's peer
 	
-	fprintf(peer_com_log,"\n");
-	fprintf(peer_com_log,"set_candidates_handler\n");
-	fprintf(peer_com_log,"session_id : %d, manifest : %d, role: %d, list_number: %d\n",session_id_count,rescue_manifest,flag,candidates_num);
+	////fprintf(peer_com_log,"\n");
+	////fprintf(peer_com_log,"set_candidates_handler\n");
+	////fprintf(peer_com_log,"session_id : %d, manifest : %d, role: %d, list_number: %d\n",session_id_count,rescue_manifest,flag,candidates_num);
 	for(int i=0;i<candidates_num;i++){
-		//fprintf(peer_com_log,"list pid : %d, public_ip : %d, private_ip: %d\n",testing_info->level_info[i]->pid,testing_info->level_info[i]->public_ip,testing_info->level_info[i]->private_ip);
-		fprintf(peer_com_log,"list pid : %d\n",testing_info->level_info[i]->pid);
+		////fprintf(peer_com_log,"list pid : %d, public_ip : %d, private_ip: %d\n",testing_info->level_info[i]->pid,testing_info->level_info[i]->public_ip,testing_info->level_info[i]->private_ip);
+		//fprintf(peer_com_log,"list pid : %d\n",testing_info->level_info[i]->pid);
 	}
-	fflush(peer_com_log);
+	//fflush(peer_com_log);
 	
 	if((candidates_num==0)&&(flag==0)){
-		fprintf(peer_com_log,"rescue peer call peer API, but list is empty\n");
+		//fprintf(peer_com_log,"rescue peer call peer API, but list is empty\n");
 		if((total_manifest & rescue_manifest)==1){
 			printf("error : re-rescue for some sub stream : %d %d in set_candidates_test\n",total_manifest,rescue_manifest);
 			PAUSE
@@ -51,7 +51,7 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 		}
 		else{
 			printf("rescue manifest: %d already rescue manifest: %d\n",rescue_manifest,total_manifest);
-			fprintf(peer_com_log,"rescue manifest: %d already rescue manifest: %d\n",rescue_manifest,total_manifest);
+			//fprintf(peer_com_log,"rescue manifest: %d already rescue manifest: %d\n",rescue_manifest,total_manifest);
 			total_manifest = total_manifest | rescue_manifest;	//total_manifest has to be erased in stop_attempt_connect
 		
 			session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
@@ -92,7 +92,7 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 			}
 			session_id_count++;
 		}
-		fflush(peer_com_log);
+		//fflush(peer_com_log);
 		return (session_id_count-1);
 	}
 	else if((candidates_num==0)&&(flag==1)){
@@ -102,7 +102,7 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 	}
 
 	if(flag == 0){
-		fprintf(peer_com_log,"rescue peer call peer API\n");
+		//fprintf(peer_com_log,"rescue peer call peer API\n");
 		if((total_manifest & rescue_manifest)==1){
 			printf("error : re-rescue for some sub stream : %d %d in set_candidates_test\n",total_manifest,rescue_manifest);
 			PAUSE
@@ -110,7 +110,7 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 		}
 		else{
 			printf("rescue manifest: %d already rescue manifest: %d\n",rescue_manifest,total_manifest);
-			fprintf(peer_com_log,"rescue manifest: %d already rescue manifest: %d\n",rescue_manifest,total_manifest);
+			//fprintf(peer_com_log,"rescue manifest: %d already rescue manifest: %d\n",rescue_manifest,total_manifest);
 			total_manifest = total_manifest | rescue_manifest;	//total_manifest has to be erased in stop_attempt_connect
 		
 			session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
@@ -152,25 +152,25 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 				for(int i=0;i<candidates_num;i++){
 					if((self_info->private_ip == self_info->public_ip)&&(testing_info->level_info[i]->private_ip ==testing_info->level_info[i]->public_ip)){	//self public ip , candidate public ip
 						printf("all public ip active connect\n");
-						fprintf(peer_com_log,"all public ip active connect\n");
+						//fprintf(peer_com_log,"all public ip active connect\n");
 						non_blocking_build_connection(testing_info->level_info[i],0,rescue_manifest,testing_info->level_info[i]->pid,0,session_id_count);
 					}
 					else if((self_info->private_ip == self_info->public_ip)&&(testing_info->level_info[i]->private_ip !=testing_info->level_info[i]->public_ip)){	//self public ip , candidate private ip
 						printf("candidate is private ip passive connect\n");
-						fprintf(peer_com_log,"candidate is private ip passive connect\n");
+						//fprintf(peer_com_log,"candidate is private ip passive connect\n");
 						accept_check(testing_info->level_info[i],0,rescue_manifest,testing_info->level_info[i]->pid,session_id_count);
 					}
 					else if((self_info->private_ip != self_info->public_ip)&&(testing_info->level_info[i]->private_ip ==testing_info->level_info[i]->public_ip)){	//self private ip , candidate public ip
 						printf("rescue peer is public ip active connect\n");
-						fprintf(peer_com_log,"rescue peer is public ip active connect\n");
+						//fprintf(peer_com_log,"rescue peer is public ip active connect\n");
 						non_blocking_build_connection(testing_info->level_info[i],0,rescue_manifest,testing_info->level_info[i]->pid,0,session_id_count);
 					}
 					else if((self_info->private_ip != self_info->public_ip)&&(testing_info->level_info[i]->private_ip !=testing_info->level_info[i]->public_ip)){	//self private ip , candidate private ip
 						printf("all private ip use NAT module\n");
-						fprintf(peer_com_log,"all private ip use NAT module\n");
+						//fprintf(peer_com_log,"all private ip use NAT module\n");
 						if(self_info->public_ip == testing_info->level_info[i]->public_ip){
 							printf("same NAT device active connect\n");
-							fprintf(peer_com_log,"same NAT device active connect\n");
+							//fprintf(peer_com_log,"same NAT device active connect\n");
 							non_blocking_build_connection(testing_info->level_info[i],0,rescue_manifest,testing_info->level_info[i]->pid,1,session_id_count);
 						}
 					}
@@ -185,7 +185,7 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 		}
 	}
 	else if(flag == 1){
-		fprintf(peer_com_log,"candidate calls peer_com API\n");
+		//fprintf(peer_com_log,"candidate calls peer_com API\n");
 		if((candidates_num>1)||((candidates_num==0))){
 			printf("error : candidate num must be 1\n");
 			PAUSE
@@ -193,7 +193,7 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 		}
 		else{
 			printf("candidate manifest: %d \n",rescue_manifest);
-			fprintf(peer_com_log,"candidate manifest: %d \n",rescue_manifest);
+			//fprintf(peer_com_log,"candidate manifest: %d \n",rescue_manifest);
 		
 			session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
 			if(session_id_candidates_set_iter != session_id_candidates_set.end()){
@@ -232,25 +232,25 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 				}
 				if((self_info->private_ip == self_info->public_ip)&&(testing_info->level_info[0]->private_ip ==testing_info->level_info[0]->public_ip)){	//self public ip , rescue peer public ip
 					printf("all public ip passive connect in cnadidate\n");
-					fprintf(peer_com_log,"all public ip passive connect in cnadidate\n");
+					//fprintf(peer_com_log,"all public ip passive connect in cnadidate\n");
 					accept_check(testing_info->level_info[0],1,rescue_manifest,testing_info->level_info[0]->pid,session_id_count);
 				}
 				else if((self_info->private_ip == self_info->public_ip)&&(testing_info->level_info[0]->private_ip !=testing_info->level_info[0]->public_ip)){	//self public ip , rescue peer private ip
 					printf("rescue peer is private ip passive connect in cnadidate\n");
-					fprintf(peer_com_log,"rescue peer is private ip passive connect in cnadidate\n");
+					//fprintf(peer_com_log,"rescue peer is private ip passive connect in cnadidate\n");
 					accept_check(testing_info->level_info[0],1,rescue_manifest,testing_info->level_info[0]->pid,session_id_count);
 				}
 				else if((self_info->private_ip != self_info->public_ip)&&(testing_info->level_info[0]->private_ip ==testing_info->level_info[0]->public_ip)){	//self private ip , rescue peer public ip
 					printf("candidate is private ip active connect in cnadidate\n");
-					fprintf(peer_com_log,"candidate is private ip active connect in cnadidate\n");
+					//fprintf(peer_com_log,"candidate is private ip active connect in cnadidate\n");
 					non_blocking_build_connection(testing_info->level_info[0],1,rescue_manifest,testing_info->level_info[0]->pid,0,session_id_count);
 				}
 				else if((self_info->private_ip != self_info->public_ip)&&(testing_info->level_info[0]->private_ip !=testing_info->level_info[0]->public_ip)){	//self private ip , rescue peer private ip
 					printf("all private ip use NAT module in cnadidate\n");
-					fprintf(peer_com_log,"all private ip use NAT module in cnadidate\n");
+					//fprintf(peer_com_log,"all private ip use NAT module in cnadidate\n");
 					if(self_info->public_ip == testing_info->level_info[0]->public_ip){
 							printf("same NAT device passive connect in cnadidate\n");
-							fprintf(peer_com_log,"same NAT device passive connect in cnadidate\n");
+							//fprintf(peer_com_log,"same NAT device passive connect in cnadidate\n");
 							accept_check(testing_info->level_info[0],1,rescue_manifest,testing_info->level_info[0]->pid,session_id_count);
 					}
 				}
@@ -269,29 +269,29 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 		exit(1);
 	}
 
-	fflush(peer_com_log);
+	//fflush(peer_com_log);
 	return (session_id_count-1);
 }
 
 void peer_communication::clear_fd_in_peer_com(int sock){
-	fprintf(peer_com_log,"\n");
-	fprintf(peer_com_log,"fd : %d start close in peer_communication::clear_fd_in_peer_com\n",sock);
-	fflush(peer_com_log);
+	//fprintf(peer_com_log,"\n");
+	//fprintf(peer_com_log,"fd : %d start close in peer_communication::clear_fd_in_peer_com\n",sock);
+	//fflush(peer_com_log);
 
 	map_fd_info_iter = map_fd_info.find(sock);
 	if(map_fd_info_iter == map_fd_info.end()){
-		fprintf(peer_com_log,"fd : %d close fail (clear_fd_in_peer_com)\n",sock);
-		fflush(peer_com_log);
+		//fprintf(peer_com_log,"fd : %d close fail (clear_fd_in_peer_com)\n",sock);
+		//fflush(peer_com_log);
 	}
 	else{
-		fprintf(peer_com_log,"fd : %d session id : %d pid : %d close succeed (clear_fd_in_peer_com)\n",sock,map_fd_info_iter->second->session_id,map_fd_info_iter->second->pid);
-		fflush(peer_com_log);
+		//fprintf(peer_com_log,"fd : %d session id : %d pid : %d close succeed (clear_fd_in_peer_com)\n",sock,map_fd_info_iter->second->session_id,map_fd_info_iter->second->pid);
+		//fflush(peer_com_log);
 
 		delete map_fd_info_iter->second;
 		map_fd_info.erase(map_fd_info_iter);
 	}
-	fprintf(peer_com_log,"\n");
-	fflush(peer_com_log);
+	//fprintf(peer_com_log,"\n");
+	//fflush(peer_com_log);
 }
 
 void peer_communication::accept_check(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, unsigned long session_id){
@@ -329,7 +329,7 @@ void peer_communication::accept_check(struct level_info_t *level_info_ptr,int fd
 			}
 
 			if((manifest == map_fd_info_iter->second->manifest)&&(fd_role == map_fd_info_iter->second->flag)&&(fd_pid == map_fd_info_iter->second->pid)){
-				fprintf(peer_com_log,"fd : %d update session of fd in peer_communication::accept_check\n",*map_fd_unknown_iter);
+				//fprintf(peer_com_log,"fd : %d update session of fd in peer_communication::accept_check\n",*map_fd_unknown_iter);
 				printf("fd : %d update session of fd in peer_communication::accept_check\n",*map_fd_unknown_iter);
 				/*map_fd_session_id_iter = map_fd_session_id.find(map_fd_unknown_iter->first);
 				if(map_fd_session_id_iter != map_fd_session_id.end()){
@@ -344,7 +344,7 @@ void peer_communication::accept_check(struct level_info_t *level_info_ptr,int fd
 				/*
 				bind to peer_com~ object
 				*/
-				fprintf(peer_com_log,"fd : %d bind to peer_com in peer_communication::accept_check\n",*map_fd_unknown_iter);
+				//fprintf(peer_com_log,"fd : %d bind to peer_com in peer_communication::accept_check\n",*map_fd_unknown_iter);
 				_net_ptr->set_nonblocking(map_fd_info_iter->first);
 
 				_net_ptr->epoll_control(map_fd_info_iter->first, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT);
@@ -374,8 +374,8 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 	/*
 	this part means that if the parent is exist, we don't create it again.
 	*/
-	//fprintf(peer_com_log,"call non_blocking_build_connection ip : %s , role :%d , manifest : %d , fd_pid : %d , flag : %d\n",level_info_ptr->public_ip,fd_role, manifest, fd_pid, flag);
-	fprintf(peer_com_log,"call non_blocking_build_connection role :%d , manifest : %d , fd_pid : %d , flag : %d\n",fd_role, manifest, fd_pid, flag);
+	////fprintf(peer_com_log,"call non_blocking_build_connection ip : %s , role :%d , manifest : %d , fd_pid : %d , flag : %d\n",level_info_ptr->public_ip,fd_role, manifest, fd_pid, flag);
+	//fprintf(peer_com_log,"call non_blocking_build_connection role :%d , manifest : %d , fd_pid : %d , flag : %d\n",fd_role, manifest, fd_pid, flag);
 	if(fd_role == 0){
 		multimap<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 		map<unsigned long, int>::iterator map_pid_fd_iter;
@@ -384,8 +384,8 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 		//之前已經建立過連線的 在map_in_pid_fd裡面 則不再建立(保證對同個parent不再建立第二條線)
 		for(map_pid_fd_iter = _peer_ptr->map_in_pid_fd.begin();map_pid_fd_iter != _peer_ptr->map_in_pid_fd.end(); map_pid_fd_iter++){
 			if(map_pid_fd_iter->first == level_info_ptr->pid ){
-				fprintf(peer_com_log,"fd already in map_in_pid_fd in non_blocking_build_connection (rescue peer)\n");
-				fflush(peer_com_log);
+				//fprintf(peer_com_log,"fd already in map_in_pid_fd in non_blocking_build_connection (rescue peer)\n");
+				//fflush(peer_com_log);
 				return 1;
 			}
 		}
@@ -399,8 +399,8 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 			if(_pk_mgr_ptr ->map_pid_peer_info.count(level_info_ptr ->pid) >= 2 ){
 				printf("pid =%d already in connect find in map_pid_peer_info  testing",level_info_ptr ->pid);
 				_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_peer_info testing");
-				fprintf(peer_com_log,"fd already in map_pid_peer_info in non_blocking_build_connection (rescue peer)\n");	
-				fflush(peer_com_log);
+				//fprintf(peer_com_log,"fd already in map_pid_peer_info in non_blocking_build_connection (rescue peer)\n");	
+				//fflush(peer_com_log);
 				return 1;
 			}
 		}
@@ -410,8 +410,8 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 		if(pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_peerDown_info.end()){
 			printf("pid =%d already in connect find in map_pid_peerDown_info",level_info_ptr ->pid);
 			_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_peerDown_info");
-			fprintf(peer_com_log,"fd already in map_pid_peerdown_info in non_blocking_build_connection (rescue peer)\n");
-			fflush(peer_com_log);
+			//fprintf(peer_com_log,"fd already in map_pid_peerdown_info in non_blocking_build_connection (rescue peer)\n");
+			//fflush(peer_com_log);
 			return 1;
 		}
 	}
@@ -426,8 +426,8 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 		//之前已經建立過連線的 在map_out_pid_fd裡面 則不再建立(保證對同個child不再建立第二條線)
 		for(map_pid_fd_iter = _peer_ptr->map_out_pid_fd.begin();map_pid_fd_iter != _peer_ptr->map_out_pid_fd.end(); map_pid_fd_iter++){
 			if(map_pid_fd_iter->first == level_info_ptr->pid ){
-				fprintf(peer_com_log,"fd already in map_out_pid_fd in non_blocking_build_connection (candidate peer)\n");
-				fflush(peer_com_log);
+				//fprintf(peer_com_log,"fd already in map_out_pid_fd in non_blocking_build_connection (candidate peer)\n");
+				//fflush(peer_com_log);
 				return 1;
 			}
 		}
@@ -437,8 +437,8 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 		if(map_pid_rescue_peer_info_iter != _pk_mgr_ptr ->map_pid_rescue_peer_info.end()){
 			printf("pid =%d already in connect find in map_pid_rescue_peer_info",level_info_ptr ->pid);
 			_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_rescue_peer_info");
-			fprintf(peer_com_log,"fd already in map_pid_rescue_peer_info in non_blocking_build_connection (candidate peer)\n");
-			fflush(peer_com_log);
+			//fprintf(peer_com_log,"fd already in map_pid_rescue_peer_info in non_blocking_build_connection (candidate peer)\n");
+			//fflush(peer_com_log);
 			return 1;
 		}
 	}
@@ -484,7 +484,7 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 			_net_ptr->epoll_control(_sock, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT);
 			_net_ptr->set_fd_bcptr_map(_sock, dynamic_cast<basic_class *> (_io_connect_ptr));
 			_peer_mgr_ptr->fd_list_ptr->push_back(_sock);	
-			fprintf(peer_com_log,"build_ connection failure : WSAEWOULDBLOCK\n");
+			//fprintf(peer_com_log,"build_ connection failure : WSAEWOULDBLOCK\n");
 		}
 		else{
 			cout << "build_ connection failure : "<<WSAGetLastError()<< endl;
@@ -511,8 +511,8 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 	/*
 	this part stores the info in each table.
 	*/
-	fprintf(peer_com_log,"non blocking connect (before) fd : %d manifest : %d session_id : %d role : %d pid : %d non_blocking_build_connection (candidate peer)\n",_sock,manifest,session_id,fd_role,fd_pid);
-	fflush(peer_com_log);
+	//fprintf(peer_com_log,"non blocking connect (before) fd : %d manifest : %d session_id : %d role : %d pid : %d non_blocking_build_connection (candidate peer)\n",_sock,manifest,session_id,fd_role,fd_pid);
+	//fflush(peer_com_log);
 
 	map_fd_info_iter = map_fd_info.find(_sock);
 	if(map_fd_info_iter != map_fd_info.end()){
@@ -534,8 +534,8 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 	map_fd_info_iter->second->manifest = manifest;
 	map_fd_info_iter->second->pid = fd_pid;
 	map_fd_info_iter->second->session_id = session_id;
-	fprintf(peer_com_log,"non blocking connect fd : %d manifest : %d session_id : %d role : %d pid : %d non_blocking_build_connection (candidate peer)\n",map_fd_info_iter->first,map_fd_info_iter->second->manifest,map_fd_info_iter->second->session_id,map_fd_info_iter->second->flag,map_fd_info_iter->second->pid);
-	fflush(peer_com_log);
+	//fprintf(peer_com_log,"non blocking connect fd : %d manifest : %d session_id : %d role : %d pid : %d non_blocking_build_connection (candidate peer)\n",map_fd_info_iter->first,map_fd_info_iter->second->manifest,map_fd_info_iter->second->session_id,map_fd_info_iter->second->flag,map_fd_info_iter->second->pid);
+	//fflush(peer_com_log);
 	/*map<int, unsigned long>::iterator map_fd_session_id_iter;	//must be store before connect, and delete in stop
 	map<int, unsigned long>::iterator map_peer_com_fd_pid_iter;	//must be store before connect, and delete in stop
 	map<int, unsigned long>::iterator map_fd_manifest_iter;	//must be store before connect, and delete in stop
@@ -576,8 +576,8 @@ io_accept * peer_communication::get_io_accept_handler(){
 }
 
 void peer_communication::fd_close(int sock){
-	fprintf(peer_com_log,"fd %d close in peer_communication::fd_close\n",sock);
-	fflush(peer_com_log);
+	//fprintf(peer_com_log,"fd %d close in peer_communication::fd_close\n",sock);
+	//fflush(peer_com_log);
 	_net_ptr->close(sock);
 
 	list<int>::iterator fd_iter;
@@ -590,8 +590,8 @@ void peer_communication::fd_close(int sock){
 
 	map_fd_info_iter = map_fd_info.find(sock);
 	if(map_fd_info_iter == map_fd_info.end()){
-		fprintf(peer_com_log,"error : fd %d close cannot find table in peer_communication::fd_close\n",sock);
-		fflush(peer_com_log);
+		//fprintf(peer_com_log,"error : fd %d close cannot find table in peer_communication::fd_close\n",sock);
+		//fflush(peer_com_log);
 		exit(1);
 	}
 	else{
@@ -603,11 +603,11 @@ void peer_communication::stop_attempt_connect(unsigned long stop_session_id){
 	/*
 	erase the manifest structure, and close and take out the fd if it is not in fd_pid table.
 	*/
-	fprintf(peer_com_log,"\n");
+	//fprintf(peer_com_log,"\n");
 	session_id_candidates_set_iter = session_id_candidates_set.find(stop_session_id);
 	if(session_id_candidates_set_iter == session_id_candidates_set.end()){
 		printf("cannot find stop_session_id in structure in stop_attempt_connect\n");
-		fprintf(peer_com_log,"cannot find stop_session_id in structure in stop_attempt_connect\n");
+		//fprintf(peer_com_log,"cannot find stop_session_id in structure in stop_attempt_connect\n");
 		PAUSE
 		exit(1);
 	}
@@ -616,13 +616,13 @@ void peer_communication::stop_attempt_connect(unsigned long stop_session_id){
 
 		if(session_id_candidates_set_iter->second->role == 0){	//caller is rescue peer
 			total_manifest = total_manifest & (~session_id_candidates_set_iter->second->manifest);
-			fprintf(peer_com_log,"find candidates in structure in stop_attempt_connect may be rescue peer\n");
-			fprintf(peer_com_log,"session_id : %d, manifest : %d, role: %d, list_number: %d\n",stop_session_id,session_id_candidates_set_iter->second->manifest,session_id_candidates_set_iter->second->role,session_id_candidates_set_iter->second->peer_num);
+			//fprintf(peer_com_log,"find candidates in structure in stop_attempt_connect may be rescue peer\n");
+			//fprintf(peer_com_log,"session_id : %d, manifest : %d, role: %d, list_number: %d\n",stop_session_id,session_id_candidates_set_iter->second->manifest,session_id_candidates_set_iter->second->role,session_id_candidates_set_iter->second->peer_num);
 			for(int i=0;i<session_id_candidates_set_iter->second->peer_num;i++){
-				//fprintf(peer_com_log,"list pid : %d, public_ip : %s, private_ip: %s\n",session_id_candidates_set_iter->second->list_info->level_info[i]->pid,session_id_candidates_set_iter->second->list_info->level_info[i]->public_ip,session_id_candidates_set_iter->second->list_info->level_info[i]->private_ip);
-				fprintf(peer_com_log,"list pid : %d\n",session_id_candidates_set_iter->second->list_info->level_info[i]->pid);
+				////fprintf(peer_com_log,"list pid : %d, public_ip : %s, private_ip: %s\n",session_id_candidates_set_iter->second->list_info->level_info[i]->pid,session_id_candidates_set_iter->second->list_info->level_info[i]->public_ip,session_id_candidates_set_iter->second->list_info->level_info[i]->private_ip);
+				//fprintf(peer_com_log,"list pid : %d\n",session_id_candidates_set_iter->second->list_info->level_info[i]->pid);
 			}
-			fflush(peer_com_log);
+			//fflush(peer_com_log);
 
 			delete session_id_candidates_set_iter->second->list_info;
 			session_id_candidates_set.erase(session_id_candidates_set_iter);
@@ -668,7 +668,7 @@ void peer_communication::stop_attempt_connect(unsigned long stop_session_id){
 							map_fd_manifest.erase(map_fd_manifest_iter);
 						}*/
 
-						fprintf(peer_com_log,"connect faild delete table and close fd %d \n",map_fd_info_iter->first);
+						//fprintf(peer_com_log,"connect faild delete table and close fd %d \n",map_fd_info_iter->first);
 						/*
 						close fd
 						*/
@@ -690,7 +690,7 @@ void peer_communication::stop_attempt_connect(unsigned long stop_session_id){
 						/*
 						connect succeed just delete table
 						*/
-						fprintf(peer_com_log,"connect succeed just delete table \n");
+						//fprintf(peer_com_log,"connect succeed just delete table \n");
 						/*map_peer_com_fd_pid_iter = map_peer_com_fd_pid.find(map_fd_session_id_iter->first);
 						if(map_peer_com_fd_pid_iter == map_peer_com_fd_pid.end()){
 							printf("error : cannot find map_peer_com_fd_pid in stop_attempt_connect\n");
@@ -728,13 +728,13 @@ void peer_communication::stop_attempt_connect(unsigned long stop_session_id){
 			}
 		}
 		else{	//caller is candidate
-			fprintf(peer_com_log,"find candidates in structure in stop_attempt_connect may be candidate peer\n");
-			fprintf(peer_com_log,"session_id : %d, manifest : %d, role: %d, list_number: %d\n",stop_session_id,session_id_candidates_set_iter->second->manifest,session_id_candidates_set_iter->second->role,session_id_candidates_set_iter->second->peer_num);
+			//fprintf(peer_com_log,"find candidates in structure in stop_attempt_connect may be candidate peer\n");
+			//fprintf(peer_com_log,"session_id : %d, manifest : %d, role: %d, list_number: %d\n",stop_session_id,session_id_candidates_set_iter->second->manifest,session_id_candidates_set_iter->second->role,session_id_candidates_set_iter->second->peer_num);
 			for(int i=0;i<session_id_candidates_set_iter->second->peer_num;i++){
-				//fprintf(peer_com_log,"list pid : %d, public_ip : %s, private_ip: %s\n",session_id_candidates_set_iter->second->list_info->level_info[i]->pid,session_id_candidates_set_iter->second->list_info->level_info[i]->public_ip,session_id_candidates_set_iter->second->list_info->level_info[i]->private_ip);
-				fprintf(peer_com_log,"list pid : %d\n",session_id_candidates_set_iter->second->list_info->level_info[i]->pid);
+				////fprintf(peer_com_log,"list pid : %d, public_ip : %s, private_ip: %s\n",session_id_candidates_set_iter->second->list_info->level_info[i]->pid,session_id_candidates_set_iter->second->list_info->level_info[i]->public_ip,session_id_candidates_set_iter->second->list_info->level_info[i]->private_ip);
+				//fprintf(peer_com_log,"list pid : %d\n",session_id_candidates_set_iter->second->list_info->level_info[i]->pid);
 			}
-			fflush(peer_com_log);
+			//fflush(peer_com_log);
 
 			delete session_id_candidates_set_iter->second->list_info;
 			session_id_candidates_set.erase(session_id_candidates_set_iter);
@@ -780,7 +780,7 @@ void peer_communication::stop_attempt_connect(unsigned long stop_session_id){
 							map_fd_manifest.erase(map_fd_manifest_iter);
 						}*/
 
-						fprintf(peer_com_log,"connect faild delete table and close fd %d \n",map_fd_info_iter->first);
+						//fprintf(peer_com_log,"connect faild delete table and close fd %d \n",map_fd_info_iter->first);
 						/*
 						close fd
 						*/
@@ -802,7 +802,7 @@ void peer_communication::stop_attempt_connect(unsigned long stop_session_id){
 						/*
 						connect succeed just delete table
 						*/
-						fprintf(peer_com_log,"connect succeed just delete table \n");
+						//fprintf(peer_com_log,"connect succeed just delete table \n");
 						/*map_peer_com_fd_pid_iter = map_peer_com_fd_pid.find(map_fd_session_id_iter->first);
 						if(map_peer_com_fd_pid_iter == map_peer_com_fd_pid.end()){
 							printf("error : cannot find map_peer_com_fd_pid in stop_attempt_connect\n");
@@ -843,19 +843,19 @@ void peer_communication::stop_attempt_connect(unsigned long stop_session_id){
 
 		//map<int, unsigned long>::iterator map_peer_com_fd_pid_iter;
 		if(delete_fd_flag==0){
-			fprintf(peer_com_log,"cannot find fd info table \n");
+			//fprintf(peer_com_log,"cannot find fd info table \n");
 		}
 		else{
-			fprintf(peer_com_log,"delete fd info table\n");
+			//fprintf(peer_com_log,"delete fd info table\n");
 		}
-		fprintf(peer_com_log,"io handler : ");
+		//fprintf(peer_com_log,"io handler : ");
 		for(map_fd_info_iter = map_fd_info.begin();map_fd_info_iter != map_fd_info.end();map_fd_info_iter++){
-			fprintf(peer_com_log,"fd : %d, pid: %d\n",map_fd_info_iter->first,map_fd_info_iter->second->pid);
+			//fprintf(peer_com_log,"fd : %d, pid: %d\n",map_fd_info_iter->first,map_fd_info_iter->second->pid);
 		}
-		fprintf(peer_com_log,"\n");
-		fprintf(peer_com_log,"\n");
-		fprintf(peer_com_log,"\n");
-		fflush(peer_com_log);
+		//fprintf(peer_com_log,"\n");
+		//fprintf(peer_com_log,"\n");
+		//fprintf(peer_com_log,"\n");
+		//fflush(peer_com_log);
 	}
 }
 
@@ -880,7 +880,7 @@ int peer_communication::handle_pkt_in(int sock)
 			//do nothing rebind to event out only
 			_net_ptr->set_nonblocking(sock);
 			_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLOUT);
-			fprintf(peer_com_log,"this fd is rescue peer do nothing rebind to event out only\n");
+			//fprintf(peer_com_log,"this fd is rescue peer do nothing rebind to event out only\n");
 		}
 		else if(map_fd_info_iter->second->flag == 1){	//this fd is candidate
 			/*
@@ -921,8 +921,8 @@ int peer_communication::handle_pkt_in(int sock)
 				else if(recv_byte == 0){
 					printf("sock closed\n");
 					cout << "error in peer_communication::handle_pkt_in (recv 0) error number : "<<WSAGetLastError()<< endl;
-					fprintf(peer_com_log,"error in peer_communication::handle_pkt_in (recv 0) error number : %d\n",WSAGetLastError());
-					fflush(peer_com_log);
+					//fprintf(peer_com_log,"error in peer_communication::handle_pkt_in (recv 0) error number : %d\n",WSAGetLastError());
+					//fflush(peer_com_log);
 					fd_close(sock);
 					//PAUSE
 					//exit(1);
@@ -980,8 +980,8 @@ int peer_communication::handle_pkt_in(int sock)
 				else if(recv_byte == 0){
 					printf("sock closed\n");
 					cout << "error in peer_communication::handle_pkt_in (recv 0 payload) error number : "<<WSAGetLastError()<< endl;
-					fprintf(peer_com_log,"error in peer_communication::handle_pkt_in (recv 0) error number : %d\n",WSAGetLastError());
-					fflush(peer_com_log);
+					//fprintf(peer_com_log,"error in peer_communication::handle_pkt_in (recv 0) error number : %d\n",WSAGetLastError());
+					//fflush(peer_com_log);
 					fd_close(sock);
 					//PAUSE
 					//exit(1);
@@ -997,7 +997,7 @@ int peer_communication::handle_pkt_in(int sock)
 			if (chunk_ptr->header.cmd == CHNK_CMD_PEER_CON) {
 				cout << "CHNK_CMD_PEER_CON" << endl;
 				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_PEER_CON ");
-				fprintf(peer_com_log,"CHNK_CMD_PEER_CON\n");
+				//fprintf(peer_com_log,"CHNK_CMD_PEER_CON\n");
 				/*
 				use fake cin info
 				*/
@@ -1091,7 +1091,7 @@ int peer_communication::handle_pkt_out(int sock)	//first write, then set fd to r
 			//之前已經建立過連線的 在map_in_pid_fd裡面 則不再建立(保證對同個parent不再建立第二條線)
 			for(map_pid_fd_iter = _peer_ptr->map_in_pid_fd.begin();map_pid_fd_iter != _peer_ptr->map_in_pid_fd.end(); map_pid_fd_iter++){
 				if(map_pid_fd_iter->first == map_fd_info_iter->second->pid ){
-					fprintf(peer_com_log,"fd already in map_in_pid_fd in peer_communication::handle_pkt_out (rescue peer)\n");
+					//fprintf(peer_com_log,"fd already in map_in_pid_fd in peer_communication::handle_pkt_out (rescue peer)\n");
 					check_flag = 1;
 				}
 			}
@@ -1105,7 +1105,7 @@ int peer_communication::handle_pkt_out(int sock)	//first write, then set fd to r
 				if(_pk_mgr_ptr ->map_pid_peer_info.count(map_fd_info_iter->second->pid) >= 2 ){
 					printf("pid =%d already in connect find in map_pid_peer_info  testing in peer_communication::handle_pkt_out\n",map_fd_info_iter->second->pid);
 					_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",map_fd_info_iter->second->pid,"already in connect find in map_pid_peer_info testing in peer_communication::handle_pkt_out");
-					fprintf(peer_com_log,"fd already in map_pid_peer_info in peer_communication::handle_pkt_out (rescue peer)\n");	
+					//fprintf(peer_com_log,"fd already in map_pid_peer_info in peer_communication::handle_pkt_out (rescue peer)\n");	
 					check_flag = 1;
 				}
 			}
@@ -1115,12 +1115,12 @@ int peer_communication::handle_pkt_out(int sock)	//first write, then set fd to r
 			if(pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_peerDown_info.end()){
 				printf("pid =%d already in connect find in map_pid_peerDown_info in peer_communication::handle_pkt_out\n",map_fd_info_iter->second->pid);
 				_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",map_fd_info_iter->second->pid,"already in connect find in map_pid_peerDown_info in peer_communication::handle_pkt_out");
-				fprintf(peer_com_log,"fd already in map_pid_peerdown_info in peer_communication::handle_pkt_out (rescue peer)\n");
+				//fprintf(peer_com_log,"fd already in map_pid_peerdown_info in peer_communication::handle_pkt_out (rescue peer)\n");
 				check_flag = 1;
 			}
 
 			if(check_flag == 1){
-				fprintf(peer_com_log,"we won't send CHNK_CMD_PEER_CON, since the connection is already exist\n");
+				//fprintf(peer_com_log,"we won't send CHNK_CMD_PEER_CON, since the connection is already exist\n");
 				_net_ptr->set_nonblocking(sock);
 				_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);	
 				_net_ptr->set_fd_bcptr_map(sock, dynamic_cast<basic_class *> (_peer_ptr));
@@ -1142,7 +1142,7 @@ int peer_communication::handle_pkt_out(int sock)	//first write, then set fd to r
 				exit(1);
 			}
 
-			fprintf(peer_com_log,"send CHNK_CMD_PEER_CON\n");
+			//fprintf(peer_com_log,"send CHNK_CMD_PEER_CON\n");
 			if(ret < 0) {
 				cout << "handle_connect_request error!!!" << endl;
 				return 0;
@@ -1158,7 +1158,7 @@ int peer_communication::handle_pkt_out(int sock)	//first write, then set fd to r
 		else if(map_fd_info_iter->second->flag == 1){	//this fd is candidate
 			//do nothing rebind to event in only
 			_net_ptr->set_nonblocking(sock);
-			fprintf(peer_com_log,"this fd is candidate do nothing rebind to event in only\n");
+			//fprintf(peer_com_log,"this fd is candidate do nothing rebind to event in only\n");
 			_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN);
 		}
 		else{

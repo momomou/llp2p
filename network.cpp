@@ -28,6 +28,9 @@ void network::garbage_collection()
 		for(_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin() ; _map_fd_bc_tbl_iter != _map_fd_bc_tbl.end() ; _map_fd_bc_tbl_iter++) {
 			close(_map_fd_bc_tbl_iter->first);
 			_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin();
+			if(_map_fd_bc_tbl_iter == _map_fd_bc_tbl.end()){
+				break;
+			}
 		}
 	}
 

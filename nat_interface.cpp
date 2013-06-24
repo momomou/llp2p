@@ -228,7 +228,7 @@ int nat_interface::handle_pkt_in(int sock)
 				
 				if(exist_flag == 0){
 					printf("fd : %d cannot find list information in nat_interface::handle_pkt_in\n",sock);
-					fprintf(_peer_communication_ptr->peer_com_log,"fd : %d cannot find list information in nat_interface::handle_pkt_in\n",sock);
+//					fprintf(_peer_communication_ptr->peer_com_log,"fd : %d cannot find list information in nat_interface::handle_pkt_in\n",sock);
 
 					/*_peer_communication_ptr->map_peer_com_fd_pid[sock] = role_protocol_ptr->send_pid;
 					_peer_communication_ptr->map_fd_manifest[sock] = role_protocol_ptr->manifest;*/
@@ -272,7 +272,7 @@ int nat_interface::handle_pkt_in(int sock)
 					/*
 					bind to peer_com~ object
 					*/
-					fprintf(_peer_communication_ptr->peer_com_log,"fd : %d find list information in nat_interface::handle_pkt_in\n",sock);
+//					fprintf(_peer_communication_ptr->peer_com_log,"fd : %d find list information in nat_interface::handle_pkt_in\n",sock);
 
 					_net_ptr->set_nonblocking(sock);
 
@@ -281,7 +281,7 @@ int nat_interface::handle_pkt_in(int sock)
 					_peer_mgr_ptr->fd_list_ptr->push_back(sock);
 				}
 
-				fflush(_peer_communication_ptr->peer_com_log);
+//				fflush(_peer_communication_ptr->peer_com_log);
 			}
 		} else{
 			cout << "error : unknow or cannot handle cmd :"<<chunk_ptr->header.cmd<< endl;
