@@ -333,6 +333,7 @@ int network::close(int sock)
 	if (_map_fd_bc_tbl_iter == _map_fd_bc_tbl.end()) {
 		return -1;
 	} else {
+//		delete _map_fd_bc_tbl_iter->second;
 		_map_fd_bc_tbl.erase(_map_fd_bc_tbl_iter);
 		//cout << "erase fd" << endl;
 		//PAUSE

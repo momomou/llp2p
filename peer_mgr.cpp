@@ -486,6 +486,9 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 		_net_ptr->epoll_control(fd_queue_iter->first, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
 	} 
 
+	if (chunk_delay_ptr)
+		delete chunk_delay_ptr;
+
 	printf("sent test delay OK !!  len = %d\n",html_buf ->header.length);
 	_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"sent test delay OK !!");
 

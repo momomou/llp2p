@@ -70,6 +70,7 @@ bit_stream_httpout::bit_stream_httpout(int stream_id,network *net_ptr, logger *l
 		_pk_mgr_ptr = pk_mgr_ptr;
 		fd_list_ptr = fd_list;
 		_bit_stream_server_ptr = bit_stream_server_ptr;
+		_queue_out_data_ptr =NULL;
 
 		_queue_out_data_ptr = new std::queue<struct chunk_t *>;	
 		memset(&_send_ctl_info, 0x00, sizeof(_send_ctl_info));
@@ -84,7 +85,7 @@ bit_stream_httpout::bit_stream_httpout(int stream_id,network *net_ptr, logger *l
 bit_stream_httpout::~bit_stream_httpout(){
 	printf("==============deldet bit_stream_httpout success==========\n");
 	if(_queue_out_data_ptr)
-	delete _queue_out_data_ptr;
+		delete _queue_out_data_ptr;
 	}
 
 void bit_stream_httpout::init(){

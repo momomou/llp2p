@@ -27,6 +27,24 @@ bit_stream_server::bit_stream_server(network *net_ptr, logger *log_ptr, pk_mgr *
 
 bit_stream_server::~bit_stream_server()
 {
+	map<int, stream *>::iterator _map_stream_iter;	// <strm_addr, stream *>
+	for(_map_stream_iter =_pk_mgr_ptr->_map_stream_media.begin() ; _map_stream_iter!=_pk_mgr_ptr->_map_stream_media.end(); _map_stream_iter++){
+
+		if(mode == mode_BitStream){
+			delete dynamic_cast<bit_stream_out *> (_map_stream_iter->second);
+		}else 	if(mode == mode_HTTP){
+			delete dynamic_cast<bit_stream_httpout *> (_map_stream_iter->second);
+		}else 	if(mode == mode_RTMP){
+			//		delete dynamic_cast<bit_stream_out *> (_map_stream_iter->second);
+		}
+
+		data_close(_map_stream_iter ->first, "player obj closed!!");
+
+
+	}
+	_pk_mgr_ptr->_map_stream_media.clear();
+
+
 
 }
 
@@ -41,6 +59,9 @@ void bit_stream_server::init(int stream_id, unsigned short bitStreamServerPort)
 
 	printf("bitStreamServerPort = %hu\n", bitStreamServerPort);
 	_sock_tcp = socket(AF_INET, SOCK_STREAM, 0);
+
+	setsockopt(_sock_tcp, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(int));
+	
 	if(_sock_tcp < 0)
 		throw "create tcp srv socket fail";
 	memset(&sin, 0 ,sizeof(sin));
@@ -70,10 +91,6 @@ void bit_stream_server::init(int stream_id, unsigned short bitStreamServerPort)
 		printf("socket error: _sock_tcp: %d\n", _sock_tcp);
 	}
 #endif
-
-
-	setsockopt(_sock_tcp, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(int));
-	
 	
 
 	_net_ptr->set_nonblocking(_sock_tcp);	// set to non-blocking
@@ -127,23 +144,23 @@ int bit_stream_server::handle_pkt_in(int sock)
 
 		_bit_stream_httpout_ptr = new bit_stream_httpout(_stream_id , _net_ptr, _log_ptr, this, _pk_mgr_ptr, fd_list_ptr ,new_fd);
 	
-	if (!_bit_stream_httpout_ptr) {				//obj create fail
-		cout << "can not allocate _bit_stream_out!!!" << endl;
-		_net_ptr -> close (new_fd);
-		return RET_ERROR;
+		if (!_bit_stream_httpout_ptr) {				//obj create fail
+			cout << "can not allocate _bit_stream_out!!!" << endl;
+			_net_ptr -> close (new_fd);
+			return RET_ERROR;
 
-	}else{				
-	printf("\nnew bit_stream_httpout successfully\n");
-	_pk_mgr_ptr ->add_stream( new_fd,(stream*)_bit_stream_httpout_ptr, STRM_TYPE_MEDIA);
+		}else{				
+		printf("\nnew bit_stream_httpout successfully\n");
+		_pk_mgr_ptr ->add_stream( new_fd,(stream*)_bit_stream_httpout_ptr, STRM_TYPE_MEDIA);
 
-	_bit_stream_httpout_ptr->set_client_sockaddr(&_cin);
-	_net_ptr->set_nonblocking(new_fd);
-	_net_ptr->epoll_control(new_fd, EPOLL_CTL_ADD, EPOLLIN);
-	_net_ptr->fd_bcptr_map_set(new_fd, dynamic_cast<basic_class *> (_bit_stream_httpout_ptr));
-	fd_list_ptr->push_back(new_fd);
-	}
+		_bit_stream_httpout_ptr->set_client_sockaddr(&_cin);
+		_net_ptr->set_nonblocking(new_fd);
+		_net_ptr->epoll_control(new_fd, EPOLL_CTL_ADD, EPOLLIN);
+		_net_ptr->fd_bcptr_map_set(new_fd, dynamic_cast<basic_class *> (_bit_stream_httpout_ptr));
+		fd_list_ptr->push_back(new_fd);
+		}
 
-	return RET_OK;
+		return RET_OK;
 	}else if (mode==mode_RTMP){
 
 	// other mode  RTSP RTMP FILE TE_SG
@@ -166,10 +183,16 @@ void bit_stream_server::handle_pkt_error(int sock)
 
 void bit_stream_server::handle_sock_error(int sock, basic_class *bcptr)
 {
-	delete dynamic_cast<bit_stream_out *> (bcptr);
-	_net_ptr->fd_bcptr_map_delete(sock);
-	del_seed(sock);
-	data_close(sock, "client closed!!");
+	if(mode == mode_BitStream){
+		delete dynamic_cast<bit_stream_out *> (bcptr);
+	}else 	if(mode == mode_HTTP){
+		delete dynamic_cast<bit_stream_httpout *> (bcptr);
+	}else 	if(mode == mode_RTMP){
+//		delete dynamic_cast<bit_stream_out *> (bcptr);
+	}
+//	_net_ptr->fd_bcptr_map_delete(sock);
+//	del_seed(sock);
+	data_close(sock, "player obj closed!!");
 	_pk_mgr_ptr->del_stream(sock,(stream *)bcptr, STRM_TYPE_MEDIA);
 }
 
@@ -206,6 +229,8 @@ void bit_stream_server::data_close(int cfd, const char *reason)
 	}
 }
 
+// add_seed  del_seed noused ~
+/*
 void bit_stream_server:: add_seed(int sock, queue<struct chunk_t *> *queue_out_data_ptr)
 {
 	_map_seed_out_data[sock] = queue_out_data_ptr;
@@ -217,6 +242,7 @@ void bit_stream_server:: del_seed(int sock)
 
 }
 
+*/
 
 
 

@@ -861,18 +861,22 @@ void peer::data_close(int cfd, const char *reason ,int type)
 	_peer_mgr_ptr->_peer_communication_ptr->clear_fd_in_peer_com(cfd);
 
 	map_fd_queue_iter = map_fd_out_ctrl.find(cfd);
-	if(map_fd_queue_iter != map_fd_out_ctrl.end()) 
+	if(map_fd_queue_iter != map_fd_out_ctrl.end()){ 
+		delete map_fd_queue_iter->second;
 		map_fd_out_ctrl.erase(map_fd_queue_iter);
-	
+	}
 
 	map_fd_queue_iter = map_fd_out_data.find(cfd);
-	if(map_fd_queue_iter != map_fd_out_data.end()) 
+	if(map_fd_queue_iter != map_fd_out_data.end()) {
+		delete map_fd_queue_iter->second;
 		map_fd_out_data.erase(map_fd_queue_iter);
+	}
 
 	map_fd_nonblocking_ctl_iter = map_fd_nonblocking_ctl.find(cfd);
-	if(map_fd_nonblocking_ctl_iter != map_fd_nonblocking_ctl.end()) 
+	if(map_fd_nonblocking_ctl_iter != map_fd_nonblocking_ctl.end()) {
+		delete map_fd_nonblocking_ctl_iter ->second;
 		map_fd_nonblocking_ctl.erase(map_fd_nonblocking_ctl_iter);
-
+	}
 
 
 	map_fd_pid_iter= map_fd_pid.find(cfd) ;

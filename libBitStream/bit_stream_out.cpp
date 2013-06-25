@@ -27,7 +27,7 @@ bit_stream_out::bit_stream_out(int stream_id,network *net_ptr, logger *log_ptr,b
 	}
 bit_stream_out::~bit_stream_out(){
 	if(_queue_out_data_ptr)
-	delete _queue_out_data_ptr;
+		delete _queue_out_data_ptr;
 	}
 
 void bit_stream_out::init(){

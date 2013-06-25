@@ -36,6 +36,16 @@ public:
 	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		// <pid, struct peer_info_t *>
 	map<unsigned long, struct peer_connect_down_t *> map_pid_peerDown_info ; //// <pid, struct peer_connect_down_t *>
 
+	//about player  ,delete by bit_stream_server
+	map<int, stream *> _map_stream_media;	// <strm_addr, stream *>
+	map<int, stream *>::iterator _map_stream_iter;	// <strm_addr, stream *>
+
+	//substreamID,delay
+	map<unsigned long, struct source_delay *> delay_table;
+
+	//streamID , media_header
+	map<int, struct update_stream_header *> map_streamID_header;
+
 	struct chunk_level_msg_t *level_msg_ptr ;
 	unsigned long lane_member;
 
@@ -59,8 +69,6 @@ public:
 	unsigned long full_manifest;
 	int _sock; 		//PK socket
 
-	////measure
-	logger *_log_measureDataPtr ;
 
 
 	unsigned long syn_round_time;
@@ -69,7 +77,7 @@ public:
 	void send_syn_token_to_pk(int pk_sock);
 	void syn_recv_handler(struct syn_token_receive* syn_struct_back_token);
 
-	map<unsigned long, struct source_delay *> delay_table;
+
 	void delay_table_init();
 	void source_delay_detection(int sock, unsigned long sub_id, unsigned int seq_now);
 	void reset_source_delay_detection(unsigned long sub_id);
@@ -85,7 +93,6 @@ public:
 	volatile unsigned int _current_send_sequence_number; //最後送給player的seq(還沒送)
 
 	unsigned long stream_number;	//channel 下stream的個數
-	map<int, struct update_stream_header *> map_streamID_header;
 	
 	pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , logger *log_ptr , configuration *prep);
 	~pk_mgr();
@@ -153,6 +160,9 @@ public:
 	void clear_map_pid_peerDown_info();
 	void clear_map_pid_rescue_peer_info();
 
+	void clear_delay_table();
+	void clear_map_streamID_header();
+
 	void peer_set(peer *peer_ptr);
 	void rtsp_viewer_set(rtsp_viewer *rtsp_viewer_ptr);
 	void time_handle();
@@ -177,8 +187,7 @@ private:
 	unsigned long _manifest;
 	bool pkSendCapacity;
 
-	map<int, stream *> _map_stream_media;	// <strm_addr, stream *>
-	map<int, stream *>::iterator _map_stream_iter;	// <strm_addr, stream *>
+
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 
 };

@@ -12,6 +12,8 @@
 #include "peer.h"
 #include "librtsp/rtsp_viewer.h"
 #include "peer_communication.h"
+//#include "libBitStream/bit_stream_out.h"
+//#include "libBitStreamHTTP/bit_stream_httpout.h"
 using namespace std;
 
 
@@ -43,6 +45,8 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 	threadLockKey = FREE ;
 	Xcount =100;
 	pkSendCapacity =false;
+	ssDetect_ptr =NULL ;
+	statsArryCount_ptr =NULL;
 	//
 //	pkmgrfile_ptr = fopen("./HEREin" , "wb");
 	//	 _log_measureDataPtr =new 
@@ -55,7 +59,7 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 	//	_chunk_bitstream = (struct chunk_bitstream_t *)malloc(RTP_PKT_BUF_MAX * _bucket_size);
 	//	memset( _chunk_bitstream, 0x0, _bucket_size * RTP_PKT_BUF_MAX );
 
-
+	buf_chunk_t =NULL;
 	buf_chunk_t = (struct chunk_t **)malloc(_bucket_size * sizeof(struct chunk_t **) ) ;
 	memset( buf_chunk_t, NULL, _bucket_size * sizeof(struct chunk_t **) );
 
@@ -79,8 +83,29 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 pk_mgr::~pk_mgr() 
 {
 
-	//	if(_chunk_bitstream)
+//		if(_chunk_bitstream)
 	//		free(_chunk_bitstream);
+	struct chunk_t* chunk_t_ptr ;
+
+	//free data memory
+	for(int i =0 ; i<_bucket_size ; i++){
+		chunk_t_ptr =*(buf_chunk_t + i);
+		delete chunk_t_ptr;
+	}
+
+
+/*
+	if(mode == mode_BitStream){
+		delete dynamic_cast<bit_stream_out *> ();
+	}else 	if(mode == mode_HTTP){
+		delete dynamic_cast<bit_stream_httpout *> ();
+	}else 	if(mode == mode_RTMP){
+//		delete dynamic_cast<bit_stream_out *> (bcptr);
+	}
+*/
+
+//	printf("heello\n");
+//	PAUSE
 
 	if(buf_chunk_t)
 		free(buf_chunk_t);
@@ -93,8 +118,11 @@ pk_mgr::~pk_mgr()
 	clear_map_pid_peer_info();
 	clear_map_pid_peerDown_info();
 	clear_map_pid_rescue_peer_info();
+	clear_delay_table();
+	clear_map_streamID_header();
 
 
+	printf("==============deldet pk_mgr success==========\n");
 }
 
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
@@ -465,6 +493,11 @@ void pk_mgr::send_capacity_to_pk(int sock){
 	} else {
 		if(send_buf)
 			delete send_buf;
+
+		for(int i = 0 ; i<sub_stream_num ;i++){
+			delete chunk_capacity_ptr->source_delay_measur[i];
+		}
+
 		if(chunk_capacity_ptr)
 			delete chunk_capacity_ptr;
 		_net_ptr->set_nonblocking(sock);	// set to non-blocking
@@ -2710,6 +2743,37 @@ void pk_mgr::clear_map_pid_peer_info(){
 	map_pid_peer_info.clear();
 
 }
+
+
+void pk_mgr::clear_delay_table(){
+
+	map<unsigned long, struct source_delay *>::iterator source_delay_iter;	
+
+	for(source_delay_iter= delay_table.begin()  ; source_delay_iter !=delay_table.end() ; source_delay_iter++){
+	
+		delete source_delay_iter->second;
+	
+	}
+
+	delay_table.clear();
+}
+
+
+
+
+void pk_mgr::clear_map_streamID_header(){
+
+	map<int, struct update_stream_header *>::iterator update_stream_header_iter;
+
+	for(update_stream_header_iter = map_streamID_header.begin() ;update_stream_header_iter !=map_streamID_header.end();update_stream_header_iter++){
+		
+		delete update_stream_header_iter->second;
+
+	}
+	map_streamID_header.clear();
+}
+
+
 
 void pk_mgr::clear_map_pid_peer_info(unsigned long manifest){
 

@@ -26,8 +26,8 @@ public:
 	virtual void handle_sock_error(int sock, basic_class *bcptr);
 	virtual void handle_job_realtime();
 	virtual void handle_job_timer();
-	void add_seed(int sock, queue<struct chunk_t *> *queue_out_data_ptr);
-	void del_seed(int sock);
+//	void add_seed(int sock, queue<struct chunk_t *> *queue_out_data_ptr);
+//	void del_seed(int sock);
 	void delBitStreamOut(stream *stream_ptr);
 
 private:

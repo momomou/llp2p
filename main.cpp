@@ -268,10 +268,11 @@ int main(int argc, char **argv)
 	fd_list.push_back(svc_fd_tcp);
 	pk_mgr_ptr->init();
 
-	bit_stream_server_ptr->_map_seed_out_data
+//	bit_stream_server_ptr->_map_seed_out_data
 
 	while(1){
-		int testServerfd = pk_mgr_ptr ->build_connection("127.0.0.1",stream_local_port);
+		int testServerfd =0;
+		testServerfd = pk_mgr_ptr ->build_connection("127.0.0.1",stream_local_port);
 		if(testServerfd){
 		
 		printf("connect ok \n");
@@ -281,7 +282,7 @@ int main(int argc, char **argv)
 		break ;
 		}else{
 		
-		printf("fail ");
+		printf("connectfail \n");
 		}
 	}
 
@@ -314,6 +315,12 @@ int main(int argc, char **argv)
 	
 	if(log_ptr)
 		delete log_ptr;
+
+	if(bit_stream_server_ptr)
+		delete bit_stream_server_ptr;
+
+	if(peer_communication_ptr)
+		delete peer_communication_ptr;
 	
 	if(net_ptr)
 		delete net_ptr;
