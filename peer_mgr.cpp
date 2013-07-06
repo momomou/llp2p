@@ -23,6 +23,7 @@ peer_mgr::peer_mgr(list<int> *fd_list)
 
 peer_mgr::~peer_mgr() 
 {
+	printf("==============deldet peer_mgr success==========\n");
 
 	if(peer_ptr)
 		delete peer_ptr;
@@ -460,8 +461,9 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 	if(fd_queue_iter !=  peer_ptr ->map_fd_out_ctrl.end()){
 	queue_out_ctrl_ptr =fd_queue_iter ->second;
 	}else{
-		printf("fd not here");
-		PAUSE
+		printf("fd not here\n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd not here");
+		*(_net_ptr->_errorRestartFlag) =RESTART;
 		return;
 	}
 
@@ -631,8 +633,9 @@ void peer_mgr::send_manifest_to_parent(unsigned long manifestValue,unsigned long
 	if(fd_queue_iter !=  peer_ptr ->map_fd_out_ctrl.end()){
 	queue_out_ctrl_ptr =fd_queue_iter ->second;
 	}else{
-		printf("fd not here");
-		PAUSE
+		printf("fd not here\n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd not here");
+		*(_net_ptr->_errorRestartFlag) =RESTART;
 		return;
 	}
 
@@ -697,8 +700,9 @@ void peer_mgr::handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr)
 
 
 	}else{
-	printf("handle_manifestSet what happen\n");
-	PAUSE
+		printf("handle_manifestSet what happen\n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"handle_manifestSet what happen");
+		*(_net_ptr->_errorRestartFlag) =RESTART;
 	}
 	
 	//如果Substream 的數量是變少的話 ,只有在給的串流變少的時候才Clean
@@ -713,7 +717,7 @@ void peer_mgr::data_close(int cfd, const char *reason)
 {
 	list<int>::iterator fd_iter;
 	
-	_log_ptr->write_log_format("s => s (s)\n", (char*)__PRETTY_FUNCTION__, "pk", reason);
+	_log_ptr->write_log_format("s => s (s)\n", (char*)__PRETTY_FUNCTION__, "peer_mgr", reason);
 	cout << "pk Client " << cfd << " exit by " << reason << ".." << endl;
 	_net_ptr->epoll_control(cfd, EPOLL_CTL_DEL, 0);
 	_net_ptr->close(cfd);

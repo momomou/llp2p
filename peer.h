@@ -65,8 +65,8 @@ private:
 	int _offset;
 //	int _time_start;
 //	unsigned long _recv_byte_count;
-    unsigned long _recv_parent_byte_count;
-    unsigned long parent_manifest;
+//    unsigned long _recv_parent_byte_count;
+//   unsigned long parent_manifest;
 
 	list<int>::iterator fd_iter;
 	map<int, queue<struct chunk_t *> *>::iterator map_fd_queue_iter;

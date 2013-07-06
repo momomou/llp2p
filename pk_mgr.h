@@ -193,7 +193,6 @@ private:
 	bool pkSendCapacity;
 	unsigned long lastPKtimer;
 
-
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 
 };

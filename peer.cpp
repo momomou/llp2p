@@ -18,34 +18,22 @@ peer::peer(list<int> *fd_list)
 	queue_out_data_ptr = NULL;
 	peerInfoPtr = NULL;
 	peerDownInfoPtr = NULL;
-
 	_send_byte = 0;
 	_expect_len = 0;
 	_offset = 0;
-//	_recv_byte_count = 0;
-    _recv_parent_byte_count = 0;
-//	_time_start = 0;
-//	count = 0;
-//	avg_bandwidth = 0;
-//    parent_bandwidth = 0;
-    parent_manifest = 0;
 	fd_list_ptr = fd_list;
 	_chunk_ptr = NULL;
 	//first_reply_peer =true;
 	firstReplyPid=-1;
 	leastSeq_set_childrenPID =0;
-/*
-	for(unsigned long i = 0; i < BANDWIDTH_BUCKET; i++) {
-		bandwidth_bucket[i] = 0;
-	}
 
-*/
 
 }
 
 peer::~peer() 
 {
 	clear_map();
+	printf("==============deldet peer success==========\n");
 
 }
 
@@ -153,7 +141,7 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd error why dup");
 		printf("rescue_peer->pid = %d  socket = %d\n",rescue_peer->pid);
 		_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"rescue_peer->pid =",rescue_peer->pid);
-		PAUSE
+		*(_net_ptr->_errorRestartFlag) =RESTART;
 		
 	}
 //	}																			//2013/01/24
@@ -431,8 +419,9 @@ int peer::handle_pkt_in(int sock)
 			if(fd_queue_iter !=  map_fd_out_ctrl.end()){
 				queue_out_ctrl_ptr =fd_queue_iter ->second;
 			}else{
-				printf("fd not here");
-				PAUSE
+				printf("fd not here\n");
+				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd not here" );
+				*(_net_ptr->_errorRestartFlag) =RESTART;
 					return RET_OK;
 			}
 
@@ -478,8 +467,6 @@ int peer::handle_pkt_in(int sock)
 					delete [] (unsigned char*)chunk_ptr;
 				}
 				return RET_OK;
-//				PAUSE
-//				exit(1);
 			}
 
 			if(substream_first_reply_peer_iter->second->firstReplyFlag){
@@ -655,7 +642,8 @@ int peer::handle_pkt_in(int sock)
 
 		cout << "what's this?" << endl;
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"what's this? from peer");
-		PAUSE
+		*(_net_ptr->_errorRestartFlag) =RESTART;
+
 	}
 
 
@@ -732,7 +720,8 @@ int peer::handle_pkt_out(int sock)
 		}
 	}else{
 		printf("map_fd_pid NOT FIND \n");
-		PAUSE
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"map_fd_pid NOT FIND");
+		*(_net_ptr->_errorRestartFlag) =RESTART;
 		return RET_SOCK_ERROR;
 	}
 //////////////////////////////////////////////////////////////
@@ -1126,7 +1115,8 @@ void peer::data_close(int cfd, const char *reason ,int type)
 		}else{
 
 			printf("peer:: not parent and not children\n");
-			PAUSE
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"peer:: not parent and not children");
+			*(_net_ptr->_errorRestartFlag) =RESTART;
 
 		}
 		

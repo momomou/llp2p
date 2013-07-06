@@ -144,8 +144,9 @@ void logger::exit(int status, const char *action)
 	stop_log_record();
 	_net_ptr->garbage_collection();
 	printf("logger error");
-	PAUSE
-	::exit(status);
+	*(_net_ptr->_errorRestartFlag) =RESTART;
+	//PAUSE
+	//::exit(status);
 }
 
 
@@ -186,7 +187,7 @@ logger::logger()
 
 logger::~logger() 
 {
-
+	printf("==============deldet logger success==========\n");
 }
 
 
@@ -378,7 +379,7 @@ void logger::getTickTime(LARGE_INTEGER *tickTime)
 	bool fail =QueryPerformanceCounter(tickTime);
 	if(fail == 0){
 		printf("QueryPerformanceCounter fail \n");
-		PAUSE
+//		PAUSE
 	}
 }
 #endif
@@ -436,13 +437,13 @@ double logger::set_diff_timmer()
 #ifdef WIN32
 void logger::timerGet(struct timerStruct *timmer)
 {
-/*
-	bool fail = QueryPerformanceCounter(&(timmer->tickTime));
-	if(fail == 0){
-		printf("QueryPerformanceCounter fail\n");
-		PAUSE
-	}
-*/
+
+	//bool fail = QueryPerformanceCounter(&(timmer->tickTime));
+	//if(fail == 0){
+	//	printf("QueryPerformanceCounter fail\n");
+	//	PAUSE
+	//}
+
 	getTickTime(&(timmer ->tickTime));
 
 	timmer ->clockTime = gettimeofday_ms() ;

@@ -22,6 +22,8 @@ io_connect::io_connect(network *net_ptr,logger *log_ptr,configuration *prep_ptr,
 }
 
 io_connect::~io_connect(){
+	printf("==============deldet io_connect success==========\n");
+
 }
 
 int io_connect::handle_pkt_in(int sock)
@@ -72,7 +74,8 @@ int io_connect::handle_pkt_out(int sock)
 			map_fd_NonBlockIO_iter = _peer_communication_ptr->map_fd_NonBlockIO.find(sock);
 			if(map_fd_NonBlockIO_iter ==  _peer_communication_ptr->map_fd_NonBlockIO.end()){
 				printf("error map_fd_NonBlockIO_iter ==  _peer_communication_ptr->map_fd_NonBlockIO.end  occ \n");
-				PAUSE
+				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"error map_fd_NonBlockIO_iter ==  _peer_communication_ptr->map_fd_NonBlockIO.end  occ" );
+				*(_net_ptr->_errorRestartFlag) =RESTART;
 			}
 
 			Nonblocking_Ctl * Nonblocking_Send_Ctrl_ptr =NULL;

@@ -17,6 +17,7 @@ logger_client::logger_client(){
 	delay_list=NULL;
 	chunk_buffer = (struct chunk_t *)new unsigned char[(CHUNK_BUFFER_SIZE + sizeof(struct chunk_header_t))];
 	quality_struct_ptr =NULL ;
+	buffer_size = 0;
 
 	quality_struct_ptr = (struct quality_struct*)(new struct quality_struct);
 	memset(quality_struct_ptr,0x00,sizeof(struct quality_struct));
@@ -40,6 +41,15 @@ logger_client::~logger_client(){
 		delete max_source_delay;
 	if(delay_list)
 		delete delay_list;
+	if(quality_struct_ptr)
+		delete quality_struct_ptr;
+	if(log_buffer.size()){
+		delete log_buffer.front();
+		log_buffer.pop();
+	}
+
+	printf("==============deldet logger_client success==========\n");
+
 
 }
 
@@ -66,7 +76,9 @@ void logger_client::log_init(){
 #ifdef _WIN32
 		::WSACleanup();
 #endif
-		exit(1);
+		//exit(1);
+		printf("log_init init create socket failure\n");
+		*(_net_ptr->_errorRestartFlag)=RESTART ;
 	}
 
 	struct sockaddr_in log_saddr;
@@ -97,7 +109,8 @@ void logger_client::log_init(){
 #else
 			::close(_sock);
 #endif
-			exit(1);
+		printf("log_init init build_connection failure\n");
+		*(_net_ptr->_errorRestartFlag)=RESTART ;
 
 		}
 	}
@@ -1029,7 +1042,8 @@ void logger_client::log_exit(){
 			
 		if(_send_byte < 0) {
 				printf("(RUNNING) send info to log server error : %d in log_exit\n",WSAGetLastError());
-				exit(1);
+				printf("log_init init build_connection failure \n");
+				*(_net_ptr->_errorRestartFlag)=RESTART ;
 		}
 	}
 
@@ -1044,7 +1058,7 @@ void logger_client::log_exit(){
 
 			if((buffer_size<0)||((chunk_buffer_offset+log_struct_size) > CHUNK_BUFFER_SIZE)){
 				printf("error : buffer size : %d and %d (overflow)  in log_exit\n",buffer_size,(chunk_buffer_offset+log_struct_size));
-				exit(1);
+				*(_net_ptr->_errorRestartFlag)=RESTART ;
 			}
 
 			memcpy((char *)(chunk_buffer->buf) + chunk_buffer_offset,log_buffer_element_ptr,log_struct_size);
@@ -1066,7 +1080,7 @@ void logger_client::log_exit(){
 
 		if(_send_byte < 0) {
 			printf("(READY) send info to log server error : %d  in log_exit\n",WSAGetLastError());
-			exit(1);
+			*(_net_ptr->_errorRestartFlag)=RESTART ;
 
 		}
 	}

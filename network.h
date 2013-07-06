@@ -16,6 +16,7 @@ public:
 
 	unsigned long long int send_byte;
 	unsigned long long int recv_byte;
+	int *_errorRestartFlag;
 	
 	void timer();		// timer
 	void setall_fd_epollout();
@@ -58,7 +59,7 @@ public:
 	int nonblock_recv(int sock, Nonblocking_Ctl* send_info);
 	int nonblock_send(int sock, Network_nonblocking_ctl* send_info);
 	
-	network();
+	network(int * errorRestartFlag);
 	~network();
 	network(const network&);
 	network& operator=(const network&);

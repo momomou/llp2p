@@ -250,6 +250,8 @@ using std::bitset;
 #define OK				0x01
 #define REJECT			0x02
 
+#define RESTART 0x01
+
 #define RTP_PKT_BUF_MAX	30000	// This value defines the max rtp packet size
 #define RTP_PKT_BUF_PAY_SIZE	(RTP_PKT_BUF_MAX - sizeof(struct chunk_header_t) - sizeof(struct rtp_hdr_t))	// This value defines the max rtp packet size
 #define MAXFDS 			2048

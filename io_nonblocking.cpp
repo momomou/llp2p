@@ -20,6 +20,8 @@ io_nonblocking::io_nonblocking(network *net_ptr,logger *log_ptr ,peer_communicat
 }
 
 io_nonblocking::~io_nonblocking(){
+	printf("==============deldet io_nonblocking success==========\n");
+
 }
 
 int io_nonblocking::handle_pkt_in(int sock)

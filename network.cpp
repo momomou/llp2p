@@ -28,7 +28,8 @@ void network::garbage_collection()
 		for(_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin() ; _map_fd_bc_tbl_iter != _map_fd_bc_tbl.end() ; _map_fd_bc_tbl_iter++) {
 			if(close(_map_fd_bc_tbl_iter->first) == -1){
 				printf("_map_fd_bc_tbl_iter error");
-				PAUSE
+				//PAUSE
+
 			}
 			_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin();
 			if(_map_fd_bc_tbl_iter == _map_fd_bc_tbl.end()){
@@ -602,17 +603,17 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 	}
 }
 
-network::network() 
+network::network(int * errorRestartFlag) 
 {
 	send_byte = 0ULL;	// typeof(_send_byte) == unsigned long long int
 	recv_byte = 0ULL;
-
+	_errorRestartFlag = errorRestartFlag;
 	_error_cfd = new std::queue<int>;
 }
 
 network::~network() 
 {
-
+	printf("==============deldet network success==========\n");
 }
 
 //================below not important=====================

@@ -51,6 +51,8 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 	memset(&lastSynStartclock,0x00,sizeof(struct timerStruct));
 	totalMod =0;
 	reSynTime=BASE_RESYN_TIME;
+	_log_ptr->timerGet(&start);
+
 	//
 //	pkmgrfile_ptr = fopen("./HEREin" , "wb");
 	//	 _log_measureDataPtr =new 
@@ -97,19 +99,6 @@ pk_mgr::~pk_mgr()
 		delete chunk_t_ptr;
 	}
 
-
-/*
-	if(mode == mode_BitStream){
-		delete dynamic_cast<bit_stream_out *> ();
-	}else 	if(mode == mode_HTTP){
-		delete dynamic_cast<bit_stream_httpout *> ();
-	}else 	if(mode == mode_RTMP){
-//		delete dynamic_cast<bit_stream_out *> (bcptr);
-	}
-*/
-
-//	printf("heello\n");
-//	PAUSE
 
 	if(buf_chunk_t)
 		free(buf_chunk_t);
@@ -643,8 +632,10 @@ void pk_mgr::init()
 		
 		_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","pk_mgr build_connection() fail");
 		_logger_client_ptr->log_exit();
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"pk_mgr build_connection() fail");
+		*(_net_ptr->_errorRestartFlag) =RESTART ;
 	}
-	printf("PK_sock = %d",_sock);
+	printf("PK_sock = %d \n",_sock);
 	_log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"PK_sock =",_sock);
 
 
@@ -840,7 +831,7 @@ int pk_mgr::handle_pkt_in(int sock)
 	}else{
 		printf("Nonblocking_Recv_Ctl_ptr NOT FIND \n");
 		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"Nonblocking_Recv_Ctl_ptr NOT FIND");
-		PAUSE
+		*(_net_ptr->_errorRestartFlag) =RESTART;
 			return RET_SOCK_ERROR;
 	}
 
@@ -1079,7 +1070,8 @@ int pk_mgr::handle_pkt_in(int sock)
 		if(chunk_ptr->header.rsv_1 == REQUEST){
 
 			printf(" not go here!!!!!!!!!!!!!!!!!!!CHNK_CMD_PEER_START_DELAY pk mgr request\n");
-			PAUSE
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"not go here!!!!!!!!!!!!!!!!!!!CHNK_CMD_PEER_START_DELAY pk mgr request");
+			*(_net_ptr->_errorRestartFlag) =RESTART;
 		}
 		else{
 			printf("CHNK_CMD_PEER_SYN pk mgr reply\n");
@@ -1131,7 +1123,8 @@ int pk_mgr::handle_pkt_in(int sock)
 			set_rescue_state(temp_rescue_sub_id,2);
 			}else{
 				printf("why not status 0 in REQUEST , manifest= %d\n",((struct chunk_rescue_list*)chunk_ptr) ->manifest);
-				PAUSE
+				_log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"why not status 0 in REQUEST ",((struct chunk_rescue_list*)chunk_ptr) ->manifest);
+				*(_net_ptr->_errorRestartFlag) =RESTART;
 			}
 		
 		}else{
@@ -1534,7 +1527,7 @@ int pk_mgr::handle_pkt_in(int sock)
 	}else {
 		printf("cmd =%d else\n", chunk_ptr->header.cmd);
 		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"what from PK !?");
-		PAUSE
+		*(_net_ptr->_errorRestartFlag) =RESTART;
 	}
 
 	if (chunk_ptr)
@@ -1861,9 +1854,6 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	//↓↓↓↓↓↓↓↓↓↓↓↓以下只有先到的chunk才會run(會濾掉重複的和更小的)↓↓↓↓↓↓↓↓↓↓↓↓↓
 	
 
-//p
-///*
-//CHILDREN ONLY
 	static unsigned long pkt_count =0 ;
 	static unsigned long totalbyte=0;
 	static unsigned long fisttimestamp=0;
@@ -1997,7 +1987,8 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 	if(leastCurrDiff < 0){
 		printf(" 1891 leastCurrDiff < 0    = %d\n" ,leastCurrDiff);
-		PAUSE
+		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"1891 leastCurrDiff < 0   ");
+		*(_net_ptr->_errorRestartFlag) =RESTART;
 	}
 
 
@@ -2138,7 +2129,8 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 				printf("  2015 leastCurrDiff    =%d \n",leastCurrDiff);
 				if(leastCurrDiff < 0){
 					printf("  2018 leastCurrDiff < 0   =%d\n",leastCurrDiff);
-					PAUSE
+					_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"2018 leastCurrDiff < 0   ");
+					*(_net_ptr->_errorRestartFlag) =RESTART;
 				}
 				//						printf("here2\n");
 				//						PAUSE
@@ -2162,7 +2154,8 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"i think not go here leastCurrDiff ",leastCurrDiff);
 
 		_current_send_sequence_number = _least_sequence_number;  
-		PAUSE
+		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"i think not go here leastCurrDiff  ");
+		*(_net_ptr->_errorRestartFlag) =RESTART;
 
 			//在正常範圍內 正常傳輸丟給player 留給下面處理
 	}else{
@@ -3670,7 +3663,8 @@ void pk_mgr::time_handle()
 				sock=map_pid_fd_iter ->second;					//get parent sock
 			}else{
 				printf("map_in_pid_fd not find ");
-				PAUSE
+				_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"i think not go here leastCurrDiff  ");
+				*(_net_ptr->_errorRestartFlag) =RESTART;
 			}
 
 			//timeout 發生
@@ -3682,8 +3676,9 @@ void pk_mgr::time_handle()
 			
 					printf("Tihis peer TimeOut\n");
 					_log_ptr->write_log_format("\ns =>u s \n", __FUNCTION__,__LINE__,"Tihis peer TimeOut") ;
-					PAUSE
-					exit(0);
+					*(_net_ptr->_errorRestartFlag) =RESTART;
+					//PAUSE
+					//exit(0);
 					pid_peerDown_info_iter++ ;
 
 				}else{
@@ -3721,7 +3716,8 @@ void pk_mgr::time_handle()
 							send_parentToPK(SubstreamIDToManifest(testingSubStreamID),PK_PID +1);
 						}else if (check_rescue_state(testingSubStreamID,1)){
 							printf("check_rescue_state(testingSubStreamID,1 parent should only PK  eror\n");
-							PAUSE
+							_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"check_rescue_state(testingSubStreamID,1 parent should only PK  eror  ");
+							*(_net_ptr->_errorRestartFlag) =RESTART;
 							//do nothing
 						}
 

@@ -153,6 +153,8 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 		if(map_streamID_header_iter !=_pk_mgr_ptr ->map_streamID_header.end()){
 			protocol_header = map_streamID_header_iter ->second ;
 		}else{
+			_log_ptr->write_log_format("s => s \n", __FUNCTION__, "map_streamID_header_iter ==_pk_mgr_ptr ->map_streamID_header.end() ");
+			*(_net_ptr->_errorRestartFlag)=RESTART;
 			PAUSE
 		}
 		cout << "send_FLVHeaderBytes=" << sendHeaderBytes<<endl;
@@ -217,7 +219,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 	//here is to down-sampling (這邊可能有些bug 可能會去pop一個空的_queue_out_data_ptr!?)
 /*
 
-			int baseCount= _pk_mgr_ptr ->Xcount*PARAMETER_X ;
+			int baseCount= (_pk_mgr_ptr ->Xcount*PARAMETER_X*MAX_DELAY/1000) ;
 			int sentSequenceNumber = chunk_ptr ->header.sequence_number ;
 			int differenceValue = (_pk_mgr_ptr ->_current_send_sequence_number -sentSequenceNumber);
 			if (differenceValue > (baseCount+1)){ //if (recv -sent)diff >100 pkt pop until  queue <30 and continuance pop until last key frame

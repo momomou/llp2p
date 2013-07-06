@@ -56,7 +56,7 @@ configuration::configuration(string file) : filename(file), tmp_only(false)
 
 configuration::~configuration() 
 {
-
+/*
 	if(!tmp_only) {
 		fstream fh(filename.c_str(), fstream::out);
 
@@ -69,7 +69,9 @@ configuration::~configuration()
 			fh.close();
 		}
 	}
-		
+*/	
+	printf("==============deldet configuration success==========\n");
+
 }
 
 void configuration::add_key(const char *key,std::string val)

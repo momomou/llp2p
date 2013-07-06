@@ -39,6 +39,7 @@ peer_communication::~peer_communication(){
 
 	if(self_info)
 		delete self_info;
+
 	if(_io_accept_ptr)
 		delete _io_accept_ptr;
 	if(_io_connect_ptr)
@@ -58,17 +59,20 @@ peer_communication::~peer_communication(){
 	}
 	session_id_candidates_set.clear();
 
+
 	for(map_fd_info_iter=map_fd_info.begin() ; map_fd_info_iter!=map_fd_info.end();map_fd_info_iter++){
 		delete map_fd_info_iter->second;
-	
 	}
 	map_fd_info.clear();
 
+
+
 	for(map_fd_NonBlockIO_iter=map_fd_NonBlockIO.begin() ; map_fd_NonBlockIO_iter!=map_fd_NonBlockIO.end();map_fd_NonBlockIO_iter++){
 		delete map_fd_NonBlockIO_iter->second;
-	
 	}
 	map_fd_NonBlockIO.clear();
+
+	printf("==============deldet peer_communication success==========\n");
 }
 
 void peer_communication::set_self_info(unsigned long public_ip){
@@ -485,7 +489,8 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 	map_fd_NonBlockIO_iter=map_fd_NonBlockIO.find(_sock);
 	if(map_fd_NonBlockIO_iter != map_fd_NonBlockIO .end()){
 		printf("map_fd_NonBlockIO_iter=map_fd_NonBlockIO.find(_sock) error\n ");
-		PAUSE 
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"map_fd_NonBlockIO_iter=map_fd_NonBlockIO.find(_sock) errorn");
+		*(_net_ptr->_errorRestartFlag) =RESTART;
 	}
 	map_fd_NonBlockIO[_sock]=new struct ioNonBlocking;
 	memset(map_fd_NonBlockIO[_sock],0x00,sizeof(struct ioNonBlocking));
@@ -945,7 +950,8 @@ int peer_communication::handle_pkt_in(int sock)
 			map_fd_NonBlockIO_iter =map_fd_NonBlockIO.find(sock);
 			if(map_fd_NonBlockIO_iter==map_fd_NonBlockIO.end()){
 				printf("can't  find map_fd_NonBlockIO_iter in peer_commiication");
-				PAUSE
+				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"can't  find map_fd_NonBlockIO_iter in peer_commiication");
+				*(_net_ptr->_errorRestartFlag) =RESTART;
 			}
 
 			Nonblocking_Ctl * Nonblocking_Recv_Ctl_ptr =NULL;
@@ -1176,7 +1182,8 @@ int peer_communication::handle_pkt_out(int sock)	//first write, then set fd to r
 			map_fd_NonBlockIO_iter =map_fd_NonBlockIO.find(sock);
 			if(map_fd_NonBlockIO_iter==map_fd_NonBlockIO.end()){
 				printf("can't  find map_fd_NonBlockIO_iter in peer_commiication");
-				PAUSE
+				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"can't  find map_fd_NonBlockIO_iter in peer_commiication");
+				*(_net_ptr->_errorRestartFlag) =RESTART;
 			}
 
 			for(i=0;i<session_id_candidates_set_iter->second->peer_num;i++){

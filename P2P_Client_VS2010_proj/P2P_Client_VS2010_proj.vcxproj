@@ -118,6 +118,7 @@
     <ClInclude Include="..\io_accept.h" />
     <ClInclude Include="..\io_connect.h" />
     <ClInclude Include="..\io_nat_punch.h" />
+    <ClInclude Include="..\io_nonblocking.h" />
     <ClInclude Include="..\libBitStreamHTTP\bit_stream_httpout.h" />
     <ClInclude Include="..\libBitStream\bit_stream_out.h" />
     <ClInclude Include="..\librtmp\amf.h" />
@@ -132,6 +133,7 @@
     <ClInclude Include="..\librtsp\rtsp_viewer.h" />
     <ClInclude Include="..\librtsp\ss_rtsp.h" />
     <ClInclude Include="..\logger.h" />
+    <ClInclude Include="..\logger_client.h" />
     <ClInclude Include="..\nat_interface.h" />
     <ClInclude Include="..\network.h" />
     <ClInclude Include="..\peer.h" />
@@ -156,6 +158,7 @@
     <ClCompile Include="..\io_accept.cpp" />
     <ClCompile Include="..\io_connect.cpp" />
     <ClCompile Include="..\io_nat_punch.cpp" />
+    <ClCompile Include="..\io_nonblocking.cpp" />
     <ClCompile Include="..\libBitStreamHTTP\bit_stream_httpout.cpp" />
     <ClCompile Include="..\libBitStream\bit_stream_out.cpp" />
     <ClCompile Include="..\librtmp\amf.cpp" />
@@ -168,6 +171,7 @@
     <ClCompile Include="..\librtsp\rtsp_viewer.cpp" />
     <ClCompile Include="..\librtsp\ss_rtsp.cpp" />
     <ClCompile Include="..\logger.cpp" />
+    <ClCompile Include="..\logger_client.cpp" />
     <ClCompile Include="..\main.cpp" />
     <ClCompile Include="..\nat_interface.cpp" />
     <ClCompile Include="..\network.cpp" />

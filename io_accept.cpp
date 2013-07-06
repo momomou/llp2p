@@ -23,6 +23,8 @@ io_accept::io_accept(network *net_ptr,logger *log_ptr,configuration *prep_ptr,pe
 }
 
 io_accept::~io_accept(){
+	printf("==============deldet io_accept success==========\n");
+
 }
 
 

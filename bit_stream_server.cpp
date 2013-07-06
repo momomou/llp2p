@@ -44,7 +44,7 @@ bit_stream_server::~bit_stream_server()
 	}
 	_pk_mgr_ptr->_map_stream_media.clear();
 
-
+	printf("==============deldet bit_stream_server success==========\n");
 
 }
 
@@ -72,7 +72,8 @@ void bit_stream_server::init(int stream_id, unsigned short bitStreamServerPort)
 	if (::bind(_sock_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == -1) {
 		
 		printf("CNANOT bitStreamServer bind at TCP port: %d\n", bitStreamServerPort);
-		PAUSE
+
+		*(_net_ptr->_errorRestartFlag)=RESTART;
 //		throw "can't bind socket: _sock_tcp";
 	} else {
 		printf("bitStreamServer bind at TCP port: %d\n", bitStreamServerPort);

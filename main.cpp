@@ -32,7 +32,7 @@ const char version[] = "1.0.0";
 
 static volatile sig_atomic_t handle_sig_alarm = 0;
 static volatile sig_atomic_t srv_shutdown = 0;
-static volatile int errorRestartFlag = 0;
+static int errorRestartFlag = 0;
 static logger_client *logger_client_ptr = NULL;
 list<int> fd_list;
 
@@ -119,9 +119,10 @@ int main(int argc, char **argv){
 		config_file = "config.ini";
 
 		prep = new configuration(config_file);
-		net_ptr = new network();
+		net_ptr = new network(&errorRestartFlag);
 		log_ptr = new logger();
 		logger_client_ptr = new logger_client();
+		log_ptr->logger_set(net_ptr);
 		peer_mgr_ptr = new peer_mgr(&fd_list);
 
 		prep->read_key("html_size", html_size);
@@ -136,7 +137,7 @@ int main(int argc, char **argv){
 
 		pk_mgr_ptr = new pk_mgr(html_size, &fd_list, net_ptr , log_ptr , prep , logger_client_ptr);
 
-		log_ptr->logger_set(net_ptr);
+
 		net_ptr->epoll_creater();
 		log_ptr->start_log_record(SYS_FREQ);
 
@@ -300,8 +301,10 @@ int main(int argc, char **argv){
 		logger_client_ptr->log_init();
 		//	bit_stream_server_ptr->_map_seed_out_data
 
+/*
+		int testServerfd =0;
+		int errorcount =0;
 		while(1){
-			int testServerfd =0;
 			testServerfd = pk_mgr_ptr ->build_connection("127.0.0.1",stream_local_port);
 			if(testServerfd){
 
@@ -311,16 +314,19 @@ int main(int argc, char **argv){
 				closesocket(testServerfd);
 				break ;
 			}else{
-
-				printf("connectfail \n");
+				Sleep(100);
+				errorcount++;
+//				if(errorcount++ >=50)
+					break;
+				printf("connectfail  errorcount=%d\n",errorcount);
 			}
 		}
+*/
 
 
 
 
-
-		while((!srv_shutdown)  ||  (!errorRestartFlag)) {
+		while((!srv_shutdown)  &&  (!errorRestartFlag)) {
 
 #ifdef _WIN32
 			net_ptr->epoll_waiter(1000, &fd_list);
@@ -330,6 +336,9 @@ int main(int argc, char **argv){
 			net_ptr->epoll_dispatcher();
 
 			pk_mgr_ptr->time_handle();
+
+			errorRestartFlag=1;
+
 		}
 
 		net_ptr->garbage_collection();
@@ -339,10 +348,6 @@ int main(int argc, char **argv){
 		if(prep) 
 			delete prep;
 		prep =NULL;
-
-		if(log_ptr)
-			delete log_ptr;
-		log_ptr =NULL;
 
 		if(bit_stream_server_ptr)
 			delete bit_stream_server_ptr;
@@ -368,9 +373,20 @@ int main(int argc, char **argv){
 			delete peer_mgr_ptr;
 		peer_mgr_ptr=NULL;
 
+		if(log_ptr)
+			delete log_ptr;
+		log_ptr =NULL;
+
 		if(logger_client_ptr)
 			delete logger_client_ptr;
 		logger_client_ptr =NULL;
+
+//		PAUSE
+		for(int i= 0 ; i< 10;i++){
+			printf("Some Thing Error Wait %d Sec To Restart ............\n",10-i );
+//			Sleep(1000);
+		}
+		errorRestartFlag =0;
 
 
 	}

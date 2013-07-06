@@ -135,12 +135,18 @@
     <ClInclude Include="..\nat_interface.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
+    <ClInclude Include="..\io_nonblocking.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger_client.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\config.ini">
+    <None Include="..\Makefile">
       <Filter>資源檔</Filter>
     </None>
-    <None Include="..\Makefile">
+    <None Include="..\config.ini">
       <Filter>資源檔</Filter>
     </None>
   </ItemGroup>
@@ -239,6 +245,12 @@
       <Filter>原始程式檔</Filter>
     </ClCompile>
     <ClCompile Include="..\nat_interface.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\io_nonblocking.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger_client.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
   </ItemGroup>

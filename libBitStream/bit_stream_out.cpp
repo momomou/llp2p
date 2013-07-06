@@ -56,7 +56,8 @@ int bit_stream_out::handle_pkt_out(int sock){
 	if(map_streamID_header_iter !=_pk_mgr_ptr ->map_streamID_header.end()){
 		protocol_header = map_streamID_header_iter ->second ;
 	}else{
-		PAUSE
+		_log_ptr->write_log_format("s => s \n", __FUNCTION__, "protocol_header = map_streamID_header_iter ->second ");
+		*(_net_ptr->_errorRestartFlag)=RESTART;
 	}
 
 
