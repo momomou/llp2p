@@ -1,8 +1,6 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
-//handle stream buff(少一兩個), check state(unknow states) , rescue testing states 2 to 1 ,lose packet rescue
-
 #define FD_SETSIZE		2048
 ////resuce PARAMETER////
 #define PARAMETER_X		10
@@ -10,8 +8,9 @@
 #define BIG_CHUNK	512
 
 //ms
-#define CONNECT_TIME_OUT 5000
-#define NETWORK_TIMEOUT  5000
+#define CONNECT_TIME_OUT 4000
+#define NETWORK_TIMEOUT  8000
+#define BASE_RESYN_TIME		 20000
 
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
 #define PARAMETER_M		8
@@ -19,12 +18,15 @@
 #define PARAMETER_P		3
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
-#define BUFF_SIZE		800
-#define CHUNK_LOSE		30
+// BUFF_SIZE sec
+#define BUFF_SIZE		6
+//CHUNK_LOSE sec, mean lose about CHUNK_LOSE sec packet
+#define CHUNK_LOSE		1
 
 //source delay PARAMETER
-#define MAX_DELAY 4000
-#define SOURCE_DELAY_CONTINUOUS 10
+#define MAX_DELAY 1500
+//SOURCE_DELAY_CONTINUOUS sec, mean  about SOURCE_DELAY_CONTINUOUS sec packet all dalay out of bound
+#define SOURCE_DELAY_CONTINUOUS 0.5
 
 //io_accept fd remain period
 #define FD_REMAIN_PERIOD	1000
@@ -37,6 +39,78 @@
 #define DEF_TIMEOUT 15
 #define TEST_TIME
 #define LISTEN_TIMEOUT	1000	//MUST less than  CONNECT_TIME_OUT
+
+//log part
+#define BUFFER_CONTENT_THRESHOLD 2000
+#define CHUNK_BUFFER_SIZE 5000
+#define TIME_BW	500
+#define LOG_BW	1000
+#define LOG_TIMES 2
+#define TIME_PERIOD 500
+//log state part
+/*
+1. LOG_REGISTER: send register info to get register back
+2. LOG_REG_LIST: from recive reg list to timeout(start testing) 
+3. LOG_REG_LIST_TESTING: from timeout(start testing) to setmanifest
+4. LOG_REG_LIST_DETECTION_TESTING_SUCCESS: from setmanifest to cut pk stream.
+5. LOG_REG_LIST_TESTING_FAIL: from timeout(start testing) to send topology to pk.
+6. LOG_REG_CUT_PK: send pk cut.
+7. LOG_REG_DATA_COME: data come.
+*/
+#define LOG_REGISTER	0x01
+#define LOG_REG_LIST	0x02
+#define LOG_REG_LIST_TESTING	0x03	
+#define LOG_REG_LIST_DETECTION_TESTING_SUCCESS	0x04
+#define LOG_REG_LIST_TESTING_FAIL	0x05
+#define LOG_REG_CUT_PK	0x06
+#define LOG_REG_DATA_COME	0x07
+
+/*
+1. LOG_RESCUE_TRIGGER: from sending rescue request to get rescue list
+2. LOG_RESCUE_LIST: from reciving rescue list to timeout(start testing)
+3. LOG_RESCUE_TESTING: from start testing to setmanifest
+4. LOG_RESCUE_DETECTION_TESTING_SUCCESS: from setmanifest to cut pk stream.
+5. LOG_RESCUE_LIST_TESTING_FAIL: from timeout(start testing) to send topology to pk.
+6. LOG_RESCUE_CUT_PK: send pk cut.
+7. LOG_RESCUE_DATA_COME: data come.
+*/
+#define LOG_RESCUE_TRIGGER	0x08	
+#define LOG_RESCUE_LIST	0x09
+#define LOG_RESCUE_TESTING	0x0a
+#define LOG_RESCUE_DETECTION_TESTING_SUCCESS	0x0b
+#define LOG_RESCUE_LIST_TESTING_FAIL	0x0c
+#define LOG_RESCUE_CUT_PK	0x0d
+#define LOG_RESCUE_DATA_COME	0x0e
+
+/*
+the peer's condition
+*/
+#define LOG_START_DELAY	0x0f
+#define LOG_PERIOD_SOURCE_DELAY	0x10
+#define LOG_RESCUE_SUB_STREAM	0x11
+#define LOG_PEER_LEAVE	0x12	
+#define LOG_WRITE_STRING	0x13
+#define LOG_BEGINE 0x14
+
+/*
+UPDTAE
+*/
+#define LOG_RESCUE_TRIGGER_BACK 0x15
+#define LOG_LIST_EMPTY 0x16
+#define LOG_TEST_DELAY_FAIL 0x17
+#define LOG_TEST_DETECTION_FAIL 0x18
+#define LOG_DATA_COME_PK 0x19
+#define LOG_DELAY_RESCUE_TRIGGER 0x1a
+#define LOG_CLIENT_BW 0x1b
+#define LOG_MERGE_TRIGGER 0x1c
+#define LOG_TIME_OUT 0x1d
+#define LOG_PKT_LOSE 0x1e
+
+/*
+log parameter
+*/
+#define LOG_DELAY_SEND_PERIOD 5000
+#define LOG_BW_SEND_PERIOD 6000
 
 #include "configuration.h"
 
@@ -101,6 +175,7 @@
 #include <set>
 #include <list>
 #include <string>
+#include <cstring>
 
 #include "basic_class.h"
 
@@ -166,7 +241,7 @@ using std::bitset;
 #define CHNK_CMD_TOPO_INFO				0x1E
 #define CHNK_CMD_ROLE					0x1F
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
-
+#define CHNK_CMD_LOG	0x20
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 #define CHNK_CMD_PEER_UNKNOWN			0xFF	// 1 B cmd => 0xFF is reserved for unknown cmd
@@ -202,6 +277,15 @@ using std::bitset;
 #define mode_BitStream		4
 #define mode_HTTP			5
 #define mode_File			6
+
+#define MOD_TIME__CLOCK		1
+#define MOD_TIME_TICK		2
+
+struct timerStruct{
+	volatile unsigned long clockTime;
+	LARGE_INTEGER tickTime;
+	volatile unsigned initFlag;
+};
 
 #define TE_RTSP				1
 #define TE_RTMP				2	
@@ -323,9 +407,10 @@ struct chunk_header_t {
 
 //detection Info for each substream
 struct detectionInfo{
-	LARGE_INTEGER	lastAlarm;
-	LARGE_INTEGER	firstAlarm;
-	LARGE_INTEGER	previousAlarm;
+	//timer
+	struct timerStruct	lastAlarm;
+	struct timerStruct	firstAlarm;
+	struct timerStruct	previousAlarm;
 
 	unsigned int	last_timestamp;
 	unsigned int	first_timestamp;
@@ -625,14 +710,17 @@ struct syn_struct{
 	int init_flag; // 0 not init 1 send 2 init complete
 	unsigned long client_abs_start_time;
 	unsigned long start_seq;
-	LARGE_INTEGER start_clock;
-	LARGE_INTEGER end_clock;
+
+	//timer
+	struct timerStruct start_clock;
+//	struct timerStruct end_clock;
 };
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 struct source_delay {
 
-	unsigned long source_delay_time;
-	LARGE_INTEGER client_end_time;
+	unsigned int source_delay_time;
+	//timer
+	struct timerStruct client_end_time;
 	unsigned long end_seq_num;
 	unsigned int end_seq_abs_time;
 	int first_pkt_recv;
@@ -650,7 +738,8 @@ struct syn_token_send{
 struct syn_token_receive{
 	struct chunk_header_t header;
 	unsigned long seq_now;
-	unsigned long pk_time;
+	unsigned long pk_RecvTime;
+	unsigned long pk_SendTime;
 };
 //////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
@@ -734,8 +823,9 @@ struct manifest_timmer_flag{
 	unsigned long	connectTimeOutFlag;
 	unsigned long	rescue_manifest;	//may be rescue peer or candidates
 	int peer_role;	//0 rescue peer 1 candidate
-	LARGE_INTEGER	networkTimeOut;
-	LARGE_INTEGER	connectTimeOut;
+	//timer
+	struct	 timerStruct	networkTimeOut;
+	struct	 timerStruct	connectTimeOut;
 };
 
 struct chunk_child_info {
@@ -786,5 +876,199 @@ typedef struct _Msg
 		CHAR chID[MAX_ID_LEN + 1];		//ID for deregierster
 	}Data;
 } Msg;
+
+/*
+1. LOG_REGISTER: send register info to get register back
+2. LOG_REG_LIST: from recive reg list to timeout(start testing) 
+3. LOG_REG_LIST_TESTING: from timeout(start testing) to setmanifest
+4. LOG_REG_LIST_DETECTION_TESTING: from setmanifest to cut pk stream.
+5. LOG_REG_LIST_TESTING_FAIL: from timeout(start testing) to send topology to pk.
+6. LOG_REG_CUT_PK: send pk cut.
+7. LOG_REG_DATA_COME: data come.
+#define LOG_REGISTER	0x01
+#define LOG_REG_LIST	0x02
+#define LOG_REG_LIST_TESTING	0x03	
+#define LOG_REG_LIST_DETECTION_TESTING	0x04
+#define LOG_REG_LIST_TESTING_FAIL	0x05
+#define LOG_REG_CUT_PK	0x06
+#define LOG_REG_DATA_COME	0x07
+
+1. LOG_RESCUE_TRIGGER: from sending rescue request to get rescue list
+2. LOG_RESCUE_LIST: from reciving rescue list to timeout(start testing)
+3. LOG_RESCUE_TESTING: from start testing to setmanifest
+4. LOG_RESCUE_DETECTION_TESTING: from setmanifest to cut pk stream.
+5. LOG_RESCUE_LIST_TESTING_FAIL: from timeout(start testing) to send topology to pk.
+6. LOG_RESCUE_CUT_PK: send pk cut.
+7. LOG_RESCUE_DATA_COME: data come.
+#define LOG_RESCUE_TRIGGER	0x08	
+#define LOG_RESCUE_LIST	0x09
+#define LOG_RESCUE_TESTING	0x0a
+#define LOG_RESCUE_DETECTION_TESTING	0x0b
+#define LOG_RESCUE_LIST_TESTING_FAIL	0x0c
+#define LOG_RESCUE_CUT_PK	0x0d
+#define LOG_RESCUE_DATA_COME	0x0e
+
+the peer's condition
+#define LOG_START_DELAY	0x0f
+#define LOG_PERIOD_SOURCE_DELAY	0x10
+#define LOG_RESCUE_SUB_STREAM	0x11
+#define LOG_PEER_LEAVE	0x12	
+#define LOG_WRITE_STRING	0x13
+#define LOG_BEGINE 0x14
+
+#define LOG_RESCUE_TRIGGER_BACK 0x15
+#define LOG_LIST_EMPTY 0x16
+#define LOG_TEST_DELAY_FAIL 0x17
+#define LOG_TEST_DETECTION_FAIL 0x18
+#define LOG_DATA_COME_PK 0x19
+*/
+struct log_header_t{
+	unsigned char cmd;
+	unsigned long pid;
+	unsigned long log_time;
+	unsigned long manifest;
+	unsigned long channel_id;
+	unsigned long length;
+};
+
+struct log_pkt_format_struct{
+	struct log_header_t log_header;
+	unsigned char buf[0];
+};
+
+struct log_register_struct{
+	struct log_header_t log_header;
+};
+
+struct log_rescue_trigger_struct{
+	struct log_header_t log_header;
+};
+
+struct log_list_struct{
+	struct log_header_t log_header;
+	unsigned long list_num;
+	unsigned long connect_num;
+	unsigned long *list_peer;
+	unsigned long *connect_list;
+};
+
+struct log_list_testing_struct{
+	struct log_header_t log_header;
+	unsigned long select_pid;
+};
+
+struct log_list_detection_testing_struct{
+	struct log_header_t log_header;
+	unsigned long testing_result;
+};
+
+struct log_list_testing_fail_struct{
+	struct log_header_t log_header;
+};
+
+struct log_cut_pk_struct{
+	struct log_header_t log_header;
+};
+
+struct log_data_come_struct{
+	struct log_header_t log_header;
+};
+
+struct log_start_delay_struct{
+	struct log_header_t log_header;
+	unsigned long start_delay;
+};
+
+struct log_period_source_delay_struct{
+	struct log_header_t log_header;
+	unsigned long max_delay;
+	unsigned long sub_num;
+	unsigned long *av_delay;
+};
+
+struct log_rescue_sub_stream_struct{
+	struct log_header_t log_header;
+	unsigned long rescue_num;
+};
+
+struct log_peer_leave_struct{
+	struct log_header_t log_header;
+};
+
+struct log_write_string_struct{
+	struct log_header_t log_header;
+	unsigned char buf[0];
+};
+
+struct log_begine_struct{
+	struct log_header_t log_header;
+};
+
+struct log_rescue_trigger_back_struct{
+	struct log_header_t log_header;
+};
+
+struct log_list_empty_struct{
+	struct log_header_t log_header;
+};
+
+struct log_test_delay_fail_struct{
+	struct log_header_t log_header;
+};
+
+struct log_test_detection_fail_struct{
+	struct log_header_t log_header;
+};
+
+struct log_data_come_pk_struct{
+	struct log_header_t log_header;
+};
+
+struct log_client_bw_struct{
+	struct log_header_t log_header;
+	unsigned long should_in_bw;
+	unsigned long real_in_bw;
+	unsigned long real_out_bw;
+	double quality;
+};
+
+struct log_time_out_struct{
+	struct log_header_t log_header;
+};
+
+struct log_pkt_lose_struct{
+	struct log_header_t log_header;
+};
+
+struct log_source_delay_struct{
+	unsigned long delay_now;
+	unsigned long average_delay;
+};
+
+struct log_in_bw_struct{
+	unsigned long time_stamp;
+	LARGE_INTEGER client_time; 
+};
+
+struct quality_struct{
+	unsigned long loss_pkt;
+	double quality_count;
+	unsigned long total_chunk;
+};
+
+
+#define INIT 0
+#define IO_FINISH 1
+
+
+struct ioNonBlocking{
+
+	Nonblocking_Buff io_nonblockBuff;
+	queue<struct chunk_t *> outPutQue;
+	unsigned long ioFinishFlag;
+
+};
+
+
 
 #endif

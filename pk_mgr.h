@@ -13,7 +13,7 @@ class peer_mgr;
 class rtsp_viewer;
 class stream;
 class peer;
-
+class logger_client;
 
 
 class pk_mgr:public basic_class {
@@ -22,15 +22,18 @@ class pk_mgr:public basic_class {
 
 public:
 
-
 	list<int> *fd_list_ptr;
 //	list<int> outside_rescue_list;
 	list <int> streamID_list;
 	struct peer_connect_down_t *pkDownInfoPtr;
-	LARGE_INTEGER start,end;
+	struct timerStruct start,end;
 	volatile int Xcount ;
+	unsigned long totalMod ;
+	unsigned long reSynTime;
+	struct timerStruct lastSynStartclock;
 
 	LARGE_INTEGER teststart,testend;
+	LARGE_INTEGER syn_round_start;
 
 	multimap <unsigned long, struct peer_info_t *> map_pid_peer_info; 	// <pid, struct peer_info_t *>
 	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		// <pid, struct peer_info_t *>
@@ -80,6 +83,7 @@ public:
 
 	void delay_table_init();
 	void source_delay_detection(int sock, unsigned long sub_id, unsigned int seq_now);
+	void quality_source_delay_count(int sock, unsigned long sub_id, unsigned int seq_now);
 	void reset_source_delay_detection(unsigned long sub_id);
 	void set_rescue_state(unsigned long sub_id,int state);
 	int check_rescue_state(unsigned long sub_id,int state);
@@ -94,7 +98,7 @@ public:
 
 	unsigned long stream_number;	//channel 下stream的個數
 	
-	pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , logger *log_ptr , configuration *prep);
+	pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , logger *log_ptr , configuration *prep , logger_client * logger_client_ptr);
 	~pk_mgr();
 
 	void init();
@@ -174,6 +178,7 @@ private:
 
 	unsigned long _html_size;
 
+	logger_client * _logger_client_ptr;
 	network *_net_ptr;
 	logger *_log_ptr;
 	configuration *_prep;
@@ -186,6 +191,7 @@ private:
 
 	unsigned long _manifest;
 	bool pkSendCapacity;
+	unsigned long lastPKtimer;
 
 
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;

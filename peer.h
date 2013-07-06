@@ -10,6 +10,7 @@ class network;
 class logger;
 class pk_mgr;
 class peer_mgr;
+class logger_client;
 
 class peer:public basic_class {
 public:
@@ -35,9 +36,9 @@ public:
 
 	peer(list<int> *fd_list);
 	~peer();
-	void peer_set(network *net_ptr , logger *log_ptr , configuration *prep, pk_mgr *pk_mgr_ptr, peer_mgr *peer_mgr_ptr);
+	void peer_set(network *net_ptr , logger *log_ptr , configuration *prep, pk_mgr *pk_mgr_ptr, peer_mgr *peer_mgr_ptr, logger_client * logger_client_ptr);
 	void handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_in cin);
-	int handle_connect_request(int sock, struct level_info_t *level_info_ptr, unsigned long pid);
+	int handle_connect_request(int sock, struct level_info_t *level_info_ptr, unsigned long pid,Nonblocking_Ctl * Nonblocking_Send_Ctrl_ptr);
 	void clear_map();
 	virtual int handle_pkt_in(int sock);
 	virtual int handle_pkt_out(int sock);
@@ -58,6 +59,7 @@ private:
 	configuration *_prep;
 	pk_mgr * _pk_mgr_ptr;
 	peer_mgr * _peer_mgr_ptr;
+	logger_client * _logger_client_ptr;
 	int _send_byte;
 	int _expect_len;
 	int _offset;

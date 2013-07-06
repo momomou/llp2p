@@ -13,10 +13,12 @@ class peer;
 class pk_mgr;
 class io_accept;
 class io_connect;
+class logger_client;
+class io_nonblocking;
 
 class peer_communication:public basic_class{
 public:
-	peer_communication(network *net_ptr,logger *log_ptr,configuration *prep_ptr,peer_mgr * peer_mgr_ptr,peer *peer_ptr,pk_mgr * pk_mgr_ptr);
+	peer_communication(network *net_ptr,logger *log_ptr,configuration *prep_ptr,peer_mgr * peer_mgr_ptr,peer *peer_ptr,pk_mgr * pk_mgr_ptr, logger_client * logger_client_ptr);
 	~peer_communication();
 
 	void set_self_info(unsigned long public_ip);
@@ -43,13 +45,17 @@ public:
 
 	map<int, struct fd_information *> map_fd_info;
 	map<int, struct fd_information *>::iterator map_fd_info_iter;
+
+	map<int , struct ioNonBlocking*> map_fd_NonBlockIO;
+	map<int ,  struct ioNonBlocking*>::iterator map_fd_NonBlockIO_iter;
 	/*map<int, int> map_fd_flag;	//flag 0 rescue peer, flag 1 candidates, and delete in stop
 	map<int, unsigned long> map_fd_session_id;	//must be store before io_connect, and delete in stop
 	map<int, unsigned long> map_peer_com_fd_pid;	//must be store before io_connect, and delete in stop
 	map<int, unsigned long> map_fd_manifest;	//must be store before io_connect, and delete in stop*/
 	//map<int, int>::iterator map_fd_flag_iter;
 
-//	FILE *peer_com_log;
+	//FILE *peer_com_log;
+	logger_client * _logger_client_ptr;
 	network *_net_ptr;
 	logger *_log_ptr;
 	configuration *_prep;
@@ -58,6 +64,9 @@ public:
 	pk_mgr * _pk_mgr_ptr;
 	io_accept *_io_accept_ptr;
 	io_connect *_io_connect_ptr;
+	io_nonblocking *_io_nonblocking_ptr;
+	list<int> *fd_list_ptr;
+
 };
 
 #endif

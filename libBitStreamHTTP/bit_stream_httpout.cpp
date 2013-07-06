@@ -215,7 +215,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 
 	//here is to down-sampling (這邊可能有些bug 可能會去pop一個空的_queue_out_data_ptr!?)
-
+/*
 
 			int baseCount= _pk_mgr_ptr ->Xcount*PARAMETER_X ;
 			int sentSequenceNumber = chunk_ptr ->header.sequence_number ;
@@ -262,7 +262,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 						chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();			 //ignore and not send
 						}	
 			}
-
+*/
 
 
 	//for debug
@@ -287,8 +287,23 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 			send_rt_val = _net_ptr->nonblock_send(sock, &_send_ctl_info);
 
-	
-		
+//for debug sequence_number
+/*
+			static unsigned long test=0;
+			if(test==0){
+				test = chunk_ptr->header.sequence_number;
+
+			}
+			printf("sequence_number = %d \n",chunk_ptr->header.sequence_number);
+
+			if(test ==chunk_ptr->header.sequence_number){
+				test++;
+			}else{
+				printf("test=%d  sequence_number=%d \n",test,chunk_ptr->header.sequence_number);
+				PAUSE
+			}
+*/
+
 	//_log_ptr->write_log_format("s => s d ( d )\n", __FUNCTION__, "sent pkt sequence_number", chunk_ptr ->header.sequence_number, send_rt_val);
 
 

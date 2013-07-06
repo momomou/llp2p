@@ -12,10 +12,11 @@ class peer_mgr;
 class peer;
 class pk_mgr;
 class peer_communication;
+class logger_client;
 
 class io_connect:public basic_class{
 public:
-	io_connect(network *net_ptr,logger *log_ptr,configuration *prep_ptr,peer_mgr * peer_mgr_ptr,peer *peer_ptr,pk_mgr * pk_mgr_ptr, peer_communication *peer_communication_ptr);
+	io_connect(network *net_ptr,logger *log_ptr,configuration *prep_ptr,peer_mgr * peer_mgr_ptr,peer *peer_ptr,pk_mgr * pk_mgr_ptr, peer_communication *peer_communication_ptr, logger_client * logger_client_ptr);
 	~io_connect();
 
 	virtual int handle_pkt_in(int sock);
@@ -24,7 +25,9 @@ public:
 	virtual void handle_sock_error(int sock, basic_class *bcptr);
 	virtual void handle_job_realtime();
 	virtual void handle_job_timer();
+	void data_close(int cfd, const char *reason) ;
 
+	logger_client * _logger_client_ptr;
 	network *_net_ptr;
 	logger *_log_ptr;
 	configuration *_prep;

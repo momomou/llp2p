@@ -42,7 +42,7 @@ private:
 	int _sock_tcp;
 	int _stream_id;
 	void data_close(int cfd, const char *reason);
-	map<int, queue<struct chunk_t *> *> _map_seed_out_data;
+//	map<int, queue<struct chunk_t *> *> _map_seed_out_data;
 
 	
 };

@@ -20,12 +20,14 @@ typedef enum
 */
 #define MAX_PRINT_LEN	2048
 #define _DEBUG 1
+#define INITED 1
 
 
 class logger {
 	
 public:
 
+	volatile int timerMod;
 	void timer();
 	char *get_now_time();
 	void start_log_record(int time);
@@ -52,9 +54,12 @@ public:
 	DWORD getTime();
 	DWORD diffgetTime_ms(DWORD startTime,DWORD endTime);
 
+	unsigned int diff_TimerGet_ms(struct timerStruct *startTime ,struct timerStruct *endTime);
+	void timerGet(struct timerStruct *timmer);
+
 #ifdef WIN32
     int gettimeofday(struct timeval *tp, void *tzp);
-	unsigned int gettimeofday_ms(struct timeval *tv);
+	unsigned int gettimeofday_ms(/*struct timeval *tv*/);
 #endif
     unsigned long timevaldiff(struct timeval *starttime, struct timeval *finishtime);
     double set_diff_timmer();
@@ -69,7 +74,7 @@ public:
 private:
 	
 	FILE *_fp;
-	FILE *_binary_fp;
+//	FILE *_binary_fp;
 	int _systime;
 	network *_net_ptr;
 	time_t last_alarm;

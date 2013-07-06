@@ -26,7 +26,10 @@ void network::garbage_collection()
 	
 	if (_map_fd_bc_tbl.size()) {
 		for(_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin() ; _map_fd_bc_tbl_iter != _map_fd_bc_tbl.end() ; _map_fd_bc_tbl_iter++) {
-			close(_map_fd_bc_tbl_iter->first);
+			if(close(_map_fd_bc_tbl_iter->first) == -1){
+				printf("_map_fd_bc_tbl_iter error");
+				PAUSE
+			}
 			_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin();
 			if(_map_fd_bc_tbl_iter == _map_fd_bc_tbl.end()){
 				break;
@@ -339,15 +342,18 @@ int network::close(int sock)
 		//PAUSE
 	}
 	
-	epoll_control(sock, EPOLL_CTL_DEL, 0);
 	cout << "sock close fd_size = " << _map_fd_bc_tbl.size() << endl;
+	epoll_control(sock, EPOLL_CTL_DEL, 0);
+//	cout << "sock close fd_size = " << _map_fd_bc_tbl.size() << endl;
 	
 	::shutdown(sock, SHUT_RDWR);
 #ifdef _WIN32
-	return ::closesocket(sock);
+	::closesocket(sock);
+	return 0;
 #else
 	return ::close(sock);
 #endif
+
 
 }
 
@@ -536,11 +542,16 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 				return RET_SOCK_ERROR;
 			}
 		} else if (send_rt_val == 0) {
-			send_info->ctl_state = RUNNING;
-			return RET_OK;
+			if(send_info->expect_len == 0){
+				send_info->ctl_state = READY;
+				return RET_OK;
+			}else{
+				send_info->ctl_state = RUNNING;
+				return RET_SOCK_ERROR;
+			}
 		}
 		else if (send_rt_val == send_info->expect_len) {
-//			send_info->ctl_state = READY;
+			send_info->ctl_state = READY;
 			return send_rt_val;
 
 		} else {	
@@ -571,8 +582,13 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 				return RET_SOCK_ERROR;
 			}
 		} else if (send_rt_val == 0) {
-			send_info->ctl_state = RUNNING;
-			return RET_OK;
+			if(send_info->expect_len == 0){
+				send_info->ctl_state = READY;
+				return RET_OK;
+			}else{
+				send_info->ctl_state = RUNNING;
+				return RET_SOCK_ERROR;
+			}
 		}
 		else if (send_rt_val == send_info->expect_len) {
 			send_info->ctl_state = READY;

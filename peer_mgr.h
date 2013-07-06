@@ -11,6 +11,7 @@ class logger;
 class pk_mgr;
 class peer;
 class peer_communication;
+class logger_client;
 
 class peer_mgr:public basic_class {
 public:
@@ -25,7 +26,7 @@ public:
 	
 	peer_mgr(list<int> *fd_list);
 	~peer_mgr();
-	void peer_mgr_set(network *net_ptr , logger *log_ptr , configuration *prep, pk_mgr * pk_mgr_ptr);
+	void peer_mgr_set(network *net_ptr , logger *log_ptr , configuration *prep, pk_mgr * pk_mgr_ptr, logger_client * logger_client_ptr);
 	void peer_communication_set(peer_communication *peer_communication_ptr);
 	peer * get_peer_object();	//call after peer_mgr_set
 	//void pk_mgr_set(pk_mgr * pk_mgr_ptr);
@@ -68,6 +69,7 @@ public:
 private:
 	
 	int _sock;
+	logger_client * _logger_client_ptr;
 	network *_net_ptr;
 	logger *_log_ptr;
 	configuration *_prep;

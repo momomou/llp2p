@@ -7,6 +7,7 @@ static const char *levels[] = {
 
 void logger::timer() 
 {
+	timerMod =MOD_TIME__CLOCK ;
 	if(--_systime == 0) {
 		write_log_format("s => [U/U]\n", 
 		"Rate[KB]", _net_ptr->send_byte/SIG_FREQ/1024, _net_ptr->recv_byte/SIG_FREQ/1024);
@@ -50,11 +51,11 @@ void logger::start_log_record(int time)
 //		::exit(0);
 	}
 
-	_binary_fp = fopen(LOGBINARYFILE, "wb");
-	if(_binary_fp==NULL) {
-		cout << "Cannot write binary log file" << endl;
+//	_binary_fp = fopen(LOGBINARYFILE, "wb");
+//	if(_binary_fp==NULL) {
+//		cout << "Cannot write binary log file" << endl;
 //		::exit(0);
-	}
+//	}
 }
 
 void logger::stop_log_record() 
@@ -62,14 +63,14 @@ void logger::stop_log_record()
 
 	if(_fp== NULL)
 		return;
-	if(_binary_fp== NULL)
-		return;
+//	if(_binary_fp== NULL)
+//		return;
 
 	fprintf(_fp, "===================================================================================================\n");
 	fflush(_fp);
 	fclose(_fp);
-	fflush(_binary_fp);
-	fclose(_binary_fp);
+//	fflush(_binary_fp);
+//	fclose(_binary_fp);
 }
 
 void logger::write_log_format(const char* fmt, ...) 
@@ -83,8 +84,8 @@ void logger::write_log_format(const char* fmt, ...)
 
 	if(_fp== NULL)
 		return;
-	if(_binary_fp== NULL)
-		return;
+//	if(_binary_fp== NULL)
+//		return;
 
 
 	fprintf(_fp,"[%s] ", get_now_time());
@@ -132,8 +133,8 @@ void logger::write_binary(unsigned int sequence_number)
 	time(&now);
 	ptm = gmtime(&now);
 	
-	fwrite(ptm ,sizeof(tm) , 1, _binary_fp);
-	fwrite(&sequence_number ,sizeof(unsigned int) , 1, _binary_fp);
+//	fwrite(ptm ,sizeof(tm) , 1, _binary_fp);
+//	fwrite(&sequence_number ,sizeof(unsigned int) , 1, _binary_fp);
 }
 
 
@@ -341,11 +342,12 @@ int logger::gettimeofday(struct timeval *tv, void *tzp)
 #endif
 
 #ifdef WIN32
-unsigned int logger::gettimeofday_ms(struct timeval *tv)
+unsigned int logger::gettimeofday_ms(/*struct timeval *tv*/)
 {
 	unsigned int time_ms;
-	gettimeofday(tv, NULL) ;
-	time_ms= (tv->tv_sec)*1000 + (unsigned int)(tv->tv_usec)/1000 ;
+	struct timeval tv;
+	gettimeofday(&tv, NULL) ;
+	time_ms= (tv.tv_sec)*1000 + (unsigned int)(tv.tv_usec)/1000 ;
 	return time_ms;
 }
 #endif
@@ -373,7 +375,11 @@ DWORD logger::diffgetTime_ms(DWORD startTime,DWORD endTime)
 #ifdef WIN32
 void logger::getTickTime(LARGE_INTEGER *tickTime)
 {
-	QueryPerformanceCounter(tickTime);
+	bool fail =QueryPerformanceCounter(tickTime);
+	if(fail == 0){
+		printf("QueryPerformanceCounter fail \n");
+		PAUSE
+	}
 }
 #endif
 
@@ -425,3 +431,43 @@ double logger::set_diff_timmer()
     }
 }
 
+
+
+#ifdef WIN32
+void logger::timerGet(struct timerStruct *timmer)
+{
+/*
+	bool fail = QueryPerformanceCounter(&(timmer->tickTime));
+	if(fail == 0){
+		printf("QueryPerformanceCounter fail\n");
+		PAUSE
+	}
+*/
+	getTickTime(&(timmer ->tickTime));
+
+	timmer ->clockTime = gettimeofday_ms() ;
+	timmer->initFlag =INITED ;
+}
+#endif
+
+
+#ifdef WIN32
+unsigned int logger::diff_TimerGet_ms(struct timerStruct *start,struct timerStruct *end)
+{
+
+	if(start ->initFlag != INITED ){
+		printf("start timer not INITED \n");
+		PAUSE
+	}
+
+	if(end ->initFlag != INITED ){
+		printf("end timer not INITED \n");
+		PAUSE
+	}
+
+	if(timerMod == MOD_TIME_TICK)
+		return diffTime_ms(start->tickTime ,end->tickTime);
+	else
+		return diffgetTime_ms(start->clockTime,end->clockTime) ;
+}
+#endif

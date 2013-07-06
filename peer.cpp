@@ -8,6 +8,7 @@
 #include "pk_mgr.h"
 #include "peer_mgr.h"
 #include "peer_communication.h"
+#include "logger_client.h"
 
 using namespace std;
 
@@ -72,23 +73,37 @@ void peer::clear_map()
 		queue_out_data_ptr = iter->second;
 		while(queue_out_data_ptr->size()) {
 			queue_out_data_ptr->pop();
-			if(chunk_ptr)
-				delete chunk_ptr;
+//			if(chunk_ptr)
+//				delete chunk_ptr;
 		}
 
 		if(queue_out_data_ptr)
 			delete queue_out_data_ptr;
 	}
 
+
+	for(map_fd_nonblocking_ctl_iter =map_fd_nonblocking_ctl.begin() ;map_fd_nonblocking_ctl_iter !=map_fd_nonblocking_ctl.end() ;map_fd_nonblocking_ctl_iter ++){
+		delete map_fd_nonblocking_ctl_iter->second;
+	}
+	map_fd_nonblocking_ctl.clear();
+
+
+	for(substream_first_reply_peer_iter =substream_first_reply_peer.begin() ;substream_first_reply_peer_iter !=substream_first_reply_peer.end() ;substream_first_reply_peer_iter ++){
+		delete substream_first_reply_peer_iter->second;
+	}
+	substream_first_reply_peer.clear();
+
+
 }
 
-void peer::peer_set(network *net_ptr , logger *log_ptr , configuration *prep, pk_mgr *pk_mgr_ptr, peer_mgr *peer_mgr_ptr)
+void peer::peer_set(network *net_ptr , logger *log_ptr , configuration *prep, pk_mgr *pk_mgr_ptr, peer_mgr *peer_mgr_ptr, logger_client * logger_client_ptr)
 {
 	_net_ptr = net_ptr;
 	_log_ptr = log_ptr;
 	_prep = prep;
 	_pk_mgr_ptr = pk_mgr_ptr;
 	_peer_mgr_ptr = peer_mgr_ptr;
+	_logger_client_ptr = logger_client_ptr;
 	_net_ptr->peer_set(this);
 }
 
@@ -130,12 +145,14 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 		rescue_peer->tcp_port = chunk_request_ptr->info.tcp_port;
 		rescue_peer->udp_port = chunk_request_ptr->info.udp_port;
 		_pk_mgr_ptr->map_pid_rescue_peer_info[rescue_peer->pid] = rescue_peer;
-		printf("rescue_peer->pid = %d",rescue_peer->pid);
+		printf("rescue_peer->pid = %d  socket=%d\n",rescue_peer->pid,sock);
 		_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"rescue_peer->pid =",rescue_peer->pid);
 	}else{
 
-		printf("fd error why dup");
+		printf("fd error why dup\n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd error why dup");
+		printf("rescue_peer->pid = %d  socket = %d\n",rescue_peer->pid);
+		_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"rescue_peer->pid =",rescue_peer->pid);
 		PAUSE
 		
 	}
@@ -145,63 +162,118 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 
 //只被build connect 呼叫
 //送CHNK_CMD_PEER_ CON 到其他peer
-int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, unsigned long pid)
+int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, unsigned long pid,Nonblocking_Ctl * Nonblocking_Send_Ctrl_ptr)
 {
-	map<unsigned long, int>::iterator map_pid_fd_iter;
 	
-	queue_out_ctrl_ptr = new std::queue<struct chunk_t *>;
-	queue_out_data_ptr = new std::queue<struct chunk_t *>;
+	if(Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY ){
 
-	map_pid_fd_iter = map_in_pid_fd.find(level_info_ptr->pid);
+		map<unsigned long, int>::iterator map_pid_fd_iter;
 
-	if(map_pid_fd_iter == map_in_pid_fd.end())
-		map_in_pid_fd[level_info_ptr->pid] = sock;
-	
-	Nonblocking_Buff * Nonblocking_Buff_ptr = new Nonblocking_Buff ;
-	memset(Nonblocking_Buff_ptr, 0x0 , sizeof(Nonblocking_Buff));
-	map_fd_nonblocking_ctl[sock] = Nonblocking_Buff_ptr ;
+		queue_out_ctrl_ptr = new std::queue<struct chunk_t *>;
+		queue_out_data_ptr = new std::queue<struct chunk_t *>;
+
+		map_pid_fd_iter = map_in_pid_fd.find(level_info_ptr->pid);
+
+		if(map_pid_fd_iter == map_in_pid_fd.end())
+			map_in_pid_fd[level_info_ptr->pid] = sock;
+
+		Nonblocking_Buff * Nonblocking_Buff_ptr = new Nonblocking_Buff ;
+		memset(Nonblocking_Buff_ptr, 0x0 , sizeof(Nonblocking_Buff));
+		map_fd_nonblocking_ctl[sock] = Nonblocking_Buff_ptr ;
 
 
-	map_fd_pid[sock] = level_info_ptr->pid;
-	map_fd_out_ctrl[sock] = queue_out_ctrl_ptr;
-	map_fd_out_data[sock] = queue_out_data_ptr;
-	
-	struct chunk_t *chunk_ptr = NULL;
-	struct chunk_request_msg_t *chunk_request_ptr = NULL;
-	int send_byte;
-	unsigned long channel_id;
-	string svc_tcp_port("");
-	string svc_udp_port("");
-	
-	_prep->read_key("channel_id", channel_id);
-	_prep->read_key("svc_tcp_port", svc_tcp_port);
-	_prep->read_key("svc_udp_port", svc_udp_port);
-	
-	chunk_request_ptr = (struct chunk_request_msg_t *)new unsigned char[sizeof(struct chunk_request_msg_t)];
-	
-	memset(chunk_request_ptr, 0x0, sizeof(struct chunk_request_msg_t));
-		
-	chunk_request_ptr->header.cmd = CHNK_CMD_PEER_CON;
-	chunk_request_ptr->header.rsv_1 = REQUEST;
-	chunk_request_ptr->header.length = sizeof(struct request_info_t);
-	chunk_request_ptr->info.pid = pid;
-	chunk_request_ptr->info.channel_id = channel_id;
-	chunk_request_ptr->info.private_ip = _net_ptr->getLocalIpv4();
-	chunk_request_ptr->info.tcp_port = (unsigned short)atoi(svc_tcp_port.c_str());
-	chunk_request_ptr->info.udp_port = (unsigned short)atoi(svc_udp_port.c_str());
+		map_fd_pid[sock] = level_info_ptr->pid;
+		map_fd_out_ctrl[sock] = queue_out_ctrl_ptr;
+		map_fd_out_data[sock] = queue_out_data_ptr;
 
-	send_byte = send(sock, (char *)chunk_request_ptr, sizeof(struct chunk_request_msg_t), 0);
-	
-	if( send_byte <= 0 ) {
-		data_close(sock, "send html_buf error",CLOSE_PARENT);
-		PAUSE
-		_log_ptr->exit(0, "send html_buf error");
-		return -1;
-	} else {
-		if(chunk_request_ptr)
-			delete chunk_request_ptr;
-		return 0;
+		struct chunk_t *chunk_ptr = NULL;
+		struct chunk_request_msg_t *chunk_request_ptr = NULL;
+		int send_byte;
+		unsigned long channel_id;
+		string svc_tcp_port("");
+		string svc_udp_port("");
+
+		_prep->read_key("channel_id", channel_id);
+		_prep->read_key("svc_tcp_port", svc_tcp_port);
+		_prep->read_key("svc_udp_port", svc_udp_port);
+
+		chunk_request_ptr = (struct chunk_request_msg_t *)new unsigned char[sizeof(struct chunk_request_msg_t)];
+
+		memset(chunk_request_ptr, 0x0, sizeof(struct chunk_request_msg_t));
+
+		chunk_request_ptr->header.cmd = CHNK_CMD_PEER_CON;
+		chunk_request_ptr->header.rsv_1 = REQUEST;
+		chunk_request_ptr->header.length = sizeof(struct request_info_t);
+		chunk_request_ptr->info.pid = pid;
+		chunk_request_ptr->info.channel_id = channel_id;
+		chunk_request_ptr->info.private_ip = _net_ptr->getLocalIpv4();
+		chunk_request_ptr->info.tcp_port = (unsigned short)atoi(svc_tcp_port.c_str());
+		chunk_request_ptr->info.udp_port = (unsigned short)atoi(svc_udp_port.c_str());
+
+		_net_ptr->set_nonblocking(sock);
+
+
+
+		Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.offset =0 ;
+		Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.total_len = sizeof(struct role_struct) ;
+		Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.expect_len = sizeof(struct role_struct) ;
+		Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.buffer = (char *)chunk_request_ptr ;
+		Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_request_ptr;
+		Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.serial_num =  chunk_request_ptr->header.sequence_number;
+
+		printf("cmd= %d total_len = %d\n",chunk_request_ptr->header.cmd,chunk_request_ptr->header.length );
+
+		_send_byte = _net_ptr->nonblock_send(sock, & (Nonblocking_Send_Ctrl_ptr->recv_ctl_info ));
+
+
+		if(_send_byte < 0) {
+			if(Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr)
+				delete Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr;
+			Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr = NULL;
+			data_close(sock, "PEER　COM error",CLOSE_PARENT);
+			return RET_SOCK_ERROR;
+
+		} else if(Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY ){
+
+			if(Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr)
+				delete Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr;
+			Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr = NULL;
+			return 0;
+		}
+
+	}else if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == RUNNING ){
+		_send_byte = _net_ptr->nonblock_send(sock, & (Nonblocking_Send_Ctrl_ptr->recv_ctl_info ));
+
+		if(_send_byte < 0) {
+			if(Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr)
+				delete Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr;
+			Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr = NULL;
+			data_close(sock, "PEER　COM error",CLOSE_PARENT);
+			return RET_SOCK_ERROR;
+		}else if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY){
+
+			if(Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr)
+				delete Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr;
+			Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr = NULL;
+			return 0;
+		}
+
 	}
+
+
+
+	//send_byte = send(sock, (char *)chunk_request_ptr, sizeof(struct chunk_request_msg_t), 0);
+	//
+	//if( send_byte <= 0 ) {
+	//	data_close(sock, "send html_buf error",CLOSE_PARENT);
+	//	PAUSE
+	//	_log_ptr->exit(0, "send html_buf error");
+	//	return -1;
+	//} else {
+	//	if(chunk_request_ptr)
+	//		delete chunk_request_ptr;
+	//	return 0;
+	//}
 
 }
 
@@ -339,9 +411,9 @@ int peer::handle_pkt_in(int sock)
 //	just send return
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_PARENT_PEER){
 		printf("CHNK_CMD_PARENT_PEER\n");
-		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_PARENT_PEER ");
-		PAUSE
-		exit(1);
+		
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","CHNK_CMD_PARENT_PEER ");
+		_logger_client_ptr->log_exit();
 		//cmd == CHNK_CMD_PEER_DATA	
 	}else if(chunk_ptr->header.cmd == CHNK_CMD_PEER_TEST_DELAY ){
 
@@ -424,7 +496,6 @@ int peer::handle_pkt_in(int sock)
 
 					if(pid_peer_info_iter != _pk_mgr_ptr ->map_pid_peer_info.end()){
 
-
 						for(unsigned long i=0 ;i< _pk_mgr_ptr ->map_pid_peer_info.count(firstReplyPid);i++){
 							peerInfoPtr = pid_peer_info_iter->second;
 							if (pid_peer_info_iter->second->manifest == replyManifest){
@@ -492,6 +563,13 @@ int peer::handle_pkt_in(int sock)
 						_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
 						_pk_mgr_ptr->reSet_detectionInfo();
 
+						if(replyManifest == _pk_mgr_ptr ->full_manifest){
+							_logger_client_ptr->log_to_server(LOG_REG_LIST_TESTING,replyManifest,firstReplyPid);
+						}
+						else{
+							_logger_client_ptr->log_to_server(LOG_RESCUE_TESTING,replyManifest,firstReplyPid);
+						}
+
 						printf("sent to parent manifest = %d\n",peerDownInfoPtr ->peerInfo.manifest);
 						_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"first_reply_peer=",firstReplyPid,"manifest",peerDownInfoPtr ->peerInfo.manifest);
 
@@ -504,6 +582,7 @@ int peer::handle_pkt_in(int sock)
 
 							if (peerInfoPtr->manifest == replyManifest){
 							//若是自己或是先前已經建立過連線的parent 則不close (會關到正常連線)  
+
 								if(pid_peer_info_iter ->first == _peer_mgr_ptr ->self_pid){
 									continue;
 								}else if(_pk_mgr_ptr ->map_pid_peerDown_info.find(pid_peer_info_iter ->first) != _pk_mgr_ptr ->map_pid_peerDown_info.end()){
@@ -679,6 +758,13 @@ int peer::handle_pkt_out(int sock)
 
 				_send_byte = _net_ptr->nonblock_send(sock, & (Nonblocking_Send_Ctrl_ptr->recv_ctl_info ));
 
+				if(!(_logger_client_ptr->log_bw_out_init_flag)){
+					_logger_client_ptr->log_bw_out_init_flag = 1;
+					_logger_client_ptr->bw_out_struct_init(_send_byte);
+				}
+				else{
+					_logger_client_ptr->set_out_bw(_send_byte);
+				}
 //				_send_byte = send(sock, (char *)chunk_ptr+_offset, _expect_len, 0);
 
 				if(_send_byte < 0) {
@@ -694,7 +780,15 @@ int peer::handle_pkt_out(int sock)
 
 			}else if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == RUNNING ){
 				_send_byte = _net_ptr->nonblock_send(sock, & (Nonblocking_Send_Ctrl_ptr->recv_ctl_info ));
-			
+
+				if(!(_logger_client_ptr->log_bw_out_init_flag)){
+					_logger_client_ptr->log_bw_out_init_flag = 1;
+					_logger_client_ptr->bw_out_struct_init(_send_byte);
+				}
+				else{
+					_logger_client_ptr->set_out_bw(_send_byte);
+				}
+
 				if(_send_byte < 0) {
 						data_close(sock, "error occured in send RUNNING queue_out_data",DONT_CARE);
 						//PAUSE
@@ -711,7 +805,7 @@ int peer::handle_pkt_out(int sock)
 		} else if(queue_out_data_ptr->size() != 0) {
 
 			if(queue_out_data_ptr->size() >100){
-				printf("queue_out_data_ptr->size() = %d",queue_out_data_ptr->size());
+				printf("queue_out_data_ptr->size() = %d\n",queue_out_data_ptr->size());
 				_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"queue_out_data_ptr->size() =",queue_out_data_ptr->size());
 
 			}
@@ -754,6 +848,13 @@ int peer::handle_pkt_out(int sock)
 
 				_send_byte = _net_ptr->nonblock_send(sock, & (Nonblocking_Send_Data_ptr->recv_ctl_info ));
 
+				if(!(_logger_client_ptr->log_bw_out_init_flag)){
+					_logger_client_ptr->log_bw_out_init_flag = 1;
+					_logger_client_ptr->bw_out_struct_init(_send_byte);
+				}
+				else{
+					_logger_client_ptr->set_out_bw(_send_byte);
+				}
 
 				if(_send_byte < 0) {
 					data_close(sock, "error occured in send queue_out_data",DONT_CARE);
@@ -768,6 +869,14 @@ int peer::handle_pkt_out(int sock)
 		
 				_send_byte = _net_ptr->nonblock_send(sock, & (Nonblocking_Send_Data_ptr->recv_ctl_info ));
 			
+				if(!(_logger_client_ptr->log_bw_out_init_flag)){
+					_logger_client_ptr->log_bw_out_init_flag = 1;
+					_logger_client_ptr->bw_out_struct_init(_send_byte);
+				}
+				else{
+					_logger_client_ptr->set_out_bw(_send_byte);
+				}
+
 				if(_send_byte < 0) {
 						data_close(sock, "error occured in send queue_out_data",DONT_CARE);
 						//PAUSE
@@ -970,18 +1079,22 @@ void peer::data_close(int cfd, const char *reason ,int type)
 				//防止peer離開 狀態卡在testing
 				if(peerDownInfoPtr->peerInfo.manifest & testingManifest){
 					peerTestingManifest = peerDownInfoPtr->peerInfo.manifest & testingManifest;
-
+					peerDownInfoPtr->peerInfo.manifest = 0 ;
 					for(unsigned long i=0 ; i<  _pk_mgr_ptr->sub_stream_num ; i++){
-						if( peerTestingManifest & i<<1){
+						if( peerTestingManifest & _pk_mgr_ptr->SubstreamIDToManifest(i)){
 							 (_pk_mgr_ptr->ssDetect_ptr +i) ->isTesting =false ;
 							 (_pk_mgr_ptr->ssDetect_ptr +i) ->previousParentPID = PK_PID +1 ;
-							 //set recue stat true
+							 //set recue stat 0
 							 if(_pk_mgr_ptr->check_rescue_state(i,1)){
 								 _pk_mgr_ptr->set_rescue_state(i,2);
 								 _pk_mgr_ptr->set_rescue_state(i,0);
+							 //TESTING
 							 }else {
+								 _pk_mgr_ptr->pkDownInfoPtr->peerInfo.manifest |=_pk_mgr_ptr->SubstreamIDToManifest(i) ;
 								 _pk_mgr_ptr->set_rescue_state(i,0);
 							 }
+							 _pk_mgr_ptr->send_parentToPK(_pk_mgr_ptr->SubstreamIDToManifest(i),PK_PID +1);
+
 						}
 					}
 				}
