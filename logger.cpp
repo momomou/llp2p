@@ -1,4 +1,5 @@
 #include "logger.h"
+#include "common.h"
 
 static const char *levels[] = {
   "CRIT", "ERROR", "WARNING", "INFO",
@@ -44,8 +45,16 @@ char *logger::get_now_time()
 
 void logger::start_log_record(int time) 
 {
+	char*   szPath[MAX_PATH]= {'\0'};
+#ifdef _FIRE_BREATH_MOD_
+	GetEnvironmentVariableA ("APPDATA" ,(LPSTR)szPath,   MAX_PATH);  
+	strcat((char*)szPath,"\\LLP2P\\");
+	CreateDirectoryA((char*)szPath,NULL);
+#endif
+	strcat((char*)szPath,"P2PLog.txt");
+	printf("PATH = %s  \n",szPath);
 	_systime = time;
-	_fp = fopen(LOGFILE, "w");
+	_fp = fopen((char*)szPath, "w");
 	if(!_fp) {
 		cout << "Cannot write log file" << endl;
 //		::exit(0);
@@ -143,9 +152,9 @@ void logger::exit(int status, const char *action)
 	write_log_format("s => s (s)\n", "log Terminate", "exit()", action);
 	stop_log_record();
 	_net_ptr->garbage_collection();
-	printf("logger error");
+	printf("logger error\n");
 	*(_net_ptr->_errorRestartFlag) =RESTART;
-	//PAUSE
+//	PAUSE
 	//::exit(status);
 }
 
@@ -367,7 +376,8 @@ DWORD logger::getTime()
 #ifdef WIN32
 DWORD logger::diffgetTime_ms(DWORD startTime,DWORD endTime)
 {
-    return (endTime-startTime);
+	int diffValue = endTime-startTime;
+    return abs(diffValue);
 }
 #endif
 
@@ -378,7 +388,8 @@ void logger::getTickTime(LARGE_INTEGER *tickTime)
 {
 	bool fail =QueryPerformanceCounter(tickTime);
 	if(fail == 0){
-		printf("QueryPerformanceCounter fail \n");
+		timerMod =MOD_TIME__CLOCK ;
+		printf("QueryPerformanceCounter fail GetLastError = %d\n",GetLastError());
 //		PAUSE
 	}
 }
@@ -437,12 +448,6 @@ double logger::set_diff_timmer()
 #ifdef WIN32
 void logger::timerGet(struct timerStruct *timmer)
 {
-
-	//bool fail = QueryPerformanceCounter(&(timmer->tickTime));
-	//if(fail == 0){
-	//	printf("QueryPerformanceCounter fail\n");
-	//	PAUSE
-	//}
 
 	getTickTime(&(timmer ->tickTime));
 

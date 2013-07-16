@@ -1,3 +1,8 @@
+//#ifndef _FIRE_BREATH_MOD_
+//#define _FIRE_BREATH_MOD_ 
+//#endif
+
+
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
@@ -5,11 +10,12 @@
 ////resuce PARAMETER////
 #define PARAMETER_X		10
 #define PK_PID			999999
-#define BIG_CHUNK	512
-
+#define BIG_CHUNK	8192
+#define LOGPORT		8754
+#define LOGIP		"140.114.90.154"
 //ms
 #define CONNECT_TIME_OUT 4000
-#define NETWORK_TIMEOUT  8000
+#define NETWORK_TIMEOUT  5000
 #define BASE_RESYN_TIME		 20000
 
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
@@ -19,14 +25,14 @@
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
 // BUFF_SIZE sec
-#define BUFF_SIZE		6
+#define BUFF_SIZE		2
 //CHUNK_LOSE sec, mean lose about CHUNK_LOSE sec packet
-#define CHUNK_LOSE		1
+#define CHUNK_LOSE		2
 
 //source delay PARAMETER
 #define MAX_DELAY 1500
 //SOURCE_DELAY_CONTINUOUS sec, mean  about SOURCE_DELAY_CONTINUOUS sec packet all dalay out of bound
-#define SOURCE_DELAY_CONTINUOUS 0.5
+#define SOURCE_DELAY_CONTINUOUS 1
 
 //io_accept fd remain period
 #define FD_REMAIN_PERIOD	1000
@@ -131,7 +137,9 @@ log parameter
 //#include <getopt.h> 
 #include <fstream>
 
+
 #ifdef _WIN32
+//#include <Dbghelp.h>
 #include <winsock2.h>
 #include <sys/timeb.h> 
 #include <ws2tcpip.h>
@@ -249,6 +257,7 @@ using std::bitset;
 
 #define OK				0x01
 #define REJECT			0x02
+
 
 #define RESTART 0x01
 

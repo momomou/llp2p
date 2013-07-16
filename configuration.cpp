@@ -6,6 +6,7 @@
 // This is a TEMPLATE CLASS TO ACCEPT MULTIPLE read_key value class
 
 #include "configuration.h"
+#include "common.h"
 
 configuration::configuration() : filename(""), tmp_only(true) 
 {
@@ -15,8 +16,11 @@ configuration::configuration() : filename(""), tmp_only(true)
 
 configuration::configuration(string file) : filename(file), tmp_only(false) 
 {
+
 	fstream fh(filename.c_str(), fstream::in);
 
+#ifdef _FIRE_BREATH_MOD_
+#else
 	if(fh.is_open()) {
 		string linebuf;
 		while(getline(fh, linebuf)) {
@@ -38,19 +42,24 @@ configuration::configuration(string file) : filename(file), tmp_only(false)
 	}
     else{
 		printf("can't open 'config.ini'\n");
+
+#endif
 		map_table["bucket_size"] = "8192";
 		map_table["channel_id"] = "0";
 		map_table["html_size"] = "8192";
 		map_table["lane_depth"] = "3";
 		map_table["max_lane"] = "8";
 		map_table["min_lane"] = "1";
-		map_table["pk_ip"] = "140.114.71.204";
-		map_table["pk_port"] = "6655";
+		map_table["pk_ip"] = "140.114.90.146";
+		map_table["pk_port"] = "6656";
 		map_table["stream_local_port"] = "3000";
 		map_table["sub_stream_num"] = "4";
 		map_table["svc_tcp_port"] = "5566";
 		map_table["svc_udp_port"] = "7788";
+#ifdef _FIRE_BREATH_MOD_
+#else
 	}
+#endif
 }
 
 

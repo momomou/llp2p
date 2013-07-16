@@ -603,12 +603,16 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 	}
 }
 
-network::network(int * errorRestartFlag) 
+network::network(int * errorRestartFlag,list<int>  * fd_list) 
 {
 	send_byte = 0ULL;	// typeof(_send_byte) == unsigned long long int
 	recv_byte = 0ULL;
 	_errorRestartFlag = errorRestartFlag;
 	_error_cfd = new std::queue<int>;
+	if(!_error_cfd){
+		printf("_error_cfd error !!!!!!!!!!!!!!\n");
+	}
+	fd_list_ptr = fd_list;
 }
 
 network::~network() 
@@ -624,3 +628,14 @@ void network::handle_rtmp_error(int sock)
 	_error_cfd->push(sock);
 }
 
+
+void network::eraseFdList(int sock) 
+{
+	list<int>::iterator fd_iter;
+	for(fd_iter = fd_list_ptr ->begin() ;fd_iter != fd_list_ptr->end();fd_iter++){
+		if(*fd_iter == sock) {
+			fd_list_ptr->erase(fd_iter);
+			break;
+		}
+	}
+}

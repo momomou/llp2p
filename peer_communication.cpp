@@ -21,15 +21,25 @@ peer_communication::peer_communication(network *net_ptr,logger *log_ptr,configur
 	_pk_mgr_ptr = pk_mgr_ptr;
 	_logger_client_ptr = logger_client_ptr;
 	total_manifest = 0;
-	session_id_count = 0;
+	session_id_count = 1;
 	self_info =NULL;
 	self_info = new struct level_info_t;
+	if(!(self_info) ){
+		printf("peer_communication::self_info  new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," ::self_info   new error");
+		PAUSE
+	}
 	_io_accept_ptr =NULL;
 	_io_connect_ptr =NULL;
 	_io_nonblocking_ptr=NULL;
 	_io_nonblocking_ptr = new io_nonblocking(net_ptr,log_ptr ,this,logger_client_ptr);
 	_io_accept_ptr = new io_accept(net_ptr,log_ptr,prep_ptr,peer_mgr_ptr,peer_ptr,pk_mgr_ptr,this,logger_client_ptr);
 	_io_connect_ptr = new io_connect(net_ptr,log_ptr,prep_ptr,peer_mgr_ptr,peer_ptr,pk_mgr_ptr,this,logger_client_ptr);
+	if(!(_io_nonblocking_ptr) || !(_io_accept_ptr) || !(_io_connect_ptr)){
+		printf("peer_communication::!(_io_nonblocking_ptr) || !(_io_accept_ptr) || !(_io_connect_ptr)  new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," ::!(_io_nonblocking_ptr) || !(_io_accept_ptr) || !(_io_connect_ptr)   new error");
+		PAUSE
+	}
 	fd_list_ptr =NULL;
 	fd_list_ptr = pk_mgr_ptr->fd_list_ptr ;
 	//peer_com_log = fopen("./peer_com_log.txt","wb");
@@ -50,7 +60,7 @@ peer_communication::~peer_communication(){
 	_io_connect_ptr =NULL;
 	_io_nonblocking_ptr=NULL;
 
-	for(session_id_candidates_set_iter = session_id_candidates_set.begin() ;session_id_candidates_set_iter !=session_id_candidates_set.end();session_id_candidates_set_iter){
+	for(session_id_candidates_set_iter = session_id_candidates_set.begin() ;session_id_candidates_set_iter !=session_id_candidates_set.end();session_id_candidates_set_iter++){
 		
 		for(int i=0;i< session_id_candidates_set_iter->second->peer_num;i++)
 			delete session_id_candidates_set_iter->second->list_info->level_info[i];
@@ -110,7 +120,11 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 			}
 			else{
 				session_id_candidates_set[session_id_count] = new struct peer_com_info;
-
+				if(!(session_id_candidates_set[session_id_count] ) ){
+					printf("peer_communication::session_id_candidates_set[session_id_count]   new error \n");
+					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set[session_id_count]    new error");
+					PAUSE
+				}
 				session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
 				if(session_id_candidates_set_iter == session_id_candidates_set.end()){
 					
@@ -126,6 +140,11 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 				session_id_candidates_set_iter->second->manifest = rescue_manifest;
 				session_id_candidates_set_iter->second->role = 0;
 				session_id_candidates_set_iter->second->list_info = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
+				if(!(session_id_candidates_set_iter->second->list_info ) ){
+					printf("peer_communication::session_id_candidates_set_iter->second->list_info   new error \n");
+					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set_iter->second->list_info   new error");
+					PAUSE
+				}
 				memset(session_id_candidates_set_iter->second->list_info, 0x0, level_msg_size);
 				memcpy(session_id_candidates_set_iter->second->list_info, testing_info, (level_msg_size - candidates_num * sizeof(struct level_info_t *)));
 
@@ -133,6 +152,11 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 
 				for(int i=0;i<candidates_num;i++){
 					session_id_candidates_set_iter->second->list_info->level_info[i] = new struct level_info_t;
+					if(!(session_id_candidates_set_iter->second->list_info ) ){
+						printf("peer_communication::session_id_candidates_set_iter->second->list_info->level_info[i]   new error \n");
+						_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set_iter->second->list_info->level_info[i]  new error");
+						PAUSE
+					}
 					memset(session_id_candidates_set_iter->second->list_info->level_info[i], 0x0 , sizeof(struct level_info_t));
 					memcpy(session_id_candidates_set_iter->second->list_info->level_info[i], testing_info->level_info[i] , sizeof(struct level_info_t));
 					offset += sizeof(struct level_info_t);
@@ -170,6 +194,11 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 			}
 			else{
 				session_id_candidates_set[session_id_count] = new struct peer_com_info;
+				if(!(session_id_candidates_set[session_id_count]) ){
+					printf("peer_communication::session_id_candidates_set[session_id_count]   new error \n");
+					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set[session_id_count]  new error");
+					PAUSE
+				}
 
 				session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
 				if(session_id_candidates_set_iter == session_id_candidates_set.end()){
@@ -186,6 +215,11 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 				session_id_candidates_set_iter->second->manifest = rescue_manifest;
 				session_id_candidates_set_iter->second->role = 0;
 				session_id_candidates_set_iter->second->list_info = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
+				if(!(session_id_candidates_set_iter->second->list_info) ){
+					printf("peer_communication::session_id_candidates_set_iter->second->list_info]   new error \n");
+					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set_iter->second->list_info  new error");
+					PAUSE
+				}
 				memset(session_id_candidates_set_iter->second->list_info, 0x0, level_msg_size);
 				memcpy(session_id_candidates_set_iter->second->list_info, testing_info, (level_msg_size - candidates_num * sizeof(struct level_info_t *)));
 
@@ -193,6 +227,11 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 
 				for(int i=0;i<candidates_num;i++){
 					session_id_candidates_set_iter->second->list_info->level_info[i] = new struct level_info_t;
+					if(!(session_id_candidates_set_iter->second->list_info->level_info[i]) ){
+						printf("peer_communication::session_id_candidates_set_iter->second->list_info->level_info[i]  new error \n");
+						_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set_iter->second->list_info->level_info[i]  new error");
+						PAUSE
+					}
 					memset(session_id_candidates_set_iter->second->list_info->level_info[i], 0x0 , sizeof(struct level_info_t));
 					memcpy(session_id_candidates_set_iter->second->list_info->level_info[i], testing_info->level_info[i] , sizeof(struct level_info_t));
 					offset += sizeof(struct level_info_t);
@@ -254,7 +293,11 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 			}
 			else{
 				session_id_candidates_set[session_id_count] = new struct peer_com_info;
-
+				if(!(session_id_candidates_set[session_id_count]) ){
+					printf("peer_communication::session_id_candidates_set[session_id_count]  new error \n");
+					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set[session_id_count]  new error");
+					PAUSE
+				}
 				session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
 				if(session_id_candidates_set_iter == session_id_candidates_set.end()){
 					
@@ -270,6 +313,11 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 				session_id_candidates_set_iter->second->manifest = rescue_manifest;
 				session_id_candidates_set_iter->second->role = 1;
 				session_id_candidates_set_iter->second->list_info = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
+				if(!(session_id_candidates_set_iter->second->list_info) ){
+					printf("peer_communication::session_id_candidates_set_iter->second->list_info new error \n");
+					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set_iter->second->list_info new error");
+					PAUSE
+				}
 				memset(session_id_candidates_set_iter->second->list_info, 0x0, level_msg_size);
 				memcpy(session_id_candidates_set_iter->second->list_info, testing_info, (level_msg_size - candidates_num * sizeof(struct level_info_t *)));
 
@@ -277,6 +325,11 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 
 				for(int i=0;i<candidates_num;i++){
 					session_id_candidates_set_iter->second->list_info->level_info[i] = new struct level_info_t;
+					if(!(session_id_candidates_set_iter->second->list_info->level_info[i] ) ){
+						printf("peer_communication::session_id_candidates_set_iter->second->list_info->level_info[i]  new error \n");
+						_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set_iter->second->list_info->level_info[i]  new error");
+						PAUSE
+					}
 					memset(session_id_candidates_set_iter->second->list_info->level_info[i], 0x0 , sizeof(struct level_info_t));
 					memcpy(session_id_candidates_set_iter->second->list_info->level_info[i], testing_info->level_info[i] , sizeof(struct level_info_t));
 					offset += sizeof(struct level_info_t);
@@ -387,15 +440,18 @@ void peer_communication::accept_check(struct level_info_t *level_info_ptr,int fd
 				_log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"bind to peer_com in peer_communication::accept_check fd : ",*map_fd_unknown_iter);
 				_net_ptr->set_nonblocking(map_fd_info_iter->first);
 
-				//_net_ptr->epoll_control(map_fd_info_iter->first, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT);
-				//_net_ptr->set_fd_bcptr_map(map_fd_info_iter->first, dynamic_cast<basic_class *> (this));
-				//_peer_mgr_ptr->fd_list_ptr->push_back(map_fd_info_iter->first);
+				_net_ptr->epoll_control(map_fd_info_iter->first, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT);
+				_net_ptr->set_fd_bcptr_map(map_fd_info_iter->first, dynamic_cast<basic_class *> (this));
+				_peer_mgr_ptr->fd_list_ptr->push_back(map_fd_info_iter->first);
 
 				_io_accept_ptr->map_fd_unknown.erase(map_fd_unknown_iter);
 				break;
 			}
 		
 	}
+
+	_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"accept_check end ");
+
 
 	/*
 	call nat accept check
@@ -453,6 +509,7 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 	this part means that if the child is exist, we don't create it again.
 	*/
 		multimap<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
+		multimap<unsigned long, struct peer_info_t *>::iterator map_pid_child_peer_info_iter;
 		map<unsigned long, int>::iterator map_pid_fd_iter;
 		map<unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
 
@@ -472,6 +529,19 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd already in map_pid_rescue_peer_info in non_blocking_build_connection (candidate peer)");\
 			return 1;
 		}
+
+
+		map_pid_child_peer_info_iter = _pk_mgr_ptr ->map_pid_child_peer_info.find(level_info_ptr ->pid);
+		if(map_pid_child_peer_info_iter !=  _pk_mgr_ptr ->map_pid_child_peer_info.end()){
+			if(_pk_mgr_ptr ->map_pid_child_peer_info.count(level_info_ptr ->pid) >=2){
+				printf("pid =%d  already in connect find in map_pid_child_peer_info  testing",level_info_ptr ->pid);
+				_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_child_peer_info ");
+				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd already in map_pid_child_peer_info in non_blocking_build_connection (candidate peer)");	
+				return 1;
+			}
+		}
+
+
 	}
 
 	if((_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
@@ -491,8 +561,14 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 		printf("map_fd_NonBlockIO_iter=map_fd_NonBlockIO.find(_sock) error\n ");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"map_fd_NonBlockIO_iter=map_fd_NonBlockIO.find(_sock) errorn");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
+		PAUSE
 	}
 	map_fd_NonBlockIO[_sock]=new struct ioNonBlocking;
+	if(!(map_fd_NonBlockIO[_sock] ) ){
+		printf("peer_communication::map_fd_NonBlockIO[_sock]  new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," map_fd_NonBlockIO[_sock] new error");
+		PAUSE
+	}
 	memset(map_fd_NonBlockIO[_sock],0x00,sizeof(struct ioNonBlocking));
 	map_fd_NonBlockIO[_sock] ->io_nonblockBuff.nonBlockingRecv.recv_packet_state= READ_HEADER_READY ;
 	_net_ptr ->set_nonblocking(_sock);	//non-blocking connect
@@ -563,6 +639,11 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 		_logger_client_ptr->log_exit();
 	}
 	map_fd_info[_sock] = new struct fd_information;
+	if(!(map_fd_info[_sock]  ) ){
+		printf("peer_communication::map_fd_info[_sock]   new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"map_fd_info[_sock]  new error");
+		PAUSE
+	}
 
 	map_fd_info_iter = map_fd_info.find(_sock);
 	if(map_fd_info_iter == map_fd_info.end()){
@@ -952,6 +1033,7 @@ int peer_communication::handle_pkt_in(int sock)
 				printf("can't  find map_fd_NonBlockIO_iter in peer_commiication");
 				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"can't  find map_fd_NonBlockIO_iter in peer_commiication");
 				*(_net_ptr->_errorRestartFlag) =RESTART;
+				PAUSE
 			}
 
 			Nonblocking_Ctl * Nonblocking_Recv_Ctl_ptr =NULL;
@@ -970,6 +1052,11 @@ int peer_communication::handle_pkt_in(int sock)
 
 
 					chunk_header_ptr = (struct chunk_header_t *)new unsigned char[sizeof(chunk_header_t)];
+					if(!(chunk_header_ptr ) ){
+						printf("peer_communication::chunk_header_ptr  new error \n");
+						_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_header_ptr new error");
+						PAUSE
+					}
 					memset(chunk_header_ptr, 0x0, sizeof(struct chunk_header_t));
 
 					Nonblocking_Recv_Ctl_ptr ->recv_ctl_info.offset =0 ;
@@ -986,7 +1073,11 @@ int peer_communication::handle_pkt_in(int sock)
 
 					buf_len = sizeof(chunk_header_t)+ ((chunk_t *)(Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer)) ->header.length ;
 					chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
-
+					if(!(chunk_ptr ) ){
+						printf("peer_communication::chunk_ptr  new error buf_len =%d \n",buf_len);
+						_log_ptr->write_log_format("s =>u s s u\n", __FUNCTION__,__LINE__,"chunk_ptr new error","buf_len",buf_len);
+						PAUSE
+					}
 					//			printf("buf_len %d \n",buf_len);
 
 					memset(chunk_ptr, 0x0, buf_len);
@@ -1184,6 +1275,7 @@ int peer_communication::handle_pkt_out(int sock)	//first write, then set fd to r
 				printf("can't  find map_fd_NonBlockIO_iter in peer_commiication");
 				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"can't  find map_fd_NonBlockIO_iter in peer_commiication");
 				*(_net_ptr->_errorRestartFlag) =RESTART;
+				PAUSE
 			}
 
 			for(i=0;i<session_id_candidates_set_iter->second->peer_num;i++){

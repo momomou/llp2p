@@ -19,15 +19,24 @@ bit_stream_out::bit_stream_out(int stream_id,network *net_ptr, logger *log_ptr,b
 		_bit_stream_server_ptr = bit_stream_server_ptr;
 		_reqStreamID =0 ;
 		_queue_out_data_ptr = new std::queue<struct chunk_t *>;
+		if(!_queue_out_data_ptr){
+			printf("!_queue_out_data_ptr in bit_stream_outerror\n");
+			_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"!_queue_out_data_ptr in bit_stream_outerror");
+			PAUSE
+		}
 		memset(&_send_ctl_info, 0x00, sizeof(_send_ctl_info));
 		first_Header=true;
 
 		file_ptr = fopen("./FILEOUT" , "wb");
 
+
+
+
 	}
 bit_stream_out::~bit_stream_out(){
 	if(_queue_out_data_ptr)
 		delete _queue_out_data_ptr;
+	_queue_out_data_ptr=NULL;
 	}
 
 void bit_stream_out::init(){
@@ -58,6 +67,7 @@ int bit_stream_out::handle_pkt_out(int sock){
 	}else{
 		_log_ptr->write_log_format("s => s \n", __FUNCTION__, "protocol_header = map_streamID_header_iter ->second ");
 		*(_net_ptr->_errorRestartFlag)=RESTART;
+		PAUSE
 	}
 
 
@@ -123,7 +133,7 @@ int bit_stream_out::handle_pkt_out(int sock){
 				}else{
 						printf("delete map and bit_stream_out_ptr");
 						_pk_mgr_ptr ->del_stream(sock,(stream*)this, STRM_TYPE_MEDIA);
-						_pk_mgr_ptr ->data_close(sock,"here sock error");
+						data_close(sock,"here sock error");
 						_bit_stream_server_ptr -> delBitStreamOut(this);
 
 					}
@@ -183,3 +193,24 @@ unsigned char bit_stream_out::get_stream_pk_id()
     return -1;
 }
 
+
+
+
+void bit_stream_out::data_close(int cfd, const char *reason) 
+{
+	list<int>::iterator fd_iter;
+
+	_log_ptr->write_log_format("s => s (s)\n", (char*)__PRETTY_FUNCTION__, "bit_stream_httpout", reason);
+	cout << "bit_stream_httpout Client " << cfd << " exit by " << reason << ".." << endl;
+//	_net_ptr->epoll_control(cfd, EPOLL_CTL_DEL, 0);
+	_net_ptr->close(cfd);
+
+	for(fd_iter = fd_list_ptr->begin(); fd_iter != fd_list_ptr->end(); fd_iter++) {
+		if(*fd_iter == cfd) {
+			fd_list_ptr->erase(fd_iter);
+			break;
+		}
+	}
+
+//	PAUSE
+}

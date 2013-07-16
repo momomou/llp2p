@@ -58,6 +58,12 @@ int io_nonblocking::handle_pkt_in(int sock)
 
 
 			chunk_header_ptr = (struct chunk_header_t *)new unsigned char[sizeof(chunk_header_t)];
+			if(!chunk_header_ptr){
+				printf("chunk_header_ptr new error \n");
+				_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__," chunk_header_ptr new error");
+				PAUSE
+			}
+
 			memset(chunk_header_ptr, 0x0, sizeof(struct chunk_header_t));
 
 			Nonblocking_Recv_Ctl_ptr ->recv_ctl_info.offset =0 ;
@@ -75,6 +81,11 @@ int io_nonblocking::handle_pkt_in(int sock)
 
 			buf_len = sizeof(chunk_header_t)+ ((chunk_t *)(Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer)) ->header.length ;
 			chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
+			if(!chunk_ptr){
+				printf("chunk_ptr iononblocking new error buf_len=%u\n",buf_len);
+				_log_ptr->write_log_format("s =>u s s u \n", __FUNCTION__,__LINE__," chunk_ptr  iononblocking new error","buf_len",buf_len);
+				PAUSE
+			}
 
 //			printf(" READ HEADER OK buf_len %d \n",buf_len);
 
@@ -188,6 +199,11 @@ int io_nonblocking::handle_pkt_in(int sock)
 							//}
 
 							_peer_communication_ptr->map_fd_info[sock] = new struct fd_information;
+							if(!(_peer_communication_ptr->map_fd_info[sock])){
+								printf("_peer_communication_ptr->map_fd_info[sock] iononblocking new error\n");
+								_log_ptr->write_log_format("s =>u s s u \n", __FUNCTION__,__LINE__," _peer_communication_ptr->map_fd_info[sock]  iononblocking new error");
+								PAUSE
+							}
 
 							map_fd_info_iter = _peer_communication_ptr->map_fd_info.find(sock);
 							if(map_fd_info_iter == _peer_communication_ptr->map_fd_info.end()){
@@ -220,6 +236,11 @@ int io_nonblocking::handle_pkt_in(int sock)
 				_log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"cannot find list information in in io nonblocking : ",sock);
 
 				_peer_communication_ptr->map_fd_info[sock] = new struct fd_information;
+				if(!(_peer_communication_ptr->map_fd_info[sock])){
+					printf("_peer_communication_ptr->map_fd_info[sock] iononblocking new error \n");
+					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," _peer_communication_ptr->map_fd_info[sock]  iononblocking new error");
+					PAUSE
+				}
 
 				map_fd_info_iter = _peer_communication_ptr->map_fd_info.find(sock);
 				if(map_fd_info_iter == _peer_communication_ptr->map_fd_info.end()){
@@ -245,8 +266,10 @@ int io_nonblocking::handle_pkt_in(int sock)
 
 				//testing bug
 				_net_ptr->set_nonblocking(sock);
-				_net_ptr->epoll_control(sock, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT);
-				_net_ptr->set_fd_bcptr_map(sock, dynamic_cast<basic_class *> (_peer_communication_ptr));
+				_net_ptr->epoll_control(sock, EPOLL_CTL_DEL, 0);
+				_net_ptr->fd_bcptr_map_delete(sock);
+				_net_ptr->eraseFdList(sock);
+//				_net_ptr->set_fd_bcptr_map(sock, dynamic_cast<basic_class *> (_peer_communication_ptr));
 			}
 			else{
 				
@@ -318,7 +341,7 @@ void io_nonblocking::handle_job_timer()
 }
 
 void io_nonblocking::handle_sock_error(int sock, basic_class *bcptr){
-	
+	_peer_communication_ptr->fd_close(sock);
 
 }
 

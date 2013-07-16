@@ -10,9 +10,16 @@
 #include "logger.h"
 #include "peer_mgr.h"
 #include "peer.h"
-#include "librtsp/rtsp_viewer.h"
 #include "peer_communication.h"
 #include "logger_client.h"
+#ifdef _FIRE_BREATH_MOD_
+#include "rtsp_viewer.h"
+#else
+#include "librtsp/rtsp_viewer.h"
+#endif
+
+
+
 
 using namespace std;
 
@@ -52,6 +59,10 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 	totalMod =0;
 	reSynTime=BASE_RESYN_TIME;
 	_log_ptr->timerGet(&start);
+	fisttimestamp=0 ;
+	firstIn =true;
+	pkt_count =0 ;
+	totalbyte=0;
 
 	//
 //	pkmgrfile_ptr = fopen("./HEREin" , "wb");
@@ -74,6 +85,11 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , l
 
 	for(int i=0 ; i<_bucket_size ;i++){
 		chunk_t_ptr  = (struct chunk_t *)new unsigned char[ sizeof (struct chunk_t) ] ;
+		if(!(chunk_t_ptr ) ){
+			printf("pk_mgr::chunk_t_ptr  new error \n");
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_t_ptr new error");
+			PAUSE
+		}
 		if (chunk_t_ptr == NULL) {
 			printf("memory not enough\n");
 		}
@@ -113,6 +129,7 @@ pk_mgr::~pk_mgr()
 	clear_map_pid_rescue_peer_info();
 	clear_delay_table();
 	clear_map_streamID_header();
+	clear_map_pid_child_peer_info();
 
 
 	printf("==============deldet pk_mgr success==========\n");
@@ -127,6 +144,11 @@ void pk_mgr::delay_table_init()
 	for(unsigned long k=0;k<sub_stream_num;k++){
 		struct source_delay *source_delay_temp_ptr = NULL;
 		source_delay_temp_ptr = new struct source_delay;
+		if(!(source_delay_temp_ptr ) ){
+			printf("peer_mgr::source_delay_temp_ptr  new error \n");
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"source_delay_temp_ptr new error");
+			PAUSE
+		}
 		memset( source_delay_temp_ptr , 0x00 ,sizeof(struct source_delay)); 
 
 		source_delay_temp_ptr->source_delay_time = -1;
@@ -272,13 +294,13 @@ void pk_mgr::source_delay_detection(int sock,unsigned long sub_id, unsigned int 
 				if(totalMod >= (syn_round_time )){
 					//should re_syn
 					printf("!!!!!!!!!!!!TotalMod OVER   (syn_round_time /2)!!!!!!!!!!!!!\n");
-					if(reSynTime >5){
+					if(reSynTime >5000){
 						reSynTime =reSynTime /2;
-						if(reSynTime <=5)
-							reSynTime =5;
+						if(reSynTime <=5000)
+							reSynTime =5000;
 						printf("reSynTime Bad change to reSynTime/2  = %d \n",reSynTime);
 					}else{
-						reSynTime =5;
+						reSynTime =5000;
 						printf("reSynTime Bad change to reSynTime/2  = %d \n",reSynTime);
 						//doing nothing it small bound if  reSynTime==10
 					}
@@ -453,6 +475,11 @@ void pk_mgr::send_capacity_to_pk(int sock){
 	send_size = msg_size - sizeof(unsigned long *)*sub_stream_num + sizeof(unsigned long)*sub_stream_num; 
 
 	chunk_capacity_ptr = (struct rescue_peer_capacity_measurement *)new unsigned char[msg_size];
+	if(!(chunk_capacity_ptr ) ){
+		printf("pk_mgr::chunk_capacity_ptr  new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_capacity_ptr new error");
+		PAUSE
+	}
 	//chunk_ptr = (struct chunk_t *) new unsigned char[send_size];
 
 	memset(chunk_capacity_ptr, 0x0, msg_size);
@@ -504,18 +531,18 @@ void pk_mgr::send_capacity_to_pk(int sock){
 				diff_temp = (delay_table_iter->second->source_delay_time) - temp;
 				//printf("source_delay_time : %ld",(delay_table+i)->source_delay_time);
 				//printf(" time : %d\n",temp);
-				printf("abs differ : %ld ",temp);
+				printf("abs differ : %lu ",temp);
 				printf("abs start : %lu ",(syn_table.client_abs_start_time));
 				printf("abs end : %lu ",(delay_table_iter->second->end_seq_abs_time));
-				printf("relate differ : %ld ",(delay_table_iter->second->source_delay_time));
+				printf("relate differ : %lu ",(delay_table_iter->second->source_delay_time));
 				printf("differ : %ld\n",diff_temp);
 				if(diff_temp < 0){
 					printf("diff error in send_capacity_to_pk   ");
 					printf("differ : %ld\n",diff_temp);
 					delay_table_iter->second->source_delay_time = 0;
-					printf("syn_table.client_abs_start_time : %ld   ",syn_table.client_abs_start_time);
+					printf("syn_table.client_abs_start_time : %lu   ",syn_table.client_abs_start_time);
 					syn_table.client_abs_start_time = syn_table.client_abs_start_time + (unsigned long)abs(diff_temp);
-					printf("syn_table.client_abs_start_time : %ld\n",syn_table.client_abs_start_time);
+					printf("syn_table.client_abs_start_time : %lu\n",syn_table.client_abs_start_time);
 					//PAUSE
 					//exit(1);
 				}
@@ -525,6 +552,11 @@ void pk_mgr::send_capacity_to_pk(int sock){
 			}
 			//(delay_table+i)->source_delay_time = (delay_table+i)->source_delay_time + (delay_table+i)->start_delay_struct.start_delay;
 			chunk_capacity_ptr->source_delay_measur[i] = new (unsigned long);
+			if(!(chunk_capacity_ptr->source_delay_measur[i] ) ){
+				printf("pk_mgr::chunk_capacity_ptr->source_delay_measur[i]  new error \n");
+				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_capacity_ptr->source_delay_measur[i] new error");
+				PAUSE
+			}
 			memset(chunk_capacity_ptr->source_delay_measur[i], 0x0 , sizeof(unsigned long));
 			memcpy(chunk_capacity_ptr->source_delay_measur[i],&(delay_table_iter->second->source_delay_time),sizeof(unsigned long));
 			printf(" source delay : %lu\n",(*(chunk_capacity_ptr->source_delay_measur[i])));
@@ -540,6 +572,11 @@ void pk_mgr::send_capacity_to_pk(int sock){
 	_net_ptr->set_blocking(sock);	// set to blocking
 
 	send_buf = (char *)new char[send_size];
+	if(!(send_buf ) ){
+		printf("pk_mgr::send_buf new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"send_buf new error");
+		PAUSE
+	}
 	memset(send_buf, 0x0, send_size);
 	memcpy(send_buf, chunk_capacity_ptr, capacity_chunk_offset);
 	for(unsigned long i=0;i<sub_stream_num;i++){
@@ -592,7 +629,7 @@ void pk_mgr::rtsp_viewer_set(rtsp_viewer *rtsp_viewer_ptr)
 }
 
 
-void pk_mgr::init()
+void pk_mgr::init(unsigned short ptop_port)
 {
 
 
@@ -605,21 +642,26 @@ void pk_mgr::init()
 	_prep->read_key("pk_ip", pk_ip);
 	_prep->read_key("pk_port", pk_port);
 	_prep->read_key("channel_id", _channel_id);
-	_prep->read_key("svc_tcp_port", svc_tcp_port);
+//	_prep->read_key("svc_tcp_port", svc_tcp_port);
 	_prep->read_key("svc_udp_port", svc_udp_port);
 
 	cout << "pk_ip=" << pk_ip << endl;
 	cout << "pk_port=" << pk_port << endl;
 	cout << "channel_id=" << _channel_id << endl;
-	cout << "svc_tcp_port=" << svc_tcp_port << endl;
+//	cout << "svc_tcp_port=" << svc_tcp_port << endl;
 	cout << "svc_udp_port=" << svc_udp_port << endl;
 
 	pkDownInfoPtr = new struct peer_connect_down_t ;
+	if(!(pkDownInfoPtr ) ){
+		printf("pk_mgr::pkDownInfoPtr new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"pkDownInfoPtr new error");
+		PAUSE
+	}
 	memset(pkDownInfoPtr , 0x0,sizeof( struct peer_connect_down_t));
 	pkDownInfoPtr ->peerInfo.pid =PK_PID;
 	pkDownInfoPtr ->peerInfo.public_ip = inet_addr(pk_ip.c_str());
-	pkDownInfoPtr ->peerInfo.tcp_port = htons((unsigned short)atoi(pk_port.c_str()));
-
+//	pkDownInfoPtr ->peerInfo.tcp_port = htons((unsigned short)atoi(pk_port.c_str()));
+	pkDownInfoPtr ->peerInfo.tcp_port = htons(ptop_port);
 
 	map_pid_peerDown_info[PK_PID] =pkDownInfoPtr;
 
@@ -630,10 +672,12 @@ void pk_mgr::init()
 		cout << "pk_mgr build_connection() success" << endl;
 	} else {
 		
-		_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","pk_mgr build_connection() fail");
-		_logger_client_ptr->log_exit();
+//		_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","pk_mgr build_connection() fail");
+//		_logger_client_ptr->log_exit();
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"pk_mgr build_connection() fail");
+		printf("pk_mgr build_connection() fail  \n");
 		*(_net_ptr->_errorRestartFlag) =RESTART ;
+		PAUSE
 	}
 	printf("PK_sock = %d \n",_sock);
 	_log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"PK_sock =",_sock);
@@ -651,10 +695,16 @@ void pk_mgr::init()
 	_peer_ptr ->map_fd_out_data[_sock] = queue_out_data_ptr;
 
 	Nonblocking_Buff * Nonblocking_Buff_ptr = new Nonblocking_Buff ;
+	if(!(Nonblocking_Buff_ptr ) || !(queue_out_ctrl_ptr)  || !(queue_out_data_ptr)){
+		printf("pk_mgr::pkDownInfoPtr new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"pkDownInfoPtr new error");
+		PAUSE
+	}
 	memset(Nonblocking_Buff_ptr, 0x0 , sizeof(Nonblocking_Buff));
 	_peer_ptr ->map_fd_nonblocking_ctl[_sock] = Nonblocking_Buff_ptr ;
 
-	if (handle_register(svc_tcp_port, svc_udp_port)) {
+//	if (handle_register(svc_tcp_port, svc_udp_port)) {
+	if (handle_register(ptop_port, svc_udp_port)) {
 		cout << "pk_mgr handle_ register() success" << endl;
 		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"pk_mgr handle_ register() success");
 
@@ -665,8 +715,8 @@ void pk_mgr::init()
 
 	} else {
 		
-		_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","pk_mgr handle_ register() fail");
-		_logger_client_ptr->log_exit();
+//		_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","pk_mgr handle_ register() fail");
+//		_logger_client_ptr->log_exit();
 	}
 
 }
@@ -732,7 +782,7 @@ int pk_mgr::build_connection(string ip, string port)
 
 //Follow light protocol spec send register message to pk,  HTTP | light | content(request_info_t)
 //This function include send() function ,send  register packet to PK Server
-int pk_mgr::handle_register(string svc_tcp_port, string svc_udp_port)
+int pk_mgr::handle_register(unsigned short ptop_port, string svc_udp_port)
 {
 	struct chunk_t *chunk_ptr = NULL;
 	struct chunk_request_msg_t *chunk_request_ptr = NULL;
@@ -740,10 +790,14 @@ int pk_mgr::handle_register(string svc_tcp_port, string svc_udp_port)
 	char *crlf_ptr = NULL;		 // it need to point to   -> \r\n\r\n
 	char html_buf[8192];
 	unsigned long html_hdr_size; // HTTP protocol  len
-	unsigned long buf_len;		 // HTTP protocol  len + HTTP content len
+	unsigned long buf_len=0;		 // HTTP protocol  len + HTTP content len
 
 	chunk_request_ptr = (struct chunk_request_msg_t *)new unsigned char[sizeof(struct chunk_request_msg_t)];
-
+	if(!(chunk_request_ptr ) ){
+		printf("pk_mgr::chunk_request_ptr new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_request_ptr new error");
+		PAUSE
+	}
 	memset(html_buf, 0x0, _html_size);
 	memset(chunk_request_ptr, 0x0, sizeof(struct chunk_request_msg_t));
 
@@ -757,7 +811,7 @@ int pk_mgr::handle_register(string svc_tcp_port, string svc_udp_port)
 	chunk_request_ptr->info.pid = 0;
 	chunk_request_ptr->info.channel_id = _channel_id;
 	chunk_request_ptr->info.private_ip = _net_ptr->getLocalIpv4();
-	chunk_request_ptr->info.tcp_port = (unsigned short)atoi(svc_tcp_port.c_str());
+	chunk_request_ptr->info.tcp_port = ptop_port;
 	chunk_request_ptr->info.udp_port = (unsigned short)atoi(svc_udp_port.c_str());
 
 	if((crlf_ptr = strstr(html_buf, "\r\n\r\n")) != NULL) {
@@ -832,17 +886,23 @@ int pk_mgr::handle_pkt_in(int sock)
 		printf("Nonblocking_Recv_Ctl_ptr NOT FIND \n");
 		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"Nonblocking_Recv_Ctl_ptr NOT FIND");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
+		PAUSE
 			return RET_SOCK_ERROR;
 	}
 
 
-		for(int i =0;i<5;i++){
+		for(int i =0;i<3;i++){
 
 
 		if(Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_HEADER_READY){
 	
 		
 			chunk_header_ptr = (struct chunk_header_t *)new unsigned char[sizeof(chunk_header_t)];
+			if(!(chunk_header_ptr ) ){
+				printf("pk_mgr::chunk_header_ptr new error \n");
+				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_header_ptr new error");
+				PAUSE
+			}
 			memset(chunk_header_ptr, 0x0, sizeof(struct chunk_header_t));
 
 			Nonblocking_Recv_Ctl_ptr ->recv_ctl_info.offset =0 ;
@@ -858,8 +918,14 @@ int pk_mgr::handle_pkt_in(int sock)
 		}else if(Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_HEADER_OK){
 
 			buf_len = sizeof(chunk_header_t)+ ((chunk_t *)(Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer)) ->header.length ;
-			chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
+			_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__,"PK_mgr recv Header OK  cmd =",((chunk_t *)(Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer)) ->header.cmd," buf_len = ", ((chunk_t *)(Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer)) ->header.length,"expect_len", Nonblocking_Recv_Ctl_ptr->recv_ctl_info.expect_len) ;
 
+			chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
+			if(!(chunk_ptr ) ){
+				printf("pk_mgr::chunk_ptr new error buf_len =%d\n",buf_len);
+				_log_ptr->write_log_format("s =>u s s u\n", __FUNCTION__,__LINE__,"chunk_ptr new error","buf_len",buf_len);
+				PAUSE
+			}
 //			printf("buf_len %d \n",buf_len);
 
 			memset(chunk_ptr, 0x0, buf_len);
@@ -884,12 +950,11 @@ int pk_mgr::handle_pkt_in(int sock)
 		}else if(Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_PAYLOAD_RUNNING){
 	
 			//do nothing
+//			_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__,"PK_mgr recv PALOAD RUNNING  cmd =",((chunk_t *)(Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer)) ->header.cmd," buf_len = ", ((chunk_t *)(Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer)) ->header.length,"expect_len", Nonblocking_Recv_Ctl_ptr->recv_ctl_info.expect_len) ;
+
 	
 		}else if(Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_PAYLOAD_OK){
 		
-//			chunk_ptr =(chunk_t *)Recv_nonblocking_ctl_ptr ->recv_ctl_info.buffer;
-
-//			Recv_nonblocking_ctl_ptr->recv_packet_state = READ_HEADER_READY ;
 
 			break;
 		
@@ -927,7 +992,8 @@ int pk_mgr::handle_pkt_in(int sock)
 
 	}
 
-//	printf("len = %d seq = %d X_count =%d\n",chunk_ptr->header.length,chunk_ptr->header.sequence_number,Xcount);
+
+//	_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"PK_mgr recv PALOAD OK  cmd =",((chunk_t *)(Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer)) ->header.cmd," buf_len = ", ((chunk_t *)(Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer)) ->header.length) ;
 
 
 
@@ -943,9 +1009,14 @@ int pk_mgr::handle_pkt_in(int sock)
 		lane_member = (buf_len - sizeof(struct chunk_header_t) - 6 * sizeof(unsigned long)) / sizeof(struct level_info_t);
 		level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + lane_member * sizeof(struct level_info_t *);
 
-		printf("lane_member = %d ",lane_member);
+		printf("lane_member = %d \n",lane_member);
 
 		level_msg_ptr = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
+		if(!(level_msg_ptr ) ){
+			printf("pk_mgr::level_msg_ptr new error \n");
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"level_msg_ptr new error");
+			PAUSE
+		}
 		memset(level_msg_ptr, 0x0, level_msg_size);
 		//memcpy(level_msg_ptr, chunk_ptr, (level_msg_size - lane_member * sizeof(struct level_info_t *)));
 
@@ -984,6 +1055,11 @@ int pk_mgr::handle_pkt_in(int sock)
 			level_msg_ptr->level_info[i] = new struct level_info_t;
 			new_peer = new struct peer_info_t;
 
+			if(!(level_msg_ptr->level_info[i] )  ||  !(new_peer) ){
+				printf("pk_mgr::level_msg_ptr  new_peer new error \n");
+				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"level_msg_ptr new error");
+				PAUSE
+			}
 			memset(level_msg_ptr->level_info[i], 0x0 , sizeof(struct level_info_t));
 			memcpy(level_msg_ptr->level_info[i], (char *)chunk_ptr + offset, sizeof(struct level_info_t));
 
@@ -1072,6 +1148,7 @@ int pk_mgr::handle_pkt_in(int sock)
 			printf(" not go here!!!!!!!!!!!!!!!!!!!CHNK_CMD_PEER_START_DELAY pk mgr request\n");
 			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"not go here!!!!!!!!!!!!!!!!!!!CHNK_CMD_PEER_START_DELAY pk mgr request");
 			*(_net_ptr->_errorRestartFlag) =RESTART;
+			PAUSE
 		}
 		else{
 			printf("CHNK_CMD_PEER_SYN pk mgr reply\n");
@@ -1103,6 +1180,11 @@ int pk_mgr::handle_pkt_in(int sock)
 		level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + lane_member * sizeof(struct level_info_t *);
 
 		level_msg_ptr = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
+		if( !(level_msg_ptr) ){
+			printf("pk_mgr::level_msg_ptr   new error \n");
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"level_msg_ptr new error");
+			PAUSE
+		}
 		memset(level_msg_ptr, 0x0, level_msg_size);
 		memcpy(level_msg_ptr, chunk_ptr, (level_msg_size - lane_member * sizeof(struct level_info_t *)));
 
@@ -1125,6 +1207,7 @@ int pk_mgr::handle_pkt_in(int sock)
 				printf("why not status 0 in REQUEST , manifest= %d\n",((struct chunk_rescue_list*)chunk_ptr) ->manifest);
 				_log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"why not status 0 in REQUEST ",((struct chunk_rescue_list*)chunk_ptr) ->manifest);
 				*(_net_ptr->_errorRestartFlag) =RESTART;
+				PAUSE
 			}
 		
 		}else{
@@ -1138,6 +1221,11 @@ int pk_mgr::handle_pkt_in(int sock)
 		for (i = 0; i < lane_member; i++) {
 			level_msg_ptr->level_info[i] = new struct level_info_t;
 			new_peer = new struct peer_info_t;
+			if( !(level_msg_ptr->level_info[i] )  || !(new_peer)){
+				printf("pk_mgr::level_msg_ptr->level_info[i]    new error \n");
+				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"level_msg_ptr->level_info[i]  new error");
+				PAUSE
+			}
 			memset(level_msg_ptr->level_info[i], 0x0 , sizeof(struct level_info_t));
 			memcpy(level_msg_ptr->level_info[i], (char *)chunk_ptr + offset, sizeof(struct level_info_t));
 			memset(new_peer, 0x0 , sizeof(struct peer_info_t));
@@ -1147,6 +1235,7 @@ int pk_mgr::handle_pkt_in(int sock)
 			map_pid_peer_info.insert(pair<unsigned long ,peer_info_t *>(new_peer->pid,new_peer));  
 
 			new_peer ->manifest = ((struct chunk_rescue_list*)chunk_ptr) ->manifest;
+//segmention fault once here  ,lane_member = 4 run once pid=65  manifest=2 and crash !!! WTFFFFF
 			printf( "  pid = %d   ",new_peer->pid);
 			_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"  pid =   ",new_peer->pid,"manifest=",new_peer ->manifest );
 
@@ -1162,6 +1251,11 @@ int pk_mgr::handle_pkt_in(int sock)
 			_peer_ptr->substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer.find(session_id);
 			if(_peer_ptr->substream_first_reply_peer_iter == _peer_ptr->substream_first_reply_peer.end()){
 				_peer_ptr->substream_first_reply_peer[session_id] = new manifest_timmer_flag;
+				if( !(_peer_ptr->substream_first_reply_peer[session_id])){
+					printf("pk_mgr::_peer_ptr->substream_first_reply_peer[session_id]  new error \n");
+					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"_peer_ptr->substream_first_reply_peer[session_id]  new error");
+					PAUSE
+				}
 				memset(_peer_ptr->substream_first_reply_peer[session_id] ,0x0 ,sizeof(struct manifest_timmer_flag));
 			}
 			else{
@@ -1392,6 +1486,11 @@ int pk_mgr::handle_pkt_in(int sock)
 
 //				ooffset += sizeof(int) + sizeof( int) ;
 				protocol_len_header = new update_stream_header;
+				if( !(protocol_len_header)){
+					printf("pk_mgr::protocol_len_header new error \n");
+					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"protocol_len_header  new error");
+					PAUSE
+				}
 				protocol_len_header ->len = *len_ptr;
 				map_streamID_header [*streamID_ptr] = (update_stream_header*)protocol_len_header ;
 				printf("streamID = %d  *len_ptr =%d  \n",*streamID_ptr,*len_ptr) ;
@@ -1400,6 +1499,11 @@ int pk_mgr::handle_pkt_in(int sock)
 			//have header
 			}else{
 				protocol_len_header = (update_stream_header *)new unsigned char[*len_ptr + sizeof( int)] ;
+				if( !(protocol_len_header)){
+					printf("pk_mgr::protocol_len_header new error \n");
+					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"protocol_len_header  new error");
+					PAUSE
+				}
 				header = ( (unsigned char *)chunk_ptr ->buf + sizeof(int) +ooffset );
 				memcpy(protocol_len_header,header,*len_ptr + sizeof( int));
 				map_streamID_header [*streamID_ptr] = (update_stream_header*)protocol_len_header ;
@@ -1435,12 +1539,17 @@ int pk_mgr::handle_pkt_in(int sock)
 		level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + list_number * sizeof(struct level_info_t *);
 
 		level_msg_ptr = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
+		if( !(level_msg_ptr)){
+			printf("pk_mgr::level_msg_ptr new error \n");
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"level_msg_ptr  new error");
+			PAUSE
+		}
 		memset(level_msg_ptr, 0x0, level_msg_size);
 		memcpy(level_msg_ptr, chunk_ptr, (level_msg_size - list_number * sizeof(struct level_info_t *)));
 
 		offset += (level_msg_size - list_number * sizeof(struct level_info_t *));
 
-		printf("list peer num %d",list_number);
+		printf("list peer num %d\n",list_number);
 		_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"list_number ",list_number);
 
 		if((list_number == 0) || (list_number >1)){
@@ -1451,18 +1560,23 @@ int pk_mgr::handle_pkt_in(int sock)
 
 		for (i = 0; i < list_number; i++) {
 			level_msg_ptr->level_info[i] = new struct level_info_t;
-			//new_peer = new struct peer_info_t;
+			new_peer = new struct peer_info_t;
+			if( !(level_msg_ptr->level_info[i]) || !(new_peer)){
+				printf("pk_mgr::level_msg_ptr new error \n");
+				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"level_msg_ptr  new error");
+				PAUSE
+			}
 			memset(level_msg_ptr->level_info[i], 0x0 , sizeof(struct level_info_t));
 			memcpy(level_msg_ptr->level_info[i], (char *)chunk_ptr + offset, sizeof(struct level_info_t));
-			//memset(new_peer, 0x0 , sizeof(struct peer_info_t));
-			//memcpy(new_peer, level_msg_ptr->level_info[i], sizeof(struct level_info_t));
+			memset(new_peer, 0x0 , sizeof(struct peer_info_t));
+			memcpy(new_peer, level_msg_ptr->level_info[i], sizeof(struct level_info_t));
 			offset += sizeof(struct level_info_t);
 
-			//map_pid_peer_info.insert(pair<unsigned long ,peer_info_t *>(new_peer->pid,new_peer));  
+			map_pid_child_peer_info.insert(pair<unsigned long ,peer_info_t *>(new_peer->pid,new_peer));  
 
-			//new_peer ->manifest = ((struct chunk_rescue_list*)chunk_ptr) ->manifest;
-			printf( "  pid = %d   ",child_info_ptr->child_level_info.pid);
-			_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"  pid =   ",child_info_ptr->child_level_info.pid,"manifest=",child_info_ptr->manifest );
+			new_peer ->manifest = ((struct chunk_rescue_list*)chunk_ptr) ->manifest;
+			printf( " child pid = %d   ",child_info_ptr->child_level_info.pid);
+			_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__," child  pid =   ",child_info_ptr->child_level_info.pid,"manifest=",child_info_ptr->manifest );
 
 		}
 		_log_ptr->write_log_format("\n");
@@ -1482,6 +1596,11 @@ int pk_mgr::handle_pkt_in(int sock)
 		_peer_ptr->substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer.find(session_id);
 		if(_peer_ptr->substream_first_reply_peer_iter == _peer_ptr->substream_first_reply_peer.end()){
 			_peer_ptr->substream_first_reply_peer[session_id] = new manifest_timmer_flag;
+			if( !(_peer_ptr->substream_first_reply_peer[session_id] )){
+				printf("pk_mgr::_peer_ptr->substream_first_reply_peer[session_id] new error \n");
+				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"_peer_ptr->substream_first_reply_peer[session_id]   new error");
+				PAUSE
+			}
 			memset(_peer_ptr->substream_first_reply_peer[session_id] ,0x0 ,sizeof(struct manifest_timmer_flag));
 		}
 		else{
@@ -1528,6 +1647,7 @@ int pk_mgr::handle_pkt_in(int sock)
 		printf("cmd =%d else\n", chunk_ptr->header.cmd);
 		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"what from PK !?");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
+		PAUSE
 	}
 
 	if (chunk_ptr)
@@ -1549,12 +1669,12 @@ int pk_mgr::handle_pkt_out(int sock)
 
 void pk_mgr::handle_pkt_error(int sock)
 {
-
+	data_close(sock,"handle_pkt_error");
 }
 
 void pk_mgr::handle_sock_error(int sock, basic_class *bcptr)
 {
-
+	data_close(sock,"handle_pkt_error");
 }
 
 void pk_mgr::handle_job_realtime()
@@ -1578,6 +1698,11 @@ void pk_mgr::send_request_sequence_number_to_pk(unsigned int req_from, unsigned 
 	_net_ptr->set_blocking(_sock);	// set to blocking
 
 	request_pkt_ptr = new struct chunk_request_pkt_t;
+	if( !(request_pkt_ptr )){
+		printf("pk_mgr::request_pkt_ptr new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"request_pkt_ptr  new error");
+		PAUSE
+	}
 
 	memset(html_buf, 0x0, _html_size);
 	memset(request_pkt_ptr, 0x0, sizeof(struct chunk_request_pkt_t));
@@ -1831,7 +1956,9 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 	if(chunk_ptr->header.sequence_number > (**(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number) {
 		delete [] (unsigned char*) *(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size)) ;
+//		_log_ptr->write_log_format("s =>u s u u\n", __FUNCTION__,__LINE__,"new sequence number in the buffer  seq",(**(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number,chunk_ptr->header.sequence_number);
 		*(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size)) =  chunk_ptr ;
+		_log_ptr->write_log_format("s =>u s u u\n", __FUNCTION__,__LINE__,"new sequence number in the buffer  seq",(**(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number,chunk_ptr->header.sequence_number);
 
 
 	} else if((**(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size))).header.sequence_number == chunk_ptr->header.sequence_number){
@@ -1854,9 +1981,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	//↓↓↓↓↓↓↓↓↓↓↓↓以下只有先到的chunk才會run(會濾掉重複的和更小的)↓↓↓↓↓↓↓↓↓↓↓↓↓
 	
 
-	static unsigned long pkt_count =0 ;
-	static unsigned long totalbyte=0;
-	static unsigned long fisttimestamp=0;
+
 	if(!fisttimestamp){
 		fisttimestamp = chunk_ptr->header.timestamp;
 		_log_ptr->timerGet(&start) ;
@@ -1989,6 +2114,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		printf(" 1891 leastCurrDiff < 0    = %d\n" ,leastCurrDiff);
 		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"1891 leastCurrDiff < 0   ");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
+		PAUSE
 	}
 
 
@@ -2048,6 +2174,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 								//LOG_PKT_LOSE
 								_logger_client_ptr->log_to_server(LOG_PKT_LOSE,loseManifest);
 								_logger_client_ptr->log_to_server(LOG_TEST_DETECTION_FAIL,loseManifest);
+								_logger_client_ptr->log_to_server(LOG_DATA_COME_PK,loseManifest);
 								printf("this lose manifest is in testing it should from PK and peer why lose\n");
 								_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"this lose manifest is in testing it should from PK and peer why lose");
 								loseParentInfo->outBuffCount = 0;
@@ -2131,6 +2258,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 					printf("  2018 leastCurrDiff < 0   =%d\n",leastCurrDiff);
 					_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"2018 leastCurrDiff < 0   ");
 					*(_net_ptr->_errorRestartFlag) =RESTART;
+					PAUSE
 				}
 				//						printf("here2\n");
 				//						PAUSE
@@ -2156,6 +2284,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		_current_send_sequence_number = _least_sequence_number;  
 		_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"i think not go here leastCurrDiff  ");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
+		PAUSE
 
 			//在正常範圍內 正常傳輸丟給player 留給下面處理
 	}else{
@@ -2355,13 +2484,13 @@ void pk_mgr::syn_recv_handler(struct syn_token_receive* syn_struct_back_token){
 		
 		if(clockPeriodDiff >= 250 && tickPeriodDiff>= 250){
 		
-			if(reSynTime >5){
+			if(reSynTime >5000){
 				reSynTime =reSynTime /2;
-				if(reSynTime <=5)
-					reSynTime =5;
+				if(reSynTime <=5000)
+					reSynTime =5000;
 				printf("reSynTime Bad change to reSynTime/2  = %d \n",reSynTime);
 			}else{
-				reSynTime =5;
+				reSynTime =5000;
 				printf("reSynTime Bad change to reSynTime/2  = %d \n",reSynTime);
 			//doing nothing it small bound if  reSynTime==10
 			}
@@ -2396,6 +2525,11 @@ void pk_mgr::send_syn_token_to_pk(int pk_sock){
 
 
 	syn_token_send_ptr = (struct syn_token_send *)new unsigned char[sizeof(struct syn_token_send)];
+	if( !(syn_token_send_ptr )){
+		printf("pk_mgr::syn_token_send_ptr new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"syn_token_send_ptr  new error");
+		PAUSE
+	}
 
 	memset(syn_token_send_ptr, 0x0, sizeof(struct syn_token_send));
 
@@ -2466,7 +2600,9 @@ void pk_mgr::data_close(int cfd, const char *reason)
 			break;
 		}
 	}
-//	PAUSE
+
+	*(_net_ptr->_errorRestartFlag) = RESTART;
+	PAUSE
 }
 
 int pk_mgr::get_sock()
@@ -2561,6 +2697,10 @@ void pk_mgr::rescue_detecion(struct chunk_t *chunk_ptr)
 			sourceTimeDiffOne =  (chunk_ptr->header.timestamp) - (ssDetect_ptr + substreamID) ->first_timestamp;
 //			localTimeDiffOne=	(newAlarm - (ssDetect_ptr + substreamID) ->firstAlarm);//_log_ptr ->diffTime_ms((ssDetect_ptr + substreamID) ->firstAlarm ,newAlarm);
 			localTimeDiffOne=	_log_ptr->diff_TimerGet_ms( &((ssDetect_ptr + substreamID) ->firstAlarm)  , &newAlarm);
+			if(localTimeDiffOne <1)
+				localTimeDiffOne=1;
+			if(sourceTimeDiffOne<1)
+				sourceTimeDiffOne=1;
 			sourceBitrate = ( ( double)((ssDetect_ptr + substreamID) ->total_byte ) /(double)sourceTimeDiffOne )*8*1000 ;
 			localBitrate  = ( ( double)((ssDetect_ptr + substreamID) ->total_byte ) /(double)localTimeDiffOne  )*8*1000 ;
 
@@ -2714,7 +2854,7 @@ void pk_mgr::measure()
 		}
 
 //printf("****************   PID=%d   *******************\n",connectPeerInfo ->peerInfo.pid);
-		_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"**************** PID= ",connectPeerInfo ->peerInfo.pid ,"*******************");
+//		_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"**************** PID= ",connectPeerInfo ->peerInfo.pid ,"*******************");
 
 
 		//根據rescueStatsArry 來決定要不要觸發rescue
@@ -2730,11 +2870,11 @@ void pk_mgr::measure()
 
 			
 //printf("%d  ",connectPeerInfo ->rescueStatsArry[i]);
-			_log_ptr->write_log_format("u  ",connectPeerInfo ->rescueStatsArry[i]);
+//			_log_ptr->write_log_format("u  ",connectPeerInfo ->rescueStatsArry[i]);
 
 		}
 //printf("\n");
-		_log_ptr->write_log_format("\n");
+//		_log_ptr->write_log_format("\n");
 
 		//近PARAMETER_P次 發生 P次
 		for(int j=0 ; j<PARAMETER_P ;j++){
@@ -2746,11 +2886,11 @@ void pk_mgr::measure()
 
 		for(unsigned long k=0 ; k<( (ssDetect_ptr + peerHighestSSID)->measure_N -1)% PARAMETER_M ;k++){
 //printf("   ");
-			_log_ptr->write_log_format("   ");
+//			_log_ptr->write_log_format("   ");
 		}
 
 //printf("↑\n");
-		_log_ptr->write_log_format("↑\n");
+//		_log_ptr->write_log_format("↑\n");
 
 
 		//找出統計最多的值
@@ -2935,7 +3075,11 @@ void pk_mgr::send_rescueManifestToPK(unsigned long manifestValue)
 	struct rescue_pkt_from_server  *chunk_rescueManifestPtr = NULL;
 
 	chunk_rescueManifestPtr = new struct rescue_pkt_from_server;
-
+	if( !(chunk_rescueManifestPtr )){
+		printf("pk_mgr::chunk_rescueManifestPtr new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_rescueManifestPtr  new error");
+		PAUSE
+	}
 
 
 	memset(chunk_rescueManifestPtr, 0x0, sizeof(struct rescue_pkt_from_server));
@@ -3023,6 +3167,10 @@ void pk_mgr::clear_map_pid_peer_info(unsigned long manifest){
 		peerInfoPtr=pid_peer_info_iter ->second;
 
 		if(peerInfoPtr ->manifest == manifest){
+
+			printf("clear map_pid_peer_info pid = %d \n",pid_peer_info_iter->first);
+			_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"clear map_pid_peer_info pid ",pid_peer_info_iter->first) ;
+
 			delete peerInfoPtr;
 
 			temp_pid_peer_info_iter =pid_peer_info_iter;
@@ -3034,10 +3182,12 @@ void pk_mgr::clear_map_pid_peer_info(unsigned long manifest){
 				break;
 
 		}else{
-		pid_peer_info_iter++ ;
+			pid_peer_info_iter++ ;
 		}
 	}
+	_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__," clear_map_pid_peer_info  end manifest =",manifest) ;
 
+	printf("clear_map_pid_peer_info  end manifest = %d \n",manifest);
 
 }
 
@@ -3068,6 +3218,37 @@ void pk_mgr::clear_map_pid_rescue_peer_info(){
 	}
 
 	map_pid_rescue_peer_info.clear();
+
+}
+
+void pk_mgr::clear_map_pid_child_peer_info(){
+
+	multimap<unsigned long, struct peer_info_t *>::iterator map_pid_child_peer_info_iter;
+	struct peer_info_t *peerInfoPtr =NULL;
+
+	for(map_pid_child_peer_info_iter =map_pid_child_peer_info.begin();map_pid_child_peer_info_iter!= map_pid_child_peer_info.end(); map_pid_child_peer_info_iter++){
+		peerInfoPtr=map_pid_child_peer_info_iter ->second;
+		delete peerInfoPtr;
+	}
+
+	map_pid_rescue_peer_info.clear();
+
+}
+
+void pk_mgr::clear_map_pid_child_peer_info(unsigned long pid,unsigned long manifest){
+
+	multimap<unsigned long, struct peer_info_t *>::iterator map_pid_child_peer_info_iter;
+	struct peer_info_t *peerInfoPtr =NULL;
+
+	for(map_pid_child_peer_info_iter =map_pid_child_peer_info.begin();map_pid_child_peer_info_iter!= map_pid_child_peer_info.end(); map_pid_child_peer_info_iter++){
+		peerInfoPtr=map_pid_child_peer_info_iter ->second;
+		if(peerInfoPtr ->pid == pid && peerInfoPtr ->manifest==manifest){
+			delete peerInfoPtr;
+			map_pid_child_peer_info.erase(map_pid_child_peer_info_iter);
+			return;
+		}
+	}
+	return;
 
 }
 
@@ -3356,7 +3537,11 @@ void pk_mgr::send_rescueManifestToPKUpdate(unsigned long manifestValue)
 	struct rescue_update_from_server  *chunk_rescueManifestPtr = NULL;
 
 	chunk_rescueManifestPtr = new struct rescue_update_from_server;
-
+	if( !(chunk_rescueManifestPtr )){
+		printf("pk_mgr::chunk_rescueManifestPtr new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_rescueManifestPtr  new error");
+		PAUSE
+	}
 
 
 	memset(chunk_rescueManifestPtr, 0x0, sizeof(struct rescue_update_from_server));
@@ -3419,7 +3604,11 @@ void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long oldPID){
 
 	packetlen = count * sizeof (unsigned long ) + sizeof(struct update_topology_info) ;
 	parentListPtr = (struct update_topology_info *) new char [packetlen];
-
+	if( !(parentListPtr )){
+		printf("pk_mgr::parentListPtr new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"parentListPtr  new error");
+		PAUSE
+	}
 
 	memset(parentListPtr, 0x0, packetlen);
 
@@ -3512,11 +3701,7 @@ void pk_mgr::time_handle()
 //	_log_ptr->write_log_format("\ns =>u s \n", __FUNCTION__,__LINE__,"************************************ a while round ***********************************") ;
 	_log_ptr->timerGet(&new_timer) ;
 	map<unsigned long, manifest_timmer_flag *>::iterator temp_substream_first_reply_peer_iter;
-	static bool firstIn =true;
-	static struct timerStruct LastTimer;
-	static struct timerStruct sleepTimer;
-	static struct timerStruct reSynTimer;
-	
+
 	if(firstIn){
 		_log_ptr->timerGet(&LastTimer) ;
 		_log_ptr->timerGet(&sleepTimer) ;
@@ -3538,7 +3723,6 @@ void pk_mgr::time_handle()
 				if(_peer_ptr->substream_first_reply_peer_iter ->second->peer_role == 0){
 
 					_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"session manifest timeout",_peer_ptr->substream_first_reply_peer_iter ->second->rescue_manifest) ;
-					pkSendCapacity =true;
 					_peer_ptr->substream_first_reply_peer_iter ->second->connectTimeOutFlag=FALSE ;
 					_log_ptr->write_log_format("s =>u s u\n", __FUNCTION__,__LINE__,"session_id_stop = ",_peer_ptr->substream_first_reply_peer_iter->first);
 					_peer_mgr_ptr->_peer_communication_ptr->stop_attempt_connect(_peer_ptr->substream_first_reply_peer_iter->first);
@@ -3551,6 +3735,7 @@ void pk_mgr::time_handle()
 					//connect all fail 
 					}else{
 
+						pkSendCapacity =true;
 						_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"manifest timeout and all connect fail",_peer_ptr->substream_first_reply_peer_iter ->second->rescue_manifest) ;
 
 						temp_substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer_iter ;
@@ -3582,8 +3767,8 @@ void pk_mgr::time_handle()
 					
 					_peer_ptr->substream_first_reply_peer_iter++;
 
+					clear_map_pid_child_peer_info(temp_substream_first_reply_peer_iter->second->pid,temp_substream_first_reply_peer_iter->second->rescue_manifest);
 					delete [] (unsigned char*)temp_substream_first_reply_peer_iter ->second;
-
 					_peer_ptr ->substream_first_reply_peer.erase(temp_substream_first_reply_peer_iter);
 				
 					if(_peer_ptr->substream_first_reply_peer_iter ==_peer_ptr->substream_first_reply_peer.end()){
@@ -3592,7 +3777,7 @@ void pk_mgr::time_handle()
 				
 				
 				}else{
-					printf("what !?");
+					printf("what !?\n");
 					PAUSE
 				}
 
@@ -3665,6 +3850,7 @@ void pk_mgr::time_handle()
 				printf("map_in_pid_fd not find ");
 				_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"i think not go here leastCurrDiff  ");
 				*(_net_ptr->_errorRestartFlag) =RESTART;
+				PAUSE
 			}
 
 			//timeout 發生
@@ -3676,7 +3862,7 @@ void pk_mgr::time_handle()
 			
 					printf("Tihis peer TimeOut\n");
 					_log_ptr->write_log_format("\ns =>u s \n", __FUNCTION__,__LINE__,"Tihis peer TimeOut") ;
-					*(_net_ptr->_errorRestartFlag) =RESTART;
+//					*(_net_ptr->_errorRestartFlag) =RESTART;
 					//PAUSE
 					//exit(0);
 					pid_peerDown_info_iter++ ;
@@ -3710,6 +3896,7 @@ void pk_mgr::time_handle()
 							//already start testing stream
 							//run testing fail direct from PK server sent topology
 							_logger_client_ptr->log_to_server(LOG_TEST_DETECTION_FAIL,SubstreamIDToManifest(testingSubStreamID));
+							_logger_client_ptr->log_to_server(LOG_DATA_COME_PK,SubstreamIDToManifest(testingSubStreamID));
 							set_rescue_state(testingSubStreamID,0);
 //							set_rescue_state(testingSubStreamID,1);
 							(ssDetect_ptr + testingSubStreamID) ->isTesting =0 ; 
@@ -3718,6 +3905,7 @@ void pk_mgr::time_handle()
 							printf("check_rescue_state(testingSubStreamID,1 parent should only PK  eror\n");
 							_log_ptr->write_log_format("s =>u s\n", __FUNCTION__,__LINE__,"check_rescue_state(testingSubStreamID,1 parent should only PK  eror  ");
 							*(_net_ptr->_errorRestartFlag) =RESTART;
+							PAUSE
 							//do nothing
 						}
 
@@ -3768,7 +3956,7 @@ void pk_mgr::time_handle()
 	
 	////////////////////for RE-SYN time START////////////////////////////////
 	if(_log_ptr ->diff_TimerGet_ms(&reSynTimer,&new_timer) >= reSynTime ){
-
+		printf("_log_ptr ->diff_TimerGet_ms =  %u   reSynTime =%u \n",_log_ptr ->diff_TimerGet_ms(&reSynTimer,&new_timer),reSynTime);
 		send_syn_token_to_pk(_sock);
 		reSynTimer =new_timer;
 	}
@@ -3777,14 +3965,18 @@ void pk_mgr::time_handle()
 
 
 
-//	Sleep(1);
-/*
+
 	//to avoid CPU 100%
-	if((new_timer - sleepTimer) >= 1){
+//	if((new_timer - sleepTimer) >= 1){
+//		Sleep(1);
+//		sleepTimer=new_timer ;
+////		printf("hello\n");
+//	}
+
+	static unsigned long runCount=0;
+	runCount++;
+	if(runCount %10 ==0){
 		Sleep(1);
-		sleepTimer=new_timer ;
-//		printf("hello\n");
 	}
-*/
 
 }

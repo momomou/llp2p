@@ -28,6 +28,7 @@ public:
 	void set_client_sockaddr(struct sockaddr_in *cin);
 	virtual void add_chunk(struct chunk_t *chunk);
     virtual unsigned char get_stream_pk_id();
+	void data_close(int cfd, const char *reason) ;
 
 
 private:
@@ -51,7 +52,7 @@ private:
 	unsigned long _html_size;
 	bool first_Header;
 
-	void data_close(int cfd, const char *reason);
+//	void data_close(int cfd, const char *reason);
 };
 
 #endif

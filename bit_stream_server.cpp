@@ -2,12 +2,15 @@
 #include "network.h"
 #include "logger.h"
 #include "pk_mgr.h"
+#include <sstream>
+#include "common.h"
+#ifdef _FIRE_BREATH_MOD_
+#include "bit_stream_out.h"
+#include "bit_stream_httpout.h"
+#else
 #include "libBitStream/bit_stream_out.h"
 #include "libBitStreamHTTP/bit_stream_httpout.h"
-#include <sstream>
-
-
-
+#endif
 //need to init a server to listen
 //after accept a client need call pk_mgr -> add_stream 
 
@@ -49,7 +52,7 @@ bit_stream_server::~bit_stream_server()
 }
 
 //init socket to listen , set nob-locking ,start to epoll LIN
-void bit_stream_server::init(int stream_id, unsigned short bitStreamServerPort)
+unsigned short bit_stream_server::init(int stream_id, unsigned short bitStreamServerPort)
 {
 	struct sockaddr_in sin;
 	int enable = 1;
@@ -60,35 +63,46 @@ void bit_stream_server::init(int stream_id, unsigned short bitStreamServerPort)
 	printf("bitStreamServerPort = %hu\n", bitStreamServerPort);
 	_sock_tcp = socket(AF_INET, SOCK_STREAM, 0);
 
-	setsockopt(_sock_tcp, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(int));
 	
-	if(_sock_tcp < 0)
+	if(_sock_tcp < 0){
 		throw "create tcp srv socket fail";
+		_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"create tcp srv socket fail");
+
+	}
 	memset(&sin, 0 ,sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = INADDR_ANY;
-	sin.sin_port = htons(bitStreamServerPort);
+//	sin.sin_port = htons(bitStreamServerPort);
 
-	if (::bind(_sock_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == -1) {
-		
-		printf("CNANOT bitStreamServer bind at TCP port: %d\n", bitStreamServerPort);
+	while(1){
+		sin.sin_port = htons(bitStreamServerPort);
 
-		*(_net_ptr->_errorRestartFlag)=RESTART;
-//		throw "can't bind socket: _sock_tcp";
-	} else {
-		printf("bitStreamServer bind at TCP port: %d\n", bitStreamServerPort);
-	}	 
+		if (::bind(_sock_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == 0) {
+			setsockopt(_sock_tcp, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(int));
+			_log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"bitStreamServer bind at TCP port",bitStreamServerPort);
+			printf("bitStreamServer bind at TCP port: %d\n", bitStreamServerPort);
+		} else {
+			_log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"CNANOT bitStreamServer bind at TCP port",bitStreamServerPort);
+			bitStreamServerPort++;
+			continue;
+		}	 
 
-	if (::listen(_sock_tcp, MAX_POLL_EVENT) == -1) {
-		printf("bitStreamServer :%d   listen error! \n",bitStreamServerPort);
+		if (::listen(_sock_tcp, MAX_POLL_EVENT) == 0) {
+			//success break
+			_log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"bitStreamServer LISTEN at TCP port",bitStreamServerPort);
+			break;
+		}else{
+			printf("bitStreamServer :%d   listen error! \n",bitStreamServerPort);
+			_log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"bitStreamServer    listen error!",bitStreamServerPort);
+			bitStreamServerPort++;
+			continue;
+		}
 
-//		throw "can't listen socket: _sock_tcp";
 	}
 
-// for windows
+// for windows set nonblocking
 #ifdef _WIN32
 	if (::ioctlsocket(_sock_tcp,FIONBIO,(u_long FAR*)&iMode) == SOCKET_ERROR){
-//		throw "socket error: _sock_tcp";
 		printf("socket error: _sock_tcp: %d\n", _sock_tcp);
 	}
 #endif
@@ -98,6 +112,7 @@ void bit_stream_server::init(int stream_id, unsigned short bitStreamServerPort)
 	_net_ptr->epoll_control(_sock_tcp, EPOLL_CTL_ADD, EPOLLIN);
 	_net_ptr->fd_bcptr_map_set(_sock_tcp, dynamic_cast<basic_class *> (this));
 	fd_list_ptr->push_back(_sock_tcp);
+	return bitStreamServerPort;
 	
 }
 
@@ -126,6 +141,8 @@ int bit_stream_server::handle_pkt_in(int sock)
 	if (!_bit_stream_out_ptr) {
 		cout << "can not allocate _bit_stream_out!!!" << endl;
 		_net_ptr -> close (new_fd);
+		_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__," can not allocate _bit_stream_out!!!");
+		PAUSE
 		return RET_ERROR;
 	}
 	printf("new bit_stream_out successfully\n");
@@ -148,10 +165,13 @@ int bit_stream_server::handle_pkt_in(int sock)
 		if (!_bit_stream_httpout_ptr) {				//obj create fail
 			cout << "can not allocate _bit_stream_out!!!" << endl;
 			_net_ptr -> close (new_fd);
+			_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__," can not allocate _bit_stream_out!!!");
+			PAUSE
 			return RET_ERROR;
 
 		}else{				
 		printf("\nnew bit_stream_httpout successfully\n");
+		_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__," new bit_stream_httpout successfully");
 		_pk_mgr_ptr ->add_stream( new_fd,(stream*)_bit_stream_httpout_ptr, STRM_TYPE_MEDIA);
 
 		_bit_stream_httpout_ptr->set_client_sockaddr(&_cin);
@@ -194,6 +214,7 @@ void bit_stream_server::handle_sock_error(int sock, basic_class *bcptr)
 //	_net_ptr->fd_bcptr_map_delete(sock);
 //	del_seed(sock);
 	data_close(sock, "player obj closed!!");
+	_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__," player obj closed!!");
 	_pk_mgr_ptr->del_stream(sock,(stream *)bcptr, STRM_TYPE_MEDIA);
 }
 

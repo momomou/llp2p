@@ -18,7 +18,7 @@ public:
 	bit_stream_server(network *net_ptr, logger *log_ptr, pk_mgr *pk_mgr_ptr, list<int> *fd_list);
 	~bit_stream_server();
 
-	void init(int stream_id, unsigned short bitStreamServerPort);
+	unsigned short init(int stream_id, unsigned short bitStreamServerPort);
 	
 	virtual int handle_pkt_in(int sock);
 	virtual int handle_pkt_out(int sock);

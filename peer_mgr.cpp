@@ -464,14 +464,24 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 		printf("fd not here\n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd not here");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
+		PAUSE
 		return;
 	}
 
-//	_net_ptr->set_blocking(sock);	// set to blocking
-	
-	chunk_delay_ptr = new struct chunk_delay_test_t;
-	struct chunk_t * html_buf = (struct chunk_t*)new unsigned char [BIG_CHUNK];
+	//	_net_ptr->set_blocking(sock);	// set to blocking
 
+	chunk_delay_ptr = new struct chunk_delay_test_t;
+	if(!(chunk_delay_ptr ) ){
+		printf("peer_mgr::chunk_delay_ptr  new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_delay_ptr new error");
+		PAUSE
+	}
+	struct chunk_t * html_buf = (struct chunk_t*)new unsigned char [BIG_CHUNK];
+	if(!(html_buf ) ){
+		printf("peer_mgr::html_buf  new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"html_buf new error");
+		PAUSE
+	}
 	memset(html_buf, 0x0, sizeof(html_buf));
 	memset(chunk_delay_ptr, 0x0, sizeof(struct chunk_delay_test_t));
 	
@@ -566,6 +576,11 @@ int peer_mgr::handle_test_delay(unsigned long manifest)
 	if(list_num != 0){
 		list_array = (unsigned long *)new unsigned char[(sizeof(unsigned long) * list_num)];
 		offset = 0;
+		if(!(list_array ) ){
+			printf("peer_mgr::list_array  new error \n");
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"list_array new error");
+			PAUSE
+		}
 
 		for(list_member_iter = list_member.begin();list_member_iter != list_member.end();list_member_iter++){
 			unsigned long temp = *list_member_iter;
@@ -577,6 +592,11 @@ int peer_mgr::handle_test_delay(unsigned long manifest)
 	if(connect_num != 0){
 		connect_array = (unsigned long *)new unsigned char[(sizeof(unsigned long) * connect_num)];
 		offset = 0;
+		if(!(connect_array ) ){
+			printf("peer_mgr::connect_array  new error \n");
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"connect_array new error");
+			PAUSE
+		}
 		for(connect_member_iter = connect_member.begin();connect_member_iter != connect_member.end();connect_member_iter++){
 			unsigned long temp = *connect_member_iter;
 			memcpy(connect_array,&temp,sizeof(unsigned long));
@@ -636,12 +656,17 @@ void peer_mgr::send_manifest_to_parent(unsigned long manifestValue,unsigned long
 		printf("fd not here\n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd not here");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
+		PAUSE
 		return;
 	}
 
-	
-	chunk_manifestSetPtr = new struct chunk_manifest_set_t;
 
+	chunk_manifestSetPtr = new struct chunk_manifest_set_t;
+	if(!(chunk_manifestSetPtr ) ){
+		printf("peer_mgr::chunk_manifestSetPtr  new error \n");
+		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_manifestSetPtr new error");
+		PAUSE
+	}
 	memset(chunk_manifestSetPtr, 0x0, sizeof(struct chunk_manifest_set_t));
 	
 	chunk_manifestSetPtr->header.cmd = CHNK_CMD_PEER_SET_MANIFEST ;
@@ -703,6 +728,7 @@ void peer_mgr::handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr)
 		printf("handle_manifestSet what happen\n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"handle_manifestSet what happen");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
+		PAUSE
 	}
 	
 	//如果Substream 的數量是變少的話 ,只有在給的串流變少的時候才Clean

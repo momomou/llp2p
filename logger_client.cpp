@@ -16,10 +16,18 @@ logger_client::logger_client(){
 	max_source_delay =NULL;
 	delay_list=NULL;
 	chunk_buffer = (struct chunk_t *)new unsigned char[(CHUNK_BUFFER_SIZE + sizeof(struct chunk_header_t))];
+	if(!(chunk_buffer)){
+		printf("chunk_buffer loggerClien new error buf_len=%u\n",(CHUNK_BUFFER_SIZE + sizeof(struct chunk_header_t)));
+		PAUSE
+	}
 	quality_struct_ptr =NULL ;
 	buffer_size = 0;
 
 	quality_struct_ptr = (struct quality_struct*)(new struct quality_struct);
+	if(!(quality_struct_ptr)){
+		printf("chunk_buffer loggerClien new error \n");
+		PAUSE
+	}
 	memset(quality_struct_ptr,0x00,sizeof(struct quality_struct));
 	memset(chunk_buffer,0x00,(CHUNK_BUFFER_SIZE + sizeof(struct chunk_header_t)));
 	memset(&non_log_recv_struct,0x00,sizeof(Nonblocking_Buff));
@@ -43,11 +51,13 @@ logger_client::~logger_client(){
 		delete delay_list;
 	if(quality_struct_ptr)
 		delete quality_struct_ptr;
-	if(log_buffer.size()){
-		delete log_buffer.front();
-		log_buffer.pop();
+	while(1){
+		if(log_buffer.size() != 0){
+			delete log_buffer.front();
+			log_buffer.pop();
+		}else
+			break;
 	}
-
 	printf("==============deldet logger_client success==========\n");
 
 
@@ -79,14 +89,15 @@ void logger_client::log_init(){
 		//exit(1);
 		printf("log_init init create socket failure\n");
 		*(_net_ptr->_errorRestartFlag)=RESTART ;
+		PAUSE
 	}
 
 	struct sockaddr_in log_saddr;
 
 	memset((struct sockaddr_in*)&log_saddr, 0x0, sizeof(struct sockaddr_in));
 
-	log_saddr.sin_addr.s_addr = inet_addr("140.114.90.146");
-	log_saddr.sin_port = htons(8754);
+	log_saddr.sin_addr.s_addr = inet_addr(LOGIP);
+	log_saddr.sin_port = htons(LOGPORT);
 	log_saddr.sin_family = AF_INET;
 
 //	_net_ptr->set_nonblocking(_sock);
@@ -111,7 +122,7 @@ void logger_client::log_init(){
 #endif
 		printf("log_init init build_connection failure\n");
 		*(_net_ptr->_errorRestartFlag)=RESTART ;
-
+		PAUSE
 		}
 	}
 
@@ -163,8 +174,16 @@ void logger_client::source_delay_struct_init(unsigned long sub_stream_num){
 	log_source_delay_init_flag = 1;
 	sub_stream_number = sub_stream_num;
 	max_source_delay = (struct log_source_delay_struct *)new unsigned char[(sub_stream_num*sizeof(struct log_source_delay_struct))]; 
+	if(!(max_source_delay)){
+		printf("max_source_delay loggerClien new error \n");
+		PAUSE
+	}
 	memset(max_source_delay,0x00,(sub_stream_num*sizeof(struct log_source_delay_struct)));
 	delay_list = (unsigned long *)new unsigned char[(sub_stream_num*sizeof(unsigned long))];
+	if(!(delay_list)){
+		printf("delay_list loggerClien new error \n");
+		PAUSE
+	}
 	memset(delay_list,0x00,(sub_stream_num*sizeof(unsigned long)));
 
 	logger_client_getTickTime(&log_period_source_delay_start);
@@ -322,6 +341,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_register_struct *log_register_struct_ptr = NULL;
 		log_register_struct_ptr = new struct log_register_struct;
+		if(!(log_register_struct_ptr)){
+			printf("log_register_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_register_struct_ptr,0x00,sizeof(struct log_register_struct));
 
 		log_register_struct_ptr->log_header.cmd = LOG_REGISTER;
@@ -350,6 +373,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		pkt_size = sizeof(struct log_header_t) + (2 * sizeof(unsigned long)) + (list_num * sizeof(unsigned long)) + (connect_num * sizeof(unsigned long));
 		log_pkt = (struct log_pkt_format_struct *)new unsigned char[pkt_size];
+		if(!(log_pkt)){
+			printf("log_pkt loggerClien new error \n");
+			PAUSE
+		}
 		log_list_struct_ptr = (struct log_list_struct*)log_pkt;
 
 		memset(log_pkt,0x00,pkt_size);
@@ -389,6 +416,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_list_testing_struct *log_list_testing_struct_ptr = NULL;
 		log_list_testing_struct_ptr = new struct log_list_testing_struct;
+		if(!(log_list_testing_struct_ptr)){
+			printf("log_list_testing_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_list_testing_struct_ptr,0x00,sizeof(struct log_list_testing_struct));
 
 		log_list_testing_struct_ptr->log_header.cmd = LOG_REG_LIST_TESTING;
@@ -409,6 +440,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_list_detection_testing_struct *log_list_detection_testing_struct_ptr = NULL;
 		log_list_detection_testing_struct_ptr = new struct log_list_detection_testing_struct;
+		if(!(log_list_detection_testing_struct_ptr)){
+			printf("log_list_detection_testing_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_list_detection_testing_struct_ptr,0x00,sizeof(struct log_list_detection_testing_struct));
 
 		log_list_detection_testing_struct_ptr->log_header.cmd = LOG_REG_LIST_DETECTION_TESTING_SUCCESS;
@@ -428,6 +463,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_list_testing_fail_struct *log_list_testing_fail_struct_ptr = NULL;
 		log_list_testing_fail_struct_ptr = new struct log_list_testing_fail_struct;
+		if(!(log_list_testing_fail_struct_ptr)){
+			printf("log_list_testing_fail_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_list_testing_fail_struct_ptr,0x00,sizeof(struct log_list_testing_fail_struct));
 
 		log_list_testing_fail_struct_ptr->log_header.cmd = LOG_REG_LIST_TESTING_FAIL;
@@ -446,6 +485,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_cut_pk_struct *log_cut_pk_struct_ptr = NULL;
 		log_cut_pk_struct_ptr = new struct log_cut_pk_struct;
+		if(!(log_cut_pk_struct_ptr)){
+			printf("log_cut_pk_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_cut_pk_struct_ptr,0x00,sizeof(struct log_cut_pk_struct));
 
 		log_cut_pk_struct_ptr->log_header.cmd = LOG_REG_CUT_PK;
@@ -464,6 +507,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_data_come_struct *log_data_come_struct_ptr = NULL;
 		log_data_come_struct_ptr = new struct log_data_come_struct;
+		if(!(log_data_come_struct_ptr)){
+			printf("log_data_come_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_data_come_struct_ptr,0x00,sizeof(struct log_data_come_struct));
 
 		log_data_come_struct_ptr->log_header.cmd = LOG_REG_DATA_COME;
@@ -482,6 +529,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_rescue_trigger_struct *log_rescue_trigger_struct_ptr = NULL;
 		log_rescue_trigger_struct_ptr = new struct log_rescue_trigger_struct;
+		if(!(log_rescue_trigger_struct_ptr)){
+			printf("log_rescue_trigger_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_rescue_trigger_struct_ptr,0x00,sizeof(struct log_rescue_trigger_struct));
 
 		log_rescue_trigger_struct_ptr->log_header.cmd = LOG_RESCUE_TRIGGER;
@@ -500,6 +551,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_rescue_trigger_struct *log_rescue_trigger_struct_ptr = NULL;
 		log_rescue_trigger_struct_ptr = new struct log_rescue_trigger_struct;
+		if(!(log_rescue_trigger_struct_ptr)){
+			printf("log_rescue_trigger_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_rescue_trigger_struct_ptr,0x00,sizeof(struct log_rescue_trigger_struct));
 
 		log_rescue_trigger_struct_ptr->log_header.cmd = LOG_DELAY_RESCUE_TRIGGER;
@@ -518,6 +573,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_rescue_trigger_struct *log_rescue_trigger_struct_ptr = NULL;
 		log_rescue_trigger_struct_ptr = new struct log_rescue_trigger_struct;
+		if(!(log_rescue_trigger_struct_ptr)){
+			printf("log_rescue_trigger_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_rescue_trigger_struct_ptr,0x00,sizeof(struct log_rescue_trigger_struct));
 
 		log_rescue_trigger_struct_ptr->log_header.cmd = LOG_MERGE_TRIGGER;
@@ -546,6 +605,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		pkt_size = sizeof(struct log_header_t) + (2 * sizeof(unsigned long)) + (list_num * sizeof(unsigned long)) + (connect_num * sizeof(unsigned long));
 		log_pkt = (struct log_pkt_format_struct *)new unsigned char[pkt_size];
+		if(!(log_pkt)){
+			printf("log_pkt loggerClien new error \n");
+			PAUSE
+		}
 		log_list_struct_ptr = (struct log_list_struct*)log_pkt;
 
 		memset(log_pkt,0x00,pkt_size);
@@ -585,6 +648,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_list_testing_struct *log_list_testing_struct_ptr = NULL;
 		log_list_testing_struct_ptr = new struct log_list_testing_struct;
+		if(!(log_list_testing_struct_ptr)){
+			printf("log_list_testing_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_list_testing_struct_ptr,0x00,sizeof(struct log_list_testing_struct));
 
 		log_list_testing_struct_ptr->log_header.cmd = LOG_RESCUE_TESTING;
@@ -605,6 +672,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_list_detection_testing_struct *log_list_detection_testing_struct_ptr = NULL;
 		log_list_detection_testing_struct_ptr = new struct log_list_detection_testing_struct;
+		if(!(log_list_detection_testing_struct_ptr)){
+			printf("log_list_detection_testing_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_list_detection_testing_struct_ptr,0x00,sizeof(struct log_list_detection_testing_struct));
 
 		log_list_detection_testing_struct_ptr->log_header.cmd = LOG_RESCUE_DETECTION_TESTING_SUCCESS;
@@ -624,6 +695,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_list_testing_fail_struct *log_list_testing_fail_struct_ptr = NULL;
 		log_list_testing_fail_struct_ptr = new struct log_list_testing_fail_struct;
+		if(!(log_list_testing_fail_struct_ptr)){
+			printf("log_list_testing_fail_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_list_testing_fail_struct_ptr,0x00,sizeof(struct log_list_testing_fail_struct));
 
 		log_list_testing_fail_struct_ptr->log_header.cmd = LOG_RESCUE_LIST_TESTING_FAIL;
@@ -642,6 +717,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_cut_pk_struct *log_cut_pk_struct_ptr = NULL;
 		log_cut_pk_struct_ptr = new struct log_cut_pk_struct;
+		if(!(log_cut_pk_struct_ptr)){
+			printf("log_cut_pk_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_cut_pk_struct_ptr,0x00,sizeof(struct log_cut_pk_struct));
 
 		log_cut_pk_struct_ptr->log_header.cmd = LOG_RESCUE_CUT_PK;
@@ -660,6 +739,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_data_come_struct *log_data_come_struct_ptr = NULL;
 		log_data_come_struct_ptr = new struct log_data_come_struct;
+		if(!(log_data_come_struct_ptr)){
+			printf("log_data_come_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_data_come_struct_ptr,0x00,sizeof(struct log_data_come_struct));
 
 		log_data_come_struct_ptr->log_header.cmd = LOG_RESCUE_DATA_COME;
@@ -679,6 +762,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_start_delay_struct *log_start_delay_struct_ptr = NULL;
 		log_start_delay_struct_ptr = new struct log_start_delay_struct;
+		if(!(log_start_delay_struct_ptr)){
+			printf("log_start_delay_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_start_delay_struct_ptr,0x00,sizeof(struct log_start_delay_struct));
 
 		log_start_delay_struct_ptr->log_header.cmd = LOG_START_DELAY;
@@ -707,6 +794,10 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_pkt_format_struct *log_pkt_format_struct_ptr = NULL;
 		struct log_period_source_delay_struct *log_period_source_delay_struct_ptr = NULL;
 		log_pkt_format_struct_ptr = (struct log_pkt_format_struct*)new unsigned char[pkt_size];
+		if(!(log_pkt_format_struct_ptr)){
+			printf("log_pkt_format_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_pkt_format_struct_ptr,0x00,pkt_size);
 		log_period_source_delay_struct_ptr = (struct log_period_source_delay_struct *)log_pkt_format_struct_ptr;
 
@@ -734,6 +825,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_rescue_sub_stream_struct *log_rescue_sub_stream_struct_ptr = NULL;
 		log_rescue_sub_stream_struct_ptr = new struct log_rescue_sub_stream_struct;
+		if(!(log_rescue_sub_stream_struct_ptr)){
+			printf("log_rescue_sub_stream_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_rescue_sub_stream_struct_ptr,0x00,sizeof(struct log_rescue_sub_stream_struct));
 
 		log_rescue_sub_stream_struct_ptr->log_header.cmd = LOG_RESCUE_SUB_STREAM;
@@ -753,6 +848,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_peer_leave_struct *log_peer_leave_struct_ptr = NULL;
 		log_peer_leave_struct_ptr = new struct log_peer_leave_struct;
+		if(!(log_peer_leave_struct_ptr)){
+			printf("log_peer_leave_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_peer_leave_struct_ptr,0x00,sizeof(struct log_peer_leave_struct));
 
 		log_peer_leave_struct_ptr->log_header.cmd = LOG_PEER_LEAVE;
@@ -770,7 +869,15 @@ void logger_client::log_to_server(int log_mode, ...){
 		int str_buffer_size = 300;
 		int int_array_size = 12;
 		unsigned char *str_buffer = new unsigned char[str_buffer_size];
+		if(!(str_buffer)){
+			printf("str_buffer loggerClien new error \n");
+			PAUSE
+		}
 		char *inttostr = new char[int_array_size];	//base 4 btes, but it will be increase if not enough (in sprintf)
+		if(!(inttostr)){
+			printf("inttostr loggerClien new error \n");
+			PAUSE
+		}
 		const char *fmt = NULL;
 		unsigned int str_buffer_offset = 0;
 		int d;
@@ -827,7 +934,11 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		pkt_size += (sizeof(struct log_header_t) + str_buffer_offset);
 		struct log_write_string_struct *log_write_string_struct_ptr = (struct log_write_string_struct *)new unsigned char[pkt_size];
-		
+		if(!(log_write_string_struct_ptr)){
+			printf("log_write_string_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
+
 		memset(log_write_string_struct_ptr,0x00,pkt_size);
 
 		log_write_string_struct_ptr->log_header.cmd = LOG_WRITE_STRING;
@@ -848,6 +959,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_begine_struct *log_begine_struct_ptr = NULL;
 		log_begine_struct_ptr = new struct log_begine_struct;
+		if(!(log_begine_struct_ptr)){
+			printf("log_begine_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_begine_struct_ptr,0x00,sizeof(struct log_begine_struct));
 
 		log_begine_struct_ptr->log_header.cmd = LOG_BEGINE;
@@ -866,6 +981,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_rescue_trigger_back_struct *log_rescue_trigger_back_struct_ptr = NULL;
 		log_rescue_trigger_back_struct_ptr = new struct log_rescue_trigger_back_struct;
+		if(!(log_rescue_trigger_back_struct_ptr)){
+			printf("log_rescue_trigger_back_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_rescue_trigger_back_struct_ptr,0x00,sizeof(struct log_rescue_trigger_back_struct));
 
 		log_rescue_trigger_back_struct_ptr->log_header.cmd = LOG_RESCUE_TRIGGER_BACK;
@@ -884,6 +1003,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_list_empty_struct *log_list_empty_struct_ptr = NULL;
 		log_list_empty_struct_ptr = new struct log_list_empty_struct;
+		if(!(log_list_empty_struct_ptr)){
+			printf("log_list_empty_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_list_empty_struct_ptr,0x00,sizeof(struct log_list_empty_struct));
 
 		log_list_empty_struct_ptr->log_header.cmd = LOG_LIST_EMPTY;
@@ -902,6 +1025,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_test_delay_fail_struct *log_test_delay_fail_struct_ptr = NULL;
 		log_test_delay_fail_struct_ptr = new struct log_test_delay_fail_struct;
+		if(!(log_test_delay_fail_struct_ptr)){
+			printf("log_test_delay_fail_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_test_delay_fail_struct_ptr,0x00,sizeof(struct log_test_delay_fail_struct));
 
 		log_test_delay_fail_struct_ptr->log_header.cmd = LOG_TEST_DELAY_FAIL;
@@ -920,6 +1047,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_test_detection_fail_struct *log_test_detection_fail_struct_ptr = NULL;
 		log_test_detection_fail_struct_ptr = new struct log_test_detection_fail_struct;
+		if(!(log_test_detection_fail_struct_ptr)){
+			printf("log_test_detection_fail_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_test_detection_fail_struct_ptr,0x00,sizeof(struct log_test_detection_fail_struct));
 
 		log_test_detection_fail_struct_ptr->log_header.cmd = LOG_TEST_DETECTION_FAIL;
@@ -938,6 +1069,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_data_come_pk_struct *log_data_come_pk_struct_ptr = NULL;
 		log_data_come_pk_struct_ptr = new struct log_data_come_pk_struct;
+		if(!(log_data_come_pk_struct_ptr)){
+			printf("log_data_come_pk_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_data_come_pk_struct_ptr,0x00,sizeof(struct log_data_come_pk_struct));
 
 		log_data_come_pk_struct_ptr->log_header.cmd = LOG_DATA_COME_PK;
@@ -965,6 +1100,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_client_bw_struct *log_client_bw_struct_ptr = NULL;
 		log_client_bw_struct_ptr = new struct log_client_bw_struct;
+		if(!(log_client_bw_struct_ptr)){
+			printf("log_client_bw_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_client_bw_struct_ptr,0x00,sizeof(struct log_client_bw_struct));
 
 		log_client_bw_struct_ptr->log_header.cmd = LOG_CLIENT_BW;
@@ -987,6 +1126,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_time_out_struct *log_time_out_struct_ptr = NULL;
 		log_time_out_struct_ptr = new struct log_time_out_struct;
+		if(!(log_time_out_struct_ptr)){
+			printf("log_time_out_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_time_out_struct_ptr,0x00,sizeof(struct log_time_out_struct));
 
 		log_time_out_struct_ptr->log_header.cmd = LOG_TIME_OUT;
@@ -1005,6 +1148,10 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_pkt_lose_struct *log_pkt_lose_struct_ptr = NULL;
 		log_pkt_lose_struct_ptr = new struct log_pkt_lose_struct;
+		if(!(log_pkt_lose_struct_ptr)){
+			printf("log_pkt_lose_struct_ptr loggerClien new error \n");
+			PAUSE
+		}
 		memset(log_pkt_lose_struct_ptr,0x00,sizeof(struct log_pkt_lose_struct));
 
 		log_pkt_lose_struct_ptr->log_header.cmd = LOG_PKT_LOSE;
@@ -1041,9 +1188,10 @@ void logger_client::log_exit(){
 		_send_byte = _net_ptr->nonblock_send(log_server_sock, & (Nonblocking_Send_Ctrl_ptr->recv_ctl_info ));
 			
 		if(_send_byte < 0) {
-				printf("(RUNNING) send info to log server error : %d in log_exit\n",WSAGetLastError());
-				printf("log_init init build_connection failure \n");
-				*(_net_ptr->_errorRestartFlag)=RESTART ;
+			printf("(RUNNING) send info to log server error : %d in log_exit\n",WSAGetLastError());
+			printf("log_init init build_connection failure \n");
+			*(_net_ptr->_errorRestartFlag)=RESTART ;
+			PAUSE
 		}
 	}
 
@@ -1067,6 +1215,7 @@ void logger_client::log_exit(){
 			log_buffer.pop();
 			if(log_buffer_element_ptr)
 				delete log_buffer_element_ptr;
+			log_buffer_element_ptr=NULL;
 		}
 		
 		chunk_buffer->header.cmd = CHNK_CMD_LOG;
@@ -1081,7 +1230,7 @@ void logger_client::log_exit(){
 		if(_send_byte < 0) {
 			printf("(READY) send info to log server error : %d  in log_exit\n",WSAGetLastError());
 			*(_net_ptr->_errorRestartFlag)=RESTART ;
-
+			PAUSE
 		}
 	}
 }
@@ -1130,6 +1279,7 @@ int logger_client::handle_pkt_out(int sock){
 						log_buffer.pop();
 						if(log_buffer_element_ptr)
 							delete log_buffer_element_ptr;
+						log_buffer_element_ptr=NULL;
 					}
 		
 					chunk_buffer->header.cmd = CHNK_CMD_LOG;
@@ -1180,6 +1330,7 @@ int logger_client::handle_pkt_out(int sock){
 						log_buffer.pop();
 						if(log_buffer_element_ptr)
 							delete log_buffer_element_ptr;
+						log_buffer_element_ptr=NULL;
 					}
 		
 					chunk_buffer->header.cmd = CHNK_CMD_LOG;

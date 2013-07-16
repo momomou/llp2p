@@ -17,7 +17,8 @@ public:
 	unsigned long long int send_byte;
 	unsigned long long int recv_byte;
 	int *_errorRestartFlag;
-	
+	list<int>  * fd_list_ptr;
+
 	void timer();		// timer
 	void setall_fd_epollout();
 	void garbage_collection();
@@ -59,10 +60,11 @@ public:
 	int nonblock_recv(int sock, Nonblocking_Ctl* send_info);
 	int nonblock_send(int sock, Network_nonblocking_ctl* send_info);
 	
-	network(int * errorRestartFlag);
+	network(int * errorRestartFlag,list<int>  * fd_list);
 	~network();
 	network(const network&);
 	network& operator=(const network&);
+	void eraseFdList(int sock) ;
 
 private:
 	

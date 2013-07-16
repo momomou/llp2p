@@ -31,11 +31,23 @@ public:
 	unsigned long totalMod ;
 	unsigned long reSynTime;
 	struct timerStruct lastSynStartclock;
+	unsigned long pkt_count ;
+	unsigned long totalbyte;
+
+	unsigned long fisttimestamp;
+	bool firstIn;
+	struct timerStruct LastTimer;
+	struct timerStruct sleepTimer;
+	struct timerStruct reSynTimer;
 
 	LARGE_INTEGER teststart,testend;
 	LARGE_INTEGER syn_round_start;
 
+	//temp parent 
 	multimap <unsigned long, struct peer_info_t *> map_pid_peer_info; 	// <pid, struct peer_info_t *>
+	//temp child
+	multimap <unsigned long, struct peer_info_t *> map_pid_child_peer_info;
+
 	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		// <pid, struct peer_info_t *>
 	map<unsigned long, struct peer_connect_down_t *> map_pid_peerDown_info ; //// <pid, struct peer_connect_down_t *>
 
@@ -101,9 +113,9 @@ public:
 	pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , logger *log_ptr , configuration *prep , logger_client * logger_client_ptr);
 	~pk_mgr();
 
-	void init();
+	void init(unsigned short ptop_port);
 	int build_connection(string ip, string port); 
-	int handle_register(string svc_tcp_port, string svc_udp_port);
+	int handle_register(unsigned short ptop_port, string svc_udp_port);
 	void peer_mgr_set(peer_mgr *peer_mgr_ptr);
 	
 	void add_stream(int strm_addr, stream *strm, unsigned strm_type);
@@ -163,6 +175,8 @@ public:
 	void clear_map_pid_peer_info(unsigned long manifest);
 	void clear_map_pid_peerDown_info();
 	void clear_map_pid_rescue_peer_info();
+	void clear_map_pid_child_peer_info(unsigned long pid,unsigned long manifest);
+	void clear_map_pid_child_peer_info();
 
 	void clear_delay_table();
 	void clear_map_streamID_header();

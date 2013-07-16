@@ -76,6 +76,7 @@ int io_connect::handle_pkt_out(int sock)
 				printf("error map_fd_NonBlockIO_iter ==  _peer_communication_ptr->map_fd_NonBlockIO.end  occ \n");
 				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"error map_fd_NonBlockIO_iter ==  _peer_communication_ptr->map_fd_NonBlockIO.end  occ" );
 				*(_net_ptr->_errorRestartFlag) =RESTART;
+				PAUSE
 			}
 
 			Nonblocking_Ctl * Nonblocking_Send_Ctrl_ptr =NULL;
@@ -93,6 +94,11 @@ int io_connect::handle_pkt_out(int sock)
 				int send_byte;
 
 				role_protocol_ptr = new struct role_struct;
+				if(!role_protocol_ptr){
+					printf("role_protocol_ptr new error \n");
+					_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__," role_protocol_ptr new error");
+					PAUSE
+				}
 				memset(role_protocol_ptr,0x00,sizeof(struct role_struct));
 
 				role_protocol_ptr->header.cmd = CHNK_CMD_ROLE;
@@ -232,7 +238,7 @@ void io_connect::handle_job_timer()
 }
 
 void io_connect::handle_sock_error(int sock, basic_class *bcptr){
-	
+	_peer_communication_ptr->fd_close(sock);
 	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in io_connect handle_sock_error error number : ",WSAGetLastError());
 	_logger_client_ptr->log_exit();
 }

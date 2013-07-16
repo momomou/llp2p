@@ -52,6 +52,11 @@ int io_accept::handle_pkt_in(int sock)
 		_peer_communication_ptr->map_fd_NonBlockIO_iter =_peer_communication_ptr->map_fd_NonBlockIO.find(new_fd);
 		if(_peer_communication_ptr->map_fd_NonBlockIO_iter ==_peer_communication_ptr->map_fd_NonBlockIO.end() ){
 		struct ioNonBlocking* ioNonBlocking_ptr =new struct ioNonBlocking;
+		if(!ioNonBlocking_ptr){
+			printf("ioNonBlocking_ptr new error \n");
+			_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__," ioNonBlocking_ptr new error");
+			PAUSE
+		}
 		memset(ioNonBlocking_ptr,0x00,sizeof(struct ioNonBlocking));
 		ioNonBlocking_ptr->io_nonblockBuff.nonBlockingRecv.recv_packet_state =READ_HEADER_READY;
 //		printf("ioNonBlocking_ptr->io_nonblockBuff.nonBlockingRecv.recv_packet_state = %d\n ",ioNonBlocking_ptr->io_nonblockBuff.nonBlockingRecv.recv_packet_state);
@@ -325,6 +330,7 @@ void io_accept::handle_job_timer()
 
 void io_accept::handle_sock_error(int sock, basic_class *bcptr){
 	
+	_peer_communication_ptr->fd_close(sock);
 	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in io_accept handle_sock_error error number : ",WSAGetLastError());
 	_logger_client_ptr->log_exit();
 }
