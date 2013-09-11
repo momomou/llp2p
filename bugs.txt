@@ -1,7 +1,0 @@
-/* 2013.09.06 */
-1. peer::data_close()竟然會在map_fd_pid找不到該socket對應的pid,代表整個系統的table維護有問題
-2. 懷疑在peer::data_close()有可能刪除到不該刪除的table,導致產生"The descriptor is not a socket"這個錯誤訊息
-
-/* 2013.09.10 */
-1. source delay的計算在經過22'32"後會出現問題(過那時間之後計算出來的source delay都一樣)
-2. buf_chunk_t指向chunk_ptr,如果chunk_ptr被delete後會不會有問題(buf_chunk_t指向NULL)?
