@@ -1,6 +1,8 @@
 #include "logger_client.h"
+#include "common.h"
+#include "logger.h"
 
-logger_client::logger_client(){
+logger_client::logger_client(logger *log_ptr){
 	self_pid = 0;
 	previous_time_differ = 0;
 	buffer_clear_flag = 0;
@@ -15,6 +17,7 @@ logger_client::logger_client(){
 	chunk_buffer =NULL;
 	max_source_delay =NULL;
 	delay_list=NULL;
+	_log_ptr =log_ptr;
 	chunk_buffer = (struct chunk_t *)new unsigned char[(CHUNK_BUFFER_SIZE + sizeof(struct chunk_header_t))];
 	if(!(chunk_buffer)){
 		printf("chunk_buffer loggerClien new error buf_len=%u\n",(CHUNK_BUFFER_SIZE + sizeof(struct chunk_header_t)));
@@ -78,9 +81,23 @@ void logger_client::set_pk_mgr_obj(pk_mgr *pk_mgr_ptr){
 	_pk_mgr_ptr = pk_mgr_ptr;
 }
 
-void logger_client::log_init(){
-	buffer_size = 0;
+void logger_client::set_prep_obj(configuration *prep)
+{
+	_prep = prep;
+}
 
+void logger_client::log_init()
+{
+	string log_ip("");
+	string log_port("");
+	
+	_prep->read_key("log_ip", log_ip);
+	_prep->read_key("log_port", log_port);
+	buffer_size = 0;
+	
+	cout << "log_ip=" << log_ip << endl;
+	cout << "log_port=" << log_port << endl;
+	
 	if((log_server_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
 		cout << "log_init init create socket failure" << endl;
 #ifdef _WIN32
@@ -96,8 +113,8 @@ void logger_client::log_init(){
 
 	memset((struct sockaddr_in*)&log_saddr, 0x0, sizeof(struct sockaddr_in));
 
-	log_saddr.sin_addr.s_addr = inet_addr(LOGIP);
-	log_saddr.sin_port = htons(LOGPORT);
+	log_saddr.sin_addr.s_addr = inet_addr(log_ip.c_str());
+	log_saddr.sin_port = htons((unsigned short)atoi(log_port.c_str()));
 	log_saddr.sin_family = AF_INET;
 
 //	_net_ptr->set_nonblocking(_sock);
@@ -106,7 +123,8 @@ void logger_client::log_init(){
 
 #ifdef _WIN32
 //win32
-		if (WSAGetLastError() == WSAEWOULDBLOCK) {
+		int n = WSAGetLastError();
+		if (n == WSAEWOULDBLOCK) {
 #else
 //linux
 #endif
@@ -120,7 +138,7 @@ void logger_client::log_init(){
 #else
 			::close(_sock);
 #endif
-		printf("log_init init build_connection failure\n");
+		printf("log_init init build_connection failure  %d \n", n);
 		*(_net_ptr->_errorRestartFlag)=RESTART ;
 		PAUSE
 		}
@@ -133,7 +151,7 @@ void logger_client::log_init(){
 
 }
 
-
+/*
 #ifdef WIN32
 void logger_client::logger_client_getTickTime(LARGE_INTEGER *tickTime)
 {
@@ -154,79 +172,104 @@ unsigned int logger_client::logger_client_diffTime_ms(LARGE_INTEGER startTime,LA
 }
 #endif
 
+*/
+
 void logger_client::log_timer_init(){
-	logger_client_getTickTime(&log_start_time);
+	_log_ptr->timerGet(&log_start_time);
 }
 
 void logger_client::log_time_differ(){
-	logger_client_getTickTime(&log_record_time);
-	log_time_dffer = logger_client_diffTime_ms(log_start_time,log_record_time);
+	_log_ptr->timerGet(&log_record_time);
+	log_time_dffer = _log_ptr->diff_TimerGet_ms(&log_start_time,&log_record_time);
 }
 
 void logger_client::count_start_delay(){
-	logger_client_getTickTime(&log_record_time);
-	start_delay = logger_client_diffTime_ms(log_start_time,log_record_time);
+	_log_ptr->timerGet(&log_record_time);
+	start_delay = (double)_log_ptr->diff_TimerGet_ms(&log_start_time,&log_record_time);
 
 	log_to_server(LOG_START_DELAY,0,start_delay);
 }
 	
-void logger_client::source_delay_struct_init(unsigned long sub_stream_num){
+void logger_client::source_delay_struct_init(unsigned long sub_stream_num)
+{
 	log_source_delay_init_flag = 1;
 	sub_stream_number = sub_stream_num;
 	max_source_delay = (struct log_source_delay_struct *)new unsigned char[(sub_stream_num*sizeof(struct log_source_delay_struct))]; 
-	if(!(max_source_delay)){
-		printf("max_source_delay loggerClien new error \n");
+	if (!max_source_delay) {
+		debug_printf("max_source_delay loggerClien new error \n");
 		PAUSE
 	}
-	memset(max_source_delay,0x00,(sub_stream_num*sizeof(struct log_source_delay_struct)));
-	delay_list = (unsigned long *)new unsigned char[(sub_stream_num*sizeof(unsigned long))];
-	if(!(delay_list)){
-		printf("delay_list loggerClien new error \n");
+	memset(max_source_delay, 0, sub_stream_num * sizeof(struct log_source_delay_struct));
+	delay_list = (double *)new unsigned char[(sub_stream_num*sizeof(double))];
+	if (!delay_list) {
+		debug_printf("delay_list loggerClien new error \n");
 		PAUSE
 	}
-	memset(delay_list,0x00,(sub_stream_num*sizeof(unsigned long)));
+	memset(delay_list, 0, sub_stream_num * sizeof(double));
 
-	logger_client_getTickTime(&log_period_source_delay_start);
+	_log_ptr->timerGet(&log_period_source_delay_start);
 }
 
-void logger_client::set_source_delay(unsigned long sub_id,unsigned long source_delay){
-	if((source_delay != 0)&&((max_source_delay + sub_id)->average_delay != 0)){
-		(max_source_delay + sub_id)->delay_now = source_delay;
-		(max_source_delay + sub_id)->average_delay = ((max_source_delay + sub_id)->average_delay + source_delay) / 2 ;
+void logger_client::set_source_delay (unsigned long sub_id, unsigned long source_delay)
+{
+	//printf("=====logger_client::set_source_delay  sub_id: %d, source_delay: %d, delay_now: %d, average_delay: %d \n", sub_id,
+	//																												  source_delay,
+	//																												  (max_source_delay + sub_id)->delay_now,
+	//																												  (max_source_delay + sub_id)->average_delay);
+
+	(max_source_delay + sub_id)->count++;
+	if (source_delay != 0 && (max_source_delay + sub_id)->average_delay != 0) {
+		(max_source_delay + sub_id)->delay_now = (double)source_delay;
+		(max_source_delay + sub_id)->average_delay += (double)source_delay ;
 	}
-	else if((source_delay != 0)&&((max_source_delay + sub_id)->average_delay == 0)){
-		(max_source_delay + sub_id)->delay_now = source_delay;
-		(max_source_delay + sub_id)->average_delay = source_delay ;
+	else if (source_delay != 0 && (max_source_delay + sub_id)->average_delay == 0) {
+		(max_source_delay + sub_id)->delay_now = (double)source_delay;
+		(max_source_delay + sub_id)->average_delay += (double)source_delay ;
 	}
-	else{
+	else {
 		(max_source_delay + sub_id)->delay_now = 0;
-		(max_source_delay + sub_id)->average_delay = 0 ;
+		(max_source_delay + sub_id)->average_delay += 0 ;
+		_log_ptr->write_log_format("s(u) s f \n", __FUNCTION__, __LINE__, "[DEBUG](average_delay too large?) set delay_now to 0. average_delay =", (max_source_delay + sub_id)->average_delay);
 	}
 }
 
-void logger_client::send_max_source_delay(){
-	unsigned long max_delay = 0;
+// Send source delay to PK
+void logger_client::send_max_source_delay()
+{
+	double max_delay = 0;
 	
-	for(int i = 0;i<sub_stream_number;i++){
-		if(((max_source_delay + i)->average_delay) != 0){
-			*(delay_list + i) = (max_source_delay + i)->average_delay;
+	for (int i = 0; i < sub_stream_number; i++) {
+		if (((max_source_delay + i)->average_delay) != 0) {
+			if ((max_source_delay + i)->count == 0) {
+				(max_source_delay + i)->count = 1;
+			}
+			*(delay_list + i) = (max_source_delay + i)->average_delay/ (double)( (max_source_delay + i)->count);
 		}
-		else{
+		else {
 			*(delay_list + i) = (max_source_delay + i)->delay_now;
 		}
 	}
 
-	for(int i = 0;i<sub_stream_number;i++){
-		if(((max_source_delay + i)->average_delay) > max_delay){
-			max_delay = ((max_source_delay + i)->average_delay);
+	for (int i = 0; i < sub_stream_number; i++) {
+		debug_printf("substream %d source delay = %f \n", i, *(delay_list+i));
+		_log_ptr->write_log_format("s(u) s d s f s f s f \n", __FUNCTION__, __LINE__,
+														"substream", i,
+														"source delay =", *(delay_list+i),
+														"average_delay =", (max_source_delay + i)->average_delay,
+														"delay_now =", (max_source_delay + i)->delay_now);
+		if ( *(delay_list + i) > max_delay) {
+			max_delay = *(delay_list + i);
 		}
 	}
 
-	log_to_server(LOG_PERIOD_SOURCE_DELAY,0,max_delay,sub_stream_number,delay_list);
-
-	for(int i = 0;i<sub_stream_number;i++){
-		(max_source_delay + i)->average_delay = (max_source_delay + i)->delay_now;
+	log_to_server(LOG_PERIOD_SOURCE_DELAY, 0, max_delay, sub_stream_number, delay_list);
+	_log_ptr->write_log_format("s(u) s f s \n", __FUNCTION__, __LINE__, "send max source delay =", max_delay, "to PK");
+	
+	for (int i = 0; i < sub_stream_number; i++) {
+		(max_source_delay + i)->average_delay = 0;
+		(max_source_delay + i)->count = 0;
 	}
+	//PAUSE
 }
 
 void logger_client::bw_in_struct_init(unsigned long timestamp,unsigned long pkt_size){
@@ -234,8 +277,8 @@ void logger_client::bw_in_struct_init(unsigned long timestamp,unsigned long pkt_
 	pre_in_pkt_size = 0;
 
 	start_in_bw_record.time_stamp = timestamp;
-	logger_client_getTickTime(&(start_in_bw_record.client_time));
-	logger_client_getTickTime(&log_period_bw_start);
+	_log_ptr->timerGet(&(start_in_bw_record.client_time));
+	_log_ptr->timerGet(&log_period_bw_start);
 	in_recv_len += pkt_size;
 	pre_in_pkt_size = pkt_size;
 }
@@ -244,20 +287,20 @@ void logger_client::bw_out_struct_init(unsigned long pkt_size){
 	pre_out_pkt_size = 0;
 	out_send_len = 0;
 
-	logger_client_getTickTime(&start_out_bw_record);
+	_log_ptr->timerGet(&start_out_bw_record);
 	out_send_len += pkt_size;
 	pre_out_pkt_size = pkt_size;
 }
 
 void logger_client::set_out_bw(unsigned long pkt_size){
-	logger_client_getTickTime(&end_out_bw_record);
+	_log_ptr->timerGet(&end_out_bw_record);
 	out_send_len += pkt_size;
 	pre_out_pkt_size = pkt_size;
 }
 
 void logger_client::set_in_bw(unsigned long timestamp,unsigned long pkt_size){
 	end_in_bw_record.time_stamp = timestamp;
-	logger_client_getTickTime(&(end_in_bw_record.client_time));
+	_log_ptr->timerGet(&(end_in_bw_record.client_time));
 	in_recv_len += pkt_size;
 	pre_in_pkt_size = pkt_size;
 }
@@ -266,61 +309,86 @@ void logger_client::send_bw(){
 	/*
 	this part is used for in bw
 	*/
-	unsigned long should_in_bw = 0;
-	unsigned long real_in_bw = 0;
+	double should_in_bw = 0;
+	double real_in_bw = 0;
 	unsigned long period_msec = 0;
-	unsigned long real_out_bw = 0;
+	double real_out_bw = 0;
 	double quality_result = 0.0;
 
-	if((start_in_bw_record.time_stamp!=0)&&(end_in_bw_record.time_stamp!=0)){
-		period_msec = logger_client_diffTime_ms(start_in_bw_record.client_time,end_in_bw_record.client_time);
+	//in bandwidth
+//	if((start_in_bw_record.time_stamp!=0)&&(end_in_bw_record.time_stamp!=0)){
+	period_msec = _log_ptr->diff_TimerGet_ms(&(start_in_bw_record.client_time),&(end_in_bw_record.client_time));
+		
+		if(period_msec <= 0)
+			period_msec = 1;
+
 		if(period_msec != 0){
-			real_in_bw = (1000 * in_recv_len) / period_msec;
+			 real_in_bw = 1000 * ( (double)in_recv_len /  (double)period_msec );
 		}
 		else{
 			real_in_bw = 0;
 		}
-		period_msec = (end_in_bw_record.time_stamp - start_in_bw_record.time_stamp);
-		if(period_msec != 0){
-			should_in_bw = (1000 * in_recv_len) / period_msec;
-		}
-		else{
-			should_in_bw = 0;
-		}
-	}
-	else{
-		//send null
-		real_in_bw = 0;
-		should_in_bw = 0;
-	}
 
-	if(out_send_len != pre_out_pkt_size){
-		period_msec = logger_client_diffTime_ms(start_out_bw_record,end_out_bw_record);
+		in_recv_len =0;
+
+//do not calu should_in_bw
+		//period_msec = (end_in_bw_record.time_stamp - start_in_bw_record.time_stamp);
+		//if(period_msec != 0){
+		//	should_in_bw = (1000 * in_recv_len) / period_msec;
+		//}
+		//else{
+		//	should_in_bw = 0;
+		//}
+	//}
+	//else{
+	//	//send null
+	//	real_in_bw = 0;
+	//	should_in_bw = 0;
+	//}
+
+
+	//out bandwith
+//	if(out_send_len != pre_out_pkt_size){
+	if(log_bw_out_init_flag == 1){
+		period_msec = _log_ptr->diff_TimerGet_ms(&start_out_bw_record,&end_out_bw_record);
 		if(period_msec == 0){
 			real_out_bw = 0;
 		}
 		else{
-			real_out_bw = (1000 * out_send_len) / period_msec;
+			real_out_bw = 1000 * ( (double)out_send_len /  (double)period_msec );
 		}
+
+		out_send_len =0;
+	}else{
+		real_out_bw= 0;
 	}
-	else{
-		real_out_bw = 0;
+	//}
+	//else{
+	//	real_out_bw = 0;
+	//}
+
+
+	if(quality_struct_ptr ->total_chunk != 0){
+		quality_result = (double)(0.5)*( quality_struct_ptr->quality_count /(double)(quality_struct_ptr ->total_chunk)) +  (double)(0.5)*( (double)(quality_struct_ptr ->total_chunk/((double)quality_struct_ptr->loss_pkt +(double)(quality_struct_ptr ->total_chunk))));
+
+	}else{
+		quality_result=0;
 	}
 
-	quality_result = (double)(0.5)*( quality_struct_ptr->quality_count /(double)(quality_struct_ptr ->total_chunk)) +  (double)(0.5)*( (double)(quality_struct_ptr ->total_chunk/((double)quality_struct_ptr->loss_pkt +(double)(quality_struct_ptr ->total_chunk))));
-	printf("%u %f %u\n",quality_struct_ptr ->total_chunk,quality_struct_ptr->quality_count,quality_struct_ptr->loss_pkt);
+//	quality_result = (double)(0.5)*( quality_struct_ptr->quality_count /(double)(quality_struct_ptr ->total_chunk)) +  (double)(0.5)*( (double)(quality_struct_ptr ->total_chunk/((double)quality_struct_ptr->loss_pkt +(double)(quality_struct_ptr ->total_chunk))));
+	printf("real_in_bw = %lf  real_out_bw = %lf total_chunk= %u quality_count =%lf loss_pkt=%u\n",real_in_bw,real_out_bw,quality_struct_ptr ->total_chunk,quality_struct_ptr->quality_count,quality_struct_ptr->loss_pkt);
 	quality_struct_ptr->loss_pkt = 0;
 	quality_struct_ptr->quality_count = 0.0;
 	quality_struct_ptr->total_chunk = 0;
 
 	log_to_server(LOG_CLIENT_BW,0,should_in_bw,real_in_bw,real_out_bw,quality_result);
 
-	in_recv_len = pre_in_pkt_size;
-	start_in_bw_record.time_stamp = end_in_bw_record.time_stamp;
+//	in_recv_len = pre_in_pkt_size;
+//	start_in_bw_record.time_stamp = end_in_bw_record.time_stamp;
 	start_in_bw_record.client_time = end_in_bw_record.client_time;
-	end_in_bw_record.time_stamp = 0;
+//	end_in_bw_record.time_stamp = 0;
 
-	out_send_len = pre_out_pkt_size;
+//	out_send_len = pre_out_pkt_size;
 	start_out_bw_record = end_out_bw_record;
 
 }
@@ -756,9 +824,10 @@ void logger_client::log_to_server(int log_mode, ...){
 		buffer_size += sizeof(struct log_data_come_struct);
 	}
 	else if(log_mode == LOG_START_DELAY){
-		unsigned long manifest,start_delay;
+		unsigned long manifest;
+		double	start_delay;
 		manifest = va_arg(ap, unsigned long);
-		start_delay = va_arg(ap, unsigned long);
+		start_delay = va_arg(ap, double);
 
 		struct log_start_delay_struct *log_start_delay_struct_ptr = NULL;
 		log_start_delay_struct_ptr = new struct log_start_delay_struct;
@@ -780,17 +849,18 @@ void logger_client::log_to_server(int log_mode, ...){
 		buffer_size += sizeof(struct log_start_delay_struct);
 	}
 	else if(log_mode == LOG_PERIOD_SOURCE_DELAY){
-		unsigned long manifest,max_delay,sub_number;
-		unsigned long *delay_list = NULL;
+		unsigned long manifest,sub_number;
+		double *delay_list = NULL;
+		double max_delay=0;
 		unsigned int pkt_size = 0;
 		unsigned int offset = 0;
 
 		manifest = va_arg(ap, unsigned long);
-		max_delay = va_arg(ap, unsigned long);
+		max_delay = va_arg(ap, double);
 		sub_number = va_arg(ap, unsigned long);
-		delay_list = va_arg(ap, unsigned long*);
+		delay_list = va_arg(ap, double*);
 
-		pkt_size = sizeof(struct log_header_t) + (2 * sizeof(unsigned long)) + (sub_number * sizeof(unsigned long));
+		pkt_size = sizeof(struct log_header_t) + sizeof(unsigned long)+ sizeof(double)+ (sub_number * sizeof(double));
 		struct log_pkt_format_struct *log_pkt_format_struct_ptr = NULL;
 		struct log_period_source_delay_struct *log_period_source_delay_struct_ptr = NULL;
 		log_pkt_format_struct_ptr = (struct log_pkt_format_struct*)new unsigned char[pkt_size];
@@ -811,9 +881,14 @@ void logger_client::log_to_server(int log_mode, ...){
 		log_period_source_delay_struct_ptr->max_delay = max_delay;
 		log_period_source_delay_struct_ptr->sub_num = sub_number;
 
-		offset = sizeof(struct log_header_t) + (2 * sizeof(unsigned long));
+		offset = sizeof(struct log_header_t) +  sizeof(unsigned long) +  sizeof(double) ;
 
-		memcpy((char *)log_pkt_format_struct_ptr + offset,delay_list,(sub_number * sizeof(unsigned long)));
+		memcpy((char *)log_pkt_format_struct_ptr + offset,delay_list,(sub_number * sizeof(double)));
+
+		for(int i=0 ;i< sub_number;i++){
+			printf("source delay i=%d delay %lf\n",i,*(delay_list+i));
+		}
+		printf("log_period_source_delay_struct_ptr->max_delay  = %lf\n",log_period_source_delay_struct_ptr->max_delay );
 
 		log_buffer.push((struct log_pkt_format_struct *)log_pkt_format_struct_ptr);
 		buffer_size += pkt_size;
@@ -1087,15 +1162,15 @@ void logger_client::log_to_server(int log_mode, ...){
 	}
 	else if(log_mode == LOG_CLIENT_BW){
 		unsigned long manifest;
-		unsigned long temp_should_in_bw;
-		unsigned long temp_real_in_bw;
-		unsigned long temp_real_out_bw;
+		double temp_should_in_bw;
+		double temp_real_in_bw;
+		double temp_real_out_bw;
 		double temp_quality;
 
 		manifest = va_arg(ap, unsigned long);
-		temp_should_in_bw = va_arg(ap, unsigned long);
-		temp_real_in_bw = va_arg(ap, unsigned long);
-		temp_real_out_bw = va_arg(ap, unsigned long);
+		temp_should_in_bw = va_arg(ap, double);
+		temp_real_in_bw = va_arg(ap, double);
+		temp_real_out_bw = va_arg(ap, double);
 		temp_quality = va_arg(ap, double);
 
 		struct log_client_bw_struct *log_client_bw_struct_ptr = NULL;
@@ -1168,6 +1243,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		
 		log_to_server(LOG_WRITE_STRING,0,"s \n","unknown state in log\n");
 		log_exit();
+		PAUSE
 	}
 }
 
@@ -1188,8 +1264,8 @@ void logger_client::log_exit(){
 		_send_byte = _net_ptr->nonblock_send(log_server_sock, & (Nonblocking_Send_Ctrl_ptr->recv_ctl_info ));
 			
 		if(_send_byte < 0) {
-			printf("(RUNNING) send info to log server error : %d in log_exit\n",WSAGetLastError());
-			printf("log_init init build_connection failure \n");
+			debug_printf("(RUNNING) send info to log server error : %d in log_exit\n",WSAGetLastError());
+			debug_printf("log_init init build_connection failure \n");
 			*(_net_ptr->_errorRestartFlag)=RESTART ;
 			PAUSE
 		}
@@ -1205,7 +1281,7 @@ void logger_client::log_exit(){
 			buffer_size -= log_struct_size;
 
 			if((buffer_size<0)||((chunk_buffer_offset+log_struct_size) > CHUNK_BUFFER_SIZE)){
-				printf("error : buffer size : %d and %d (overflow)  in log_exit\n",buffer_size,(chunk_buffer_offset+log_struct_size));
+				debug_printf("error : buffer size : %d and %d (overflow)  in log_exit\n",buffer_size,(chunk_buffer_offset+log_struct_size));
 				*(_net_ptr->_errorRestartFlag)=RESTART ;
 			}
 
@@ -1224,14 +1300,17 @@ void logger_client::log_exit(){
 		chunk_buffer->header.sequence_number = 0;
 
 		//non-bolcking send maybe have problem?
+		_net_ptr->set_blocking(log_server_sock);
 		_send_byte = send(log_server_sock, (char *)chunk_buffer, (chunk_buffer->header.length + sizeof(chunk_header_t)), 0);
-
+		_net_ptr->set_nonblocking(log_server_sock);
 
 		if(_send_byte < 0) {
-			printf("(READY) send info to log server error : %d  in log_exit\n",WSAGetLastError());
+			debug_printf("(READY) send info to log server error : %d  %d  in log_exit \n", _send_byte, WSAGetLastError());
+			debug_printf("__PRETTY_FUNCTION__ = %s \n",__PRETTY_FUNCTION__);
 			*(_net_ptr->_errorRestartFlag)=RESTART ;
 			PAUSE
 		}
+
 	}
 }
 
@@ -1250,7 +1329,7 @@ int logger_client::handle_pkt_out(int sock){
 	int log_struct_size = 0;
 	int _send_byte;
 	log_time_differ();
-
+	//cout << "logger_client::handle_pkt_out " << Nonblocking_Send_Ctrl_ptr->recv_ctl_info.ctl_state << "\n";
 	if(Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY ){
 
 		if((log_time_dffer - previous_time_differ) > TIME_PERIOD){
@@ -1268,7 +1347,7 @@ int logger_client::handle_pkt_out(int sock){
 						buffer_size -= log_struct_size;
 
 						if((buffer_size<0)||((chunk_buffer_offset+log_struct_size) > CHUNK_BUFFER_SIZE)){
-							
+							PAUSE
 							log_to_server(LOG_WRITE_STRING,0,"s d d \n","error : buffer size : %d and %d (overflow)\n",buffer_size,(chunk_buffer_offset+log_struct_size));
 							log_exit();
 						}
@@ -1319,7 +1398,7 @@ int logger_client::handle_pkt_out(int sock){
 						buffer_size -= log_struct_size;
 
 						if((buffer_size<0)||((chunk_buffer_offset+log_struct_size) > CHUNK_BUFFER_SIZE)){
-							
+							PAUSE
 							log_to_server(LOG_WRITE_STRING,0,"s d d \n","error : buffer size : %d and %d (overflow) in send all\n",buffer_size,(chunk_buffer_offset+log_struct_size));
 							log_exit();
 						}
@@ -1363,7 +1442,7 @@ int logger_client::handle_pkt_out(int sock){
 		_send_byte = _net_ptr->nonblock_send(sock, & (Nonblocking_Send_Ctrl_ptr->recv_ctl_info ));
 			
 		if(_send_byte < 0) {
-				
+				PAUSE
 				log_to_server(LOG_WRITE_STRING,0,"s d \n","(RUNNING) send info to log server error : ",WSAGetLastError());
 				log_exit();
 		}/*else if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY){
@@ -1374,25 +1453,25 @@ int logger_client::handle_pkt_out(int sock){
 }
 
 void logger_client::handle_pkt_error(int sock){
-	
+	PAUSE
 	log_to_server(LOG_WRITE_STRING,0,"s \n","cannot in this sope in logger_client::handle_pkt_error");
 	log_exit();
 }
 
 void logger_client::handle_sock_error(int sock, basic_class *bcptr){
-	
+	PAUSE
 	log_to_server(LOG_WRITE_STRING,0,"s \n","cannot in this sope in logger_client::handle_sock_error");
 	log_exit();
 }
 
 void logger_client::handle_job_realtime(){
-	
+	PAUSE
 	log_to_server(LOG_WRITE_STRING,0,"s \n","cannot in this sope in logger_client::handle_job_realtime");
 	log_exit();
 }
 
 void logger_client::handle_job_timer(){
-
+	PAUSE
 	log_to_server(LOG_WRITE_STRING,0,"s \n","cannot in this sope in logger_client::handle_job_timer");
 	log_exit();
 }

@@ -16,8 +16,8 @@ class peer:public basic_class {
 public:
 
 
-	map<unsigned long, manifest_timmer_flag *> substream_first_reply_peer;
-	map<unsigned long, manifest_timmer_flag *>::iterator substream_first_reply_peer_iter;
+	map<unsigned long, struct manifest_timmer_flag *> substream_first_reply_peer;
+	map<unsigned long, struct manifest_timmer_flag *>::iterator substream_first_reply_peer_iter;
 	unsigned long firstReplyPid;
 	unsigned int leastSeq_set_childrenPID;
 
@@ -25,10 +25,10 @@ public:
 	queue<struct chunk_t *> *queue_out_data_ptr;
 	
 	map<int, queue<struct chunk_t *> *> map_fd_out_ctrl;	// <fd, queue of chunk pointer which store outgoing control packet(chunk) >
-	map<int, queue<struct chunk_t *> *> map_fd_out_data;		// <fd, queue of chunk pointer which store outgoin data packet(chunk) >
-	map<unsigned long, int> map_in_pid_fd;
-	map<unsigned long, int> map_out_pid_fd;
-	map<int , unsigned long> map_fd_pid;
+	map<int, queue<struct chunk_t *> *> map_fd_out_data;	// <fd, queue of chunk pointer which store outgoin data packet(chunk) >
+	map<unsigned long, int> map_in_pid_fd;					// store parent-peer which alreay established connection(including temp parent-peer)
+	map<unsigned long, int> map_out_pid_fd;					// store child-peer which alreay established connection(including temp child-peer)
+	map<int , unsigned long> map_fd_pid;					// store fd in both map_in_pid_fd and map_out_pid_fd
 	map<int , Nonblocking_Buff * > map_fd_nonblocking_ctl;
 //	set<unsigned long> set_childrenPID;
 
@@ -73,7 +73,7 @@ private:
 	map<int , unsigned long>::iterator map_fd_pid_iter;
 	map<unsigned long, int>::iterator map_pid_fd_iter;
 	multimap<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
-	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
+	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;	// store real parent-peer
 	map<unsigned long, struct peer_info_t *>::iterator map_pid_rescue_peer_info_iter;
 //	set<unsigned long>::iterator set_childrenPID_iter;
 	map<int , Nonblocking_Buff * > ::iterator map_fd_nonblocking_ctl_iter;

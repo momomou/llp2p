@@ -6,7 +6,7 @@
 #include <sstream>
 
 
-const	char httpHeader[]=	"HTTP/1.1·200·OK\r\n" \
+//const	char httpHeader[]=	"HTTP/1.1·200·OK\r\n" \
 							"Server:·Apache-Coyote/1.1"\
 							"Server: Apache/2.2.8 (Win32) PHP/5.2.6\r\n"\
 							"Last-Modified:·Thu,·23·May·2013·06:58:16·GMT\r\n"\
@@ -14,6 +14,21 @@ const	char httpHeader[]=	"HTTP/1.1·200·OK\r\n" \
 							"Date:·Thu,·23·May·2013·07:23:03·GMT\r\n"\
 							"Connection:·close\r\n"\
 							"\r\n";
+
+
+//const	char httpHeader[]=	"HTTP/1.1·200·OK\r\n" \
+							"Server:·Apache-Coyote/1.1"\
+							"Content-Type:·video/x-flv\r\n"\
+							"Pragma:·no-cache"\
+							"Cache-Control:·no-cache"\
+							"Connection:·close\r\n"\
+							"\r\n";
+
+const	char httpHeader[]=	"HTTP/1.1·200·OK\r\n" \
+							"Server:·Apache-Coyote/1.1\r\n"\
+							"Content-Type:·video/x-flv\r\n"\
+							"Connection:·close\r\n"\
+							"\r\n" ;
 
 
 const char crossdomain[]=	 "<?xml version=\"1.0\"?>\r\n"\
@@ -24,7 +39,7 @@ const char crossdomain[]=	 "<?xml version=\"1.0\"?>\r\n"\
 
 
 
-static const char flvHeader[] =			{ 'F', 'L', 'V', 0x01,
+const char flvHeader[] =			{ 'F', 'L', 'V', 0x01,
 	0x00,	 /* 0x04 == audio, 0x01 == video */
 	0x00, 0x00, 0x00, 0x09,
 	0x00, 0x00, 0x00, 0x00
@@ -61,6 +76,8 @@ static const char flvHeader[] =			{ 'F', 'L', 'V', 0x01,
 bit_stream_httpout::bit_stream_httpout(int stream_id,network *net_ptr, logger *log_ptr,bit_stream_server *bit_stream_server_ptr ,pk_mgr *pk_mgr_ptr, list<int> *fd_list,int acceptfd){
 
 	_reqStreamID=-1;
+	firstRecvReqSreamID=0;
+
 	first_pkt=true;
 	first_HTTP_Header=true;
 
@@ -103,6 +120,7 @@ void bit_stream_httpout::init(){
 //只有一開始第一次接收player的http request 接收後即關閉監聽
 int bit_stream_httpout::handle_pkt_in(int sock){
 
+	printf("bit_stream_httpout handle_pkt_in socket = %d \n",sock);
 	int recv_byte;
 	char HTTPrequestBuffer[512]={0x0};
 	_net_ptr->set_nonblocking(sock);
@@ -110,17 +128,35 @@ int bit_stream_httpout::handle_pkt_in(int sock){
 	recv_byte = _net_ptr ->recv(sock, HTTPrequestBuffer,  sizeof(HTTPrequestBuffer), 0);
 
 
+	if(recv_byte <= 0){
+	_log_ptr->write_log_format("s =>u s  d\n", __FUNCTION__,__LINE__," HTTP Stream in channel WSAGetLastError() = ",WSAGetLastError());
+	}
 	//		Sleep(1000);
-	//		for(int i =0 ; i <512 ;i++)
-	//		printf("%c",HTTPrequestBuffer[i]);
-	//		printf("\n");
+	//printf("==============REQUEST==============\n");
+	//for(int i =0 ; i <512 ;i++)
+	//	printf("%c",HTTPrequestBuffer[i]);
+	//printf("\n");
+	//printf("==============REQUEST==============\n");
+	
+	if(_reqStreamID == -1){
+		_reqStreamID= getStreamID_FromHTTP_Request(sock,HTTPrequestBuffer,sizeof(HTTPrequestBuffer));
+	}else{
+		_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLOUT);	
+		_log_ptr->write_log_format("s =>u s  d\n", __FUNCTION__,__LINE__," HTTP Stream in channel _reqStreamID",_reqStreamID);
+		return RET_OK;
+	}
 
+	if(recv_byte <=0 ){
+		_log_ptr->write_log_format("s =>u s  d\n", __FUNCTION__,__LINE__," HTTP Stream in channel WSAGetLastError() = ",WSAGetLastError());
 
-	_reqStreamID= getStreamID_FromHTTP_Request(sock,HTTPrequestBuffer,sizeof(HTTPrequestBuffer));
+		_pk_mgr_ptr ->del_stream(sock,(stream*)this, STRM_TYPE_MEDIA);
+		data_close(sock," bit_stream_httpout::handle_pkt_in HTTPrequestBuffer ");
+		delete this;
+		return RET_SOCK_ERROR;
+	}
+
 	printf("\n HTTP  _reqStreamID =%d\n",_reqStreamID);
 	_log_ptr->write_log_format("s =>u s  d\n", __FUNCTION__,__LINE__," HTTP  _reqStreamID",_reqStreamID);
-
-
 
 
 
@@ -150,7 +186,8 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 	if(first_HTTP_Header){
 		cout << "============= Acceppt New Player ============"<<endl;
 		int sendHeaderBytes = _net_ptr->send(sock,httpHeader,sizeof(httpHeader) -1 ,0);  //-1 to subtract '\0'
-		_log_ptr->write_log_format("s =>u s  d\n", __FUNCTION__,__LINE__,"============= Acceppt New Player ============  send httpHeader",_reqStreamID);
+		_log_ptr->write_log_format("s =>u s  d\n", __FUNCTION__,__LINE__,"============= Acceppt New Player ============  _reqStreamID=",_reqStreamID);
+		_log_ptr->write_log_format("s =>u s  d\n", __FUNCTION__,__LINE__,"send httpHeader sendHeaderBytes=",sendHeaderBytes);
 
 		//		cout << "send_HttpHeaderBytes=" << sendHeaderBytes<<endl;
 		//		sendHeaderBytes = _net_ptr->send(sock,(char *)FLV_Header,sizeof(FLV_Header),0);
@@ -199,7 +236,7 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 		if (!_queue_out_data_ptr->size()) {
 			//			_log_ptr->write_log_format("s => s \n", __FUNCTION__, "_queue_out_data_ptr->size =0");
-			_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN);	
+//			_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN);	
 			return RET_OK;
 		}
 
@@ -207,8 +244,6 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 
 		//pop until get the first keyframe
-
-
 		while(first_pkt){
 			if(_queue_out_data_ptr ->size() >=10){
 				for(int i=0;i<5;i++){
@@ -365,18 +400,27 @@ int bit_stream_httpout::handle_pkt_out(int sock){
 
 
 		if(send_rt_val < 0) {
-			printf("delete map and bit_stream_httpout_ptr\n");
-			_log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"delete map and bit_stream_httpout_ptr WSAGetLastError",WSAGetLastError());
+			printf("socket error number=%d\n",WSAGetLastError());
+			if((WSAGetLastError()==WSAEWOULDBLOCK )){								//buff full
+				//it not a error
+				//				_send_ctl_info.ctl_state = RUNNING;
+				//					_queue_out_data_ptr->pop();
+				_log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__," HTTP Stream RUNNINGD  WSAGetLastError",WSAGetLastError());
 
-			//						_net_ptr->epoll_control(sock, EPOLL_CTL_DEL, EPOLLIN | EPOLLOUT);	
-			_pk_mgr_ptr ->del_stream(sock,(stream*)this, STRM_TYPE_MEDIA);
-			data_close(sock," bit_stream_httpout  delete map");
-			delete this;
-			return RET_SOCK_ERROR;
+				//					continue;
+			}else{
+				printf("delete map and bit_stream_httpout_ptr\n");
+				_log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"delete map and bit_stream_httpout_ptr WSAGetLastError",WSAGetLastError());
 
-		}else if (_send_ctl_info.ctl_state == READY){
-			//donothing
+				//						_net_ptr->epoll_control(sock, EPOLL_CTL_DEL, EPOLLIN | EPOLLOUT);	
+				_pk_mgr_ptr ->del_stream(sock,(stream*)this, STRM_TYPE_MEDIA);
+				data_close(sock," bit_stream_httpout ");
+				delete this;
+				return RET_SOCK_ERROR;
+			}
+
 		}
+		return RET_OK;
 
 		/*
 		switch (send_rt_val) {
@@ -500,7 +544,6 @@ int  bit_stream_httpout::getStreamID_FromHTTP_Request(int sock,char *httpBuffer,
 
 		return -1 ;
 	}
-
 
 
 	ptr = strstr(httpBuffer ,"GET /");

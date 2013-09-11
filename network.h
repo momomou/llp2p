@@ -14,6 +14,9 @@ class network {
 	
 public:
 
+	#ifdef _FIRE_BREATH_MOD_
+		EpollVars epollVar;
+	#endif
 	unsigned long long int send_byte;
 	unsigned long long int recv_byte;
 	int *_errorRestartFlag;

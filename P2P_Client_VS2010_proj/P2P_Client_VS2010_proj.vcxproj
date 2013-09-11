@@ -109,15 +109,12 @@
   <ItemGroup>
     <ClInclude Include="..\basic_class.h" />
     <ClInclude Include="..\bit_stream_server.h" />
-    <ClInclude Include="..\Client.h" />
-    <ClInclude Include="..\ClientAPI.h" />
-    <ClInclude Include="..\ClientMacro.h" />
     <ClInclude Include="..\common.h" />
     <ClInclude Include="..\configuration.h" />
     <ClInclude Include="..\EpollFake.h" />
     <ClInclude Include="..\io_accept.h" />
+    <ClInclude Include="..\io_accept_nat.h" />
     <ClInclude Include="..\io_connect.h" />
-    <ClInclude Include="..\io_nat_punch.h" />
     <ClInclude Include="..\io_nonblocking.h" />
     <ClInclude Include="..\libBitStreamHTTP\bit_stream_httpout.h" />
     <ClInclude Include="..\libBitStream\bit_stream_out.h" />
@@ -134,7 +131,6 @@
     <ClInclude Include="..\librtsp\ss_rtsp.h" />
     <ClInclude Include="..\logger.h" />
     <ClInclude Include="..\logger_client.h" />
-    <ClInclude Include="..\nat_interface.h" />
     <ClInclude Include="..\network.h" />
     <ClInclude Include="..\peer.h" />
     <ClInclude Include="..\peer_communication.h" />
@@ -144,6 +140,10 @@
     <ClInclude Include="..\stream_handler.h" />
     <ClInclude Include="..\stream_handler_udp.h" />
     <ClInclude Include="..\stream_udp.h" />
+    <ClInclude Include="..\stunt\ClientMacro_v2.h" />
+    <ClInclude Include="..\stunt\stuntdef.h" />
+    <ClInclude Include="..\stunt\tcp_punch.h" />
+    <ClInclude Include="..\stunt_mgr.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\config.ini" />
@@ -152,12 +152,11 @@
   <ItemGroup>
     <ClCompile Include="..\basic_class.cpp" />
     <ClCompile Include="..\bit_stream_server.cpp" />
-    <ClCompile Include="..\Client.cpp" />
     <ClCompile Include="..\configuration.cpp" />
     <ClCompile Include="..\EpollFake.cpp" />
     <ClCompile Include="..\io_accept.cpp" />
+    <ClCompile Include="..\io_accept_nat.cpp" />
     <ClCompile Include="..\io_connect.cpp" />
-    <ClCompile Include="..\io_nat_punch.cpp" />
     <ClCompile Include="..\io_nonblocking.cpp" />
     <ClCompile Include="..\libBitStreamHTTP\bit_stream_httpout.cpp" />
     <ClCompile Include="..\libBitStream\bit_stream_out.cpp" />
@@ -173,17 +172,17 @@
     <ClCompile Include="..\logger.cpp" />
     <ClCompile Include="..\logger_client.cpp" />
     <ClCompile Include="..\main.cpp" />
-    <ClCompile Include="..\nat_interface.cpp" />
     <ClCompile Include="..\network.cpp" />
     <ClCompile Include="..\peer.cpp" />
     <ClCompile Include="..\peer_communication.cpp" />
     <ClCompile Include="..\peer_mgr.cpp" />
     <ClCompile Include="..\pk_mgr.cpp" />
-    <ClCompile Include="..\Sample.cpp" />
     <ClCompile Include="..\stream.cpp" />
     <ClCompile Include="..\stream_handler.cpp" />
     <ClCompile Include="..\stream_handler_udp.cpp" />
     <ClCompile Include="..\stream_udp.cpp" />
+    <ClCompile Include="..\stunt\tcp_punch.cpp" />
+    <ClCompile Include="..\stunt_mgr.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

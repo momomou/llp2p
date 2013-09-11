@@ -176,15 +176,18 @@ int io_nonblocking::handle_pkt_in(int sock)
 		map<int, struct fd_information *>::iterator map_fd_info_iter;
 
 		map_fd_info_iter = _peer_communication_ptr->map_fd_info.find(sock);
-		if(map_fd_info_iter != _peer_communication_ptr->map_fd_info.end()){
+		if (map_fd_info_iter != _peer_communication_ptr->map_fd_info.end()) {
 			_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","fd already in map_fd_info in in io nonblocking\n");
 			_logger_client_ptr->log_exit();
-		}
-		else{
-
+		} else {
+			printf("_peer_communication_ptr->session_id_candidates_set.size: %d \n", _peer_communication_ptr->session_id_candidates_set.size());
 			for(session_id_candidates_set_iter = _peer_communication_ptr->session_id_candidates_set.begin();session_id_candidates_set_iter != _peer_communication_ptr->session_id_candidates_set.end();session_id_candidates_set_iter++){
+				printf("session_id_candidates_set_iter->second->manifest: %d, role_protocol_ptr->manifest: %d \n", session_id_candidates_set_iter->second->manifest, role_protocol_ptr->manifest);
+				printf("session_id_candidates_set_iter->second->role: %d, role_protocol_ptr->flag: %d \n", session_id_candidates_set_iter->second->role, role_protocol_ptr->flag);
+					
 				if((session_id_candidates_set_iter->second->manifest == role_protocol_ptr->manifest)&&(session_id_candidates_set_iter->second->role == role_protocol_ptr->flag)){
-					for(int i=0;i<session_id_candidates_set_iter->second->peer_num;i++){
+					for(int i=0; i<session_id_candidates_set_iter->second->peer_num; i++){
+						printf("session_id_candidates_set_iter->second->list_info->level_info[i]->pid: %d, role_protocol_ptr->send_pid: %d \n", session_id_candidates_set_iter->second->list_info->level_info[i]->pid, role_protocol_ptr->send_pid);
 						if(session_id_candidates_set_iter->second->list_info->level_info[i]->pid == role_protocol_ptr->send_pid){
 
 							//_peer_communication_ptr->map_fd_session_id[sock] = session_id_candidates_set_iter->first;
@@ -272,7 +275,7 @@ int io_nonblocking::handle_pkt_in(int sock)
 //				_net_ptr->set_fd_bcptr_map(sock, dynamic_cast<basic_class *> (_peer_communication_ptr));
 			}
 			else{
-				
+				printf("exist_flag: %d \n", exist_flag);
 //				bind to peer_com~ object
 				
 				_log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"find list information in in io nonblocking : ",sock);
@@ -281,6 +284,7 @@ int io_nonblocking::handle_pkt_in(int sock)
 
 				_net_ptr->epoll_control(sock, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT);
 				_net_ptr->set_fd_bcptr_map(sock, dynamic_cast<basic_class *> (_peer_communication_ptr));
+				printf("_net_ptr->set_fd_bcptr_map(sock, dynamic_cast<basic_class *> (_peer_communication_ptr)); \n");
 				//					_peer_mgr_ptr->fd_list_ptr->push_back(sock);
 			}
 

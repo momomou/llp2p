@@ -62,21 +62,7 @@ peer * peer_mgr::get_peer_object(){
 //只有註冊時收到peer list 才會呼叫
 void peer_mgr::connect_peer(struct chunk_level_msg_t *level_msg_ptr, unsigned long pid)
 {
-    
-
-//	for(unsigned long i = 0; i < _pk_mgr_ptr->lane_member; i++) {
-//		if((level_msg_ptr->level_info[i])->pid != level_msg_ptr->pid) {
-//			if (build_connection(level_msg_ptr->level_info[i], pid)) {
-//				cout << "peer_mgr build _connection() success" << endl;
-//			} else {
-//				cout << "peer_mgr build_ connection() fail" << endl;
-////				PAUSE
-////				exit(0);
-//			}
-//
-//		}
-//	}
-
+	return;
 }
 
 //給定一個rescue 的list 然後隨機從list 挑一個peer
@@ -90,260 +76,17 @@ void peer_mgr::connect_peer(struct chunk_level_msg_t *level_msg_ptr, unsigned lo
 //最後把sock設成 nonblock 然後加入select 的監聽 EPOLLIN | EPOLLOUT ( 由peer 的obj做後續的傳送處理)
 int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned long pid)
 {
-
 	return 0;
-
-//	struct sockaddr_in peer_saddr;
-//	int ret;
-//	struct in_addr ip;
-//	
-//	struct peer_info_t *peerInfoPtr =NULL;
-//	multimap<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
-////	struct in_addr selfip;
-//	map<unsigned long, int>::iterator map_pid_fd_iter;
-//
-//	//之前已經建立過連線的 在map_in_pid_fd裡面 則不再建立(保證對同個parent不再建立第二條線)
-//	for(map_pid_fd_iter = peer_ptr->map_in_pid_fd.begin();map_pid_fd_iter != peer_ptr->map_in_pid_fd.end(); map_pid_fd_iter++){
-//		if(map_pid_fd_iter->first == level_info_ptr->pid ){
-//			printf("pid =%d already in connect find in map_in_pid_fd  testing",level_info_ptr ->pid);
-//			_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_in_pid_fd testing");
-//			return 1;
-//		}
-//	}
-//
-//
-//	pid_peer_info_iter = _pk_mgr_ptr ->map_pid_peer_info.find(level_info_ptr ->pid);
-//	if(pid_peer_info_iter !=  _pk_mgr_ptr ->map_pid_peer_info.end() ){
-//
-//		//兩個以上就沿用第一個的連線
-//		if(_pk_mgr_ptr ->map_pid_peer_info.count(level_info_ptr ->pid) >= 2 ){
-//			printf("pid =%d already in connect find in map_pid_peer_info  testing",level_info_ptr ->pid);
-//			_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_peer_info testing");
-//				return 1;
-//		}
-//	}
-//
-////若在map_pid_peerDown_info 則不再次建立連線
-//	pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(level_info_ptr ->pid);
-//	if(pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_peerDown_info.end()){
-//		printf("pid =%d already in connect find in map_pid_peerDown_info",level_info_ptr ->pid);
-//		_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_peerDown_info");
-//		return 1;
-//	}
-//
-//
-//	if((_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
-//		cout << "init create socket failure" << endl;
-//
-//		_net_ptr ->set_nonblocking(_sock);
-//#ifdef _WIN32
-//		::WSACleanup();
-//#endif
-//		return 0;
-//	}
-//
-//	memset((struct sockaddr_in*)&peer_saddr, 0x0, sizeof(struct sockaddr_in));
-//	
-////在同個NAT 底下
-//    if(self_public_ip == level_info_ptr->public_ip){
-//	    peer_saddr.sin_addr.s_addr = level_info_ptr->private_ip;
-//		ip.s_addr = level_info_ptr->private_ip;
-//		printf("connect to private_ip %s port= %d \n" ,inet_ntoa (ip),level_info_ptr->tcp_port );
-//		_log_ptr->write_log_format("s =>u s u s s s u\n", __FUNCTION__,__LINE__,"connect to PID ",level_info_ptr ->pid,"private_ip",inet_ntoa (ip),"port= ",level_info_ptr->tcp_port );
-//
-//
-//	}else{
-//        peer_saddr.sin_addr.s_addr = level_info_ptr->public_ip;
-//		ip.s_addr = level_info_ptr->public_ip;
-////		selfip.s_addr = self_public_ip ;
-//		printf("connect to public %s  port= %d \n", inet_ntoa(ip),level_info_ptr->tcp_port);	
-//		_log_ptr->write_log_format("s =>u s u s s s u\n", __FUNCTION__,__LINE__,"connect to PID ",level_info_ptr ->pid,"public_ip",inet_ntoa (ip),"port= ",level_info_ptr->tcp_port );
-//
-//	}
-//
-//	peer_saddr.sin_port = htons(level_info_ptr->tcp_port);
-//	peer_saddr.sin_family = AF_INET;
-//
-//	ip.s_addr = level_info_ptr->public_ip;
-////	printf("connect to %s  port= %d \n", inet_ntoa(ip),level_info_ptr->tcp_port);	
-//	
-//	if(connect(_sock, (struct sockaddr*)&peer_saddr, sizeof(peer_saddr)) < 0) {
-//		cout << "build_ connection failure" << endl;
-//
-////		PAUSE
-//#ifdef _WIN32
-//		::closesocket(_sock);
-//		::WSACleanup();
-//		data_close(_sock,"peer_mgr::build_connection") ;
-//#else
-//		::close(_sock);
-//#endif
-//		return 0;
-//	} else {
-//#ifdef _WIN32
-//		u_long iMode = 0;
-//		ioctlsocket(_sock, FIONBIO, &iMode);
-//#endif
-//
-//		ret = peer_ptr->handle_connect_request(_sock, level_info_ptr, pid);
-//
-//		if(ret < 0) {
-//			cout << "handle_connect_request error!!!" << endl;
-//			return 0;
-//		} else {
-//			cout << "_sock = " << _sock << endl;
-////			_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"new socket =",_sock );
-//
-//			_net_ptr->set_nonblocking(_sock);
-//			_net_ptr->epoll_control(_sock, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT);	
-//			_net_ptr->set_fd_bcptr_map(_sock, dynamic_cast<basic_class *>(peer_ptr));
-//			fd_list_ptr->push_back(_sock);
-//			return 1;
-//		}
-//	}
-//	
-
 }
 
 
 //只用來接收 CHNK_CMD_PEER_CON的資訊  並把fd 加入監聽
 int peer_mgr::handle_pkt_in(int sock)
 {
-	/*int recv_byte;	
-	int expect_len;
-	int offset = 0;
-	unsigned long buf_len;
-	struct chunk_t *chunk_ptr = NULL;
-	struct chunk_header_t *chunk_header_ptr = NULL;
-	struct chunk_request_msg_t *chunk_request_ptr = NULL;
-	
-	socklen_t sin_len = sizeof(struct sockaddr_in);
-
-	int new_fd = _net_ptr->accept(sock, (struct sockaddr *)&_cin, &sin_len);
-
-	if(new_fd < 0) {
-		return RET_SOCK_ERROR;
-	} else {
-
-		_net_ptr->set_nonblocking(new_fd);
-		cout << "new_fd = " << new_fd << endl;   
-		//PAUSE
-	}
-	
-	chunk_header_ptr = new struct chunk_header_t;
-	
-	memset(chunk_header_ptr, 0x0, sizeof(struct chunk_header_t));
-	
-	expect_len = sizeof(struct chunk_header_t) ;
-	
-	while (1) {
-		recv_byte = recv(new_fd, (char *)chunk_header_ptr + offset, expect_len, 0);
-		if (recv_byte < 0) {
-#ifdef _WIN32 
-			if (WSAGetLastError() == WSAEWOULDBLOCK) {
-#else
-			if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-#endif
-				continue;
-			} else {
-				DBG_PRINTF("here\n");
-				//continue;
-				data_close(new_fd, "recv error in peer_mgr::handle_pkt_in");
-				return RET_SOCK_ERROR;
-				//PAUSE
-				//_log_ptr->exit(0, "recv error in peer_mgr::handle_pkt_in");
-			}
-			
-		}
-		else if(recv_byte == 0){
-			printf("sock closed\n");
-			data_close(new_fd, "recv error in peer_mgr::handle_pkt_in");
-				//PAUSE
-			return RET_SOCK_ERROR;
-		}
-		expect_len -= recv_byte;
-		offset += recv_byte;
-		
-		if (!expect_len)
-			break;
-	}
-
-	expect_len = chunk_header_ptr->length;
-	
-	buf_len = sizeof(struct chunk_header_t) + expect_len;
-	cout << "buf_len = " << buf_len << endl;
-
-	chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
-
-	if (!chunk_ptr) {
-		data_close(new_fd, "memory not enough");
-		_log_ptr->exit(0, "memory not enough");
-		return RET_SOCK_ERROR;
-	}
-
-	memset(chunk_ptr, 0x0, buf_len);
-		
-	memcpy(chunk_ptr, chunk_header_ptr, sizeof(struct chunk_header_t));
-
-	if(chunk_header_ptr)
-		delete chunk_header_ptr;
-	
-	while (1) {
-		recv_byte = recv(new_fd, (char *)chunk_ptr + offset, expect_len, 0);
-		if (recv_byte < 0) {
-#ifdef _WIN32 
-			if (WSAGetLastError() == WSAEWOULDBLOCK) {
-#else
-			if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-#endif
-				continue;
-			} else {
-				data_close(new_fd, "recv error in peer_mgr::handle_pkt_in");
-				cout << "haha5" << endl;
-				//PAUSE
-				return RET_SOCK_ERROR;
-				//_log_ptr->exit(0, "recv error in peer_mgr::handle_pkt_in");
-			}
-		}
-		else if(recv_byte == 0){
-			printf("sock closed\n");
-			data_close(sock, "recv error in peer::handle_pkt_in");
-				//PAUSE
-			return RET_SOCK_ERROR;
-		}
-		expect_len -= recv_byte;
-		offset += recv_byte;
-		if (expect_len == 0)
-			break;
-	}
-
-	_net_ptr->set_nonblocking(new_fd);
-	_net_ptr->epoll_control(new_fd, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT);	
-	_net_ptr->set_fd_bcptr_map(new_fd, dynamic_cast<basic_class *>(peer_ptr));
-	fd_list_ptr->push_back(new_fd);
-
-	
-	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_CON) {
-		cout << "CHNK_CMD_PEER_CON" << endl;
-		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_PEER_CON ");
-		peer_ptr->handle_connect(new_fd, chunk_ptr,_cin);
-
-//	}  else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SYN) {
-	//////////////////////////////////////////////////////////////////////////////////measure start delay
-//	printf("CHNK_CMD_PEER_SYN not here peer_mgr\n");
-//	PAUSE
-	//////////////////////////////////////////////////////////////////////////////////
-	//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
-	} else{
-	printf("what this\n");
-	_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"what this at peer mgr ");
-	PAUSE
-	}
-
-	if(chunk_ptr)
-		delete chunk_ptr;*/
+	printf("-----------------peer_mgr::handle_pkt_in--------------------------");
 	
 	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","cannot inside this scope in peer_mgr::handle_pkt_in\n");
+	printf("peer_mgr::pkt_in \n");
 	_logger_client_ptr->log_exit();
 	return RET_OK;
 }
@@ -369,7 +112,6 @@ void peer_mgr::handle_job_realtime()
 {
 
 }
-
 
 void peer_mgr::handle_job_timer()
 {
@@ -432,14 +174,10 @@ void peer_mgr::clear_ouput_buffer(unsigned long pid)
 	} 
 }
 
-
-
 void peer_mgr::set_up_public_ip(unsigned long public_ip)
 {
-    if(self_public_ip == 0){
-
-			    self_public_ip = public_ip;
-
+    if (self_public_ip == 0) {
+		self_public_ip = public_ip;
     }
 }
 
@@ -459,7 +197,7 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 
 	fd_queue_iter = peer_ptr->map_fd_out_ctrl.find(sock);
 	if(fd_queue_iter !=  peer_ptr ->map_fd_out_ctrl.end()){
-	queue_out_ctrl_ptr =fd_queue_iter ->second;
+		queue_out_ctrl_ptr =fd_queue_iter ->second;
 	}else{
 		printf("fd not here\n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd not here");
@@ -552,6 +290,11 @@ int peer_mgr::handle_test_delay(unsigned long manifest)
 			list_num++;
 			list_member.push_back(pid);
 
+			//testing in PC room avoid connect to self
+			if(pid_peer_info_iter->second->public_ip == self_public_ip && pid_peer_info_iter->second->private_ip == _net_ptr->getLocalIpv4()){
+				continue;
+			}
+
 			map_pid_fd_iter = peer_ptr ->map_in_pid_fd.find(pid);
 			if(map_pid_fd_iter != peer_ptr ->map_in_pid_fd.end() ){
 				sock =peer_ptr ->map_in_pid_fd [pid] ;
@@ -628,8 +371,6 @@ int peer_mgr::handle_test_delay(unsigned long manifest)
 
 }
 
-
-
 void peer_mgr::send_manifest_to_parent(unsigned long manifestValue,unsigned long parentPid )
 {
 
@@ -684,7 +425,8 @@ void peer_mgr::send_manifest_to_parent(unsigned long manifestValue,unsigned long
 //	}
 
 	queue_out_ctrl_ptr->push((struct chunk_t *)chunk_manifestSetPtr);
-
+	_log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"push into queue_out_ctrl, queue_out_ctrl_ptr->size() =", queue_out_ctrl_ptr->size());
+	
 	if(queue_out_ctrl_ptr->size() != 0 ) {
 		_net_ptr->epoll_control(fd_queue_iter->first, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
 	} 

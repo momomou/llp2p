@@ -1,22 +1,27 @@
 //#ifndef _FIRE_BREATH_MOD_
 //#define _FIRE_BREATH_MOD_ 
 //#endif
-
+#ifndef DEBUG
+#define DEBUG 
+#endif
 
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
 #define FD_SETSIZE		2048
 ////resuce PARAMETER////
-#define PARAMETER_X		10
+#define PARAMETER_X		4	// chunk packets per (1000/PARAMETER_X) ms
 #define PK_PID			999999
+#define STUNT_PID		999998
 #define BIG_CHUNK	8192
+
+// LOG SERVER
 #define LOGPORT		8754
 #define LOGIP		"140.114.90.154"
 //ms
-#define CONNECT_TIME_OUT 4000
-#define NETWORK_TIMEOUT  5000
-#define BASE_RESYN_TIME		 20000
+#define CONNECT_TIME_OUT	4000
+#define NETWORK_TIMEOUT		5000		// Period of check peer's unnormal disconnection
+#define BASE_RESYN_TIME		20000
 
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
 #define PARAMETER_M		8
@@ -27,12 +32,12 @@
 // BUFF_SIZE sec
 #define BUFF_SIZE		2
 //CHUNK_LOSE sec, mean lose about CHUNK_LOSE sec packet
-#define CHUNK_LOSE		2
+#define CHUNK_LOSE		1	//
 
-//source delay PARAMETER
+//source delay PARAMETER ms
 #define MAX_DELAY 1500
 //SOURCE_DELAY_CONTINUOUS sec, mean  about SOURCE_DELAY_CONTINUOUS sec packet all dalay out of bound
-#define SOURCE_DELAY_CONTINUOUS 1
+#define SOURCE_DELAY_CONTINUOUS 0.5
 
 //io_accept fd remain period
 #define FD_REMAIN_PERIOD	1000
@@ -201,7 +206,18 @@ using std::bitset;
 
 #pragma pack(1)
 
-#define PAUSE cout << "PAUSE , Press any key to continue..."; fgetc(stdin);
+// Defined Macro
+#define PAUSE cout << "PAUSE , Press any key to continue..." << __FUNCTION__ << ":" << __LINE__; fgetc(stdin);
+#ifdef DEBUG
+    #define debug_printf(str, ...) do { printf("(%d)\t", __LINE__); printf(str, __VA_ARGS__); } while (0)
+#else
+    #define debug_printf(str, ...)
+#endif
+#ifdef DEBUG2
+    #define debug_printf2(str, ...) do { printf("(%d)\t", __LINE__); printf(str, __VA_ARGS__); } while (0)
+#else
+    #define debug_printf2(str, ...)
+#endif 
 
 #define LOGFILE			"log.txt"
 #define LOGBINARYFILE	"logbinary.txt"
@@ -295,7 +311,8 @@ using std::bitset;
 struct timerStruct{
 	volatile unsigned long clockTime;
 	LARGE_INTEGER tickTime;
-	volatile unsigned initFlag;
+	volatile unsigned initTickFlag;
+	volatile unsigned initClockFlag;
 };
 
 #define TE_RTSP				1
@@ -339,6 +356,30 @@ struct timerStruct{
 #endif
 
 enum RET_VALUE {RET_WRONG_SER_NUM = -3, RET_SOCK_ERROR = -2, RET_ERROR = -1, RET_OK = 0};
+
+// This structure is for NAT Hole Punching
+struct peer_info_t_nat {
+	unsigned long pid;
+	unsigned long level;
+	unsigned long public_ip;
+	unsigned long private_ip;
+	unsigned short tcp_port;
+	unsigned short udp_port;
+//////////NAT////////////
+	unsigned short public_port;
+	unsigned short private_port;
+	unsigned long upnp_acess;	//yes1 no0 
+	unsigned long NAT_type;	//from 1 to 4 (4 cannot punch)
+//////////NAT////////////
+	// My information
+	unsigned long manifest;
+	unsigned long session_id;
+	bool isPuncher;				// If I am puncher, set true; otherwise, false
+	// STUNT-CTRL information
+	unsigned long	ctrl_ip;	// STUNT-CTRL IP
+	unsigned short	ctrl_port;	// STUNT-CTRL port
+//	int rescueStatsArry[PARAMETER_M];
+};
 
 
 //down stream
@@ -552,7 +593,9 @@ struct rescue_pkt_from_server{
 
 
 //////////////////////////////////////////////////
-
+/****************************************************/
+/*		Structures of each P2P header command		*/
+/****************************************************/
 struct chunk_register_reply_t {
 	struct chunk_header_t header;
 	unsigned long pid;
@@ -570,8 +613,6 @@ struct chunk_bandwidth_t {
 	unsigned long bandwidth;
 };
 */
-
-
 
 struct chunk_rescue_reply_t {
 	struct chunk_header_t header;
@@ -650,18 +691,18 @@ typedef struct nonblocking_ctrl{
 	Network_nonblocking_ctl recv_ctl_info;
 } Nonblocking_Ctl;
 
-
- typedef struct nonblocking_buff{
-	struct nonblocking_ctrl nonBlockingRecv;
+// The lowest level header; each fd has one this buff 0807
+typedef struct nonblocking_buff{
+	struct nonblocking_ctrl nonBlockingRecv;		// all received messages are store in here 0807
 	struct nonblocking_ctrl nonBlockingSendData;
 	struct nonblocking_ctrl nonBlockingSendCtrl;
- } Nonblocking_Buff;
+} Nonblocking_Buff;
 
 struct chunk_level_msg_t {
 	struct chunk_header_t header;
 	unsigned long pid;
 	unsigned long manifest;
-	struct level_info_t *level_info[0];	
+	struct level_info_t *level_info[0];		// each peer's Info
 };
 
 struct chunk_cut_peer_info_t {
@@ -718,12 +759,12 @@ struct peer_latency_measure {
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 struct syn_struct{
-	int init_flag; // 0 not init 1 send 2 init complete
-	unsigned long client_abs_start_time;
+	int init_flag; // 0:not init, 1:send, 2:init complete
+	unsigned long client_abs_start_time;	// Synchronized time relative to PK
 	unsigned long start_seq;
 
 	//timer
-	struct timerStruct start_clock;
+	struct timerStruct start_clock;			// The last synchronization time
 //	struct timerStruct end_clock;
 };
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
@@ -735,18 +776,20 @@ struct source_delay {
 	unsigned long end_seq_num;
 	unsigned int end_seq_abs_time;
 	int first_pkt_recv;
-	int rescue_state;	//0 normal 1 rescue trigger 2 testing
-	int delay_beyond_count;
+	int rescue_state;			//0 normal 1 rescue trigger 2 testing
+	int delay_beyond_count;		// Counter++ if delay more than MAX_DELAY
 //	int delay time
 
 };
-//////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
-struct syn_token_send{
+/****************************************************/
+/*		Structures of synchronization				*/
+/****************************************************/
+struct syn_token_send {
 	struct chunk_header_t header;
 	unsigned long reserve;
 };
 
-struct syn_token_receive{
+struct syn_token_receive {
 	struct chunk_header_t header;
 	unsigned long seq_now;
 	unsigned long pk_RecvTime;
@@ -874,19 +917,7 @@ struct nat_con_thread_struct {
 	XconnInfo Xconn;
 };
 
-typedef struct _Msg
-{
-	INT32 nType;
-	union
-	{
-		struct 
-		{
-			CHAR chSrcID[MAX_ID_LEN + 1];		//ID of the source client
-			CHAR chDstID[MAX_ID_LEN + 1];		//ID of the destination client 
-		} Connection;
-		CHAR chID[MAX_ID_LEN + 1];		//ID for deregierster
-	}Data;
-} Msg;
+
 
 /*
 1. LOG_REGISTER: send register info to get register back
@@ -987,14 +1018,14 @@ struct log_data_come_struct{
 
 struct log_start_delay_struct{
 	struct log_header_t log_header;
-	unsigned long start_delay;
+	double start_delay;
 };
 
 struct log_period_source_delay_struct{
 	struct log_header_t log_header;
-	unsigned long max_delay;
+	double max_delay;
 	unsigned long sub_num;
-	unsigned long *av_delay;
+	double *av_delay;
 };
 
 struct log_rescue_sub_stream_struct{
@@ -1037,9 +1068,9 @@ struct log_data_come_pk_struct{
 
 struct log_client_bw_struct{
 	struct log_header_t log_header;
-	unsigned long should_in_bw;
-	unsigned long real_in_bw;
-	unsigned long real_out_bw;
+	double should_in_bw;
+	double real_in_bw;
+	double real_out_bw;
 	double quality;
 };
 
@@ -1052,13 +1083,15 @@ struct log_pkt_lose_struct{
 };
 
 struct log_source_delay_struct{
-	unsigned long delay_now;
-	unsigned long average_delay;
+	unsigned int count;
+	double delay_now;
+	double average_delay;
 };
 
 struct log_in_bw_struct{
 	unsigned long time_stamp;
-	LARGE_INTEGER client_time; 
+//	LARGE_INTEGER client_time; 
+	struct timerStruct client_time; 
 };
 
 struct quality_struct{
@@ -1081,5 +1114,12 @@ struct ioNonBlocking{
 };
 
 
+typedef struct{
+
+	fd_set read_master, read_fds;   // master file descriptor list
+	fd_set write_master, write_fds; // temp file descriptor list for select()
+	fd_set error_master, error_fds; // temp file descriptor list for select()
+
+} EpollVars;
 
 #endif

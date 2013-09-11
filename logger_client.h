@@ -11,7 +11,7 @@ public:
 	1. constructor will init obj
 	2. it will call the timer init.
 	*/
-	logger_client();
+	logger_client(logger *log_ptr);
 	~logger_client();
 
 	/*
@@ -28,9 +28,10 @@ public:
 	void set_self_pid_channel(unsigned long pid,unsigned long channel_id);
 	void set_net_obj(network *net_ptr);
 	void set_pk_mgr_obj(pk_mgr *pk_mgr_ptr);
+	void set_prep_obj(configuration *prep);
 
-	void logger_client_getTickTime(LARGE_INTEGER *tickTime);
-	unsigned int logger_client_diffTime_ms(LARGE_INTEGER startTime,LARGE_INTEGER endTime);
+//	void logger_client_getTickTime(LARGE_INTEGER *tickTime);
+//	unsigned int logger_client_diffTime_ms(LARGE_INTEGER startTime,LARGE_INTEGER endTime);
 
 	/*
 	init the log timer
@@ -132,19 +133,26 @@ public:
 
 	network *_net_ptr;
 	pk_mgr *_pk_mgr_ptr;
-	LARGE_INTEGER log_start_time,log_record_time;
+	configuration *_prep;
+	logger *_log_ptr;
+
+//	LARGE_INTEGER log_start_time,log_record_time;
+	struct timerStruct log_start_time,log_record_time;
 	unsigned long log_time_dffer;
 	unsigned long previous_time_differ;
-	unsigned long start_delay;
-	LARGE_INTEGER log_period_source_delay_start;
+	double start_delay;
+//	LARGE_INTEGER log_period_source_delay_start;
+	struct timerStruct log_period_source_delay_start;
 	struct log_source_delay_struct *max_source_delay;
-	unsigned long *delay_list;
+	double *delay_list;
 	unsigned long sub_stream_number;
 	int log_source_delay_init_flag;
 
 	struct log_in_bw_struct start_in_bw_record,end_in_bw_record;
-	LARGE_INTEGER start_out_bw_record,end_out_bw_record;
-	LARGE_INTEGER log_period_bw_start;
+//	LARGE_INTEGER start_out_bw_record,end_out_bw_record;
+//	LARGE_INTEGER log_period_bw_start;
+	struct timerStruct start_out_bw_record,end_out_bw_record;
+	struct timerStruct log_period_bw_start;
 	unsigned long in_recv_len;
 	unsigned long out_send_len;
 	unsigned long pre_in_pkt_size;

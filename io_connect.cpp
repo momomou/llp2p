@@ -80,7 +80,7 @@ int io_connect::handle_pkt_out(int sock)
 			}
 
 			Nonblocking_Ctl * Nonblocking_Send_Ctrl_ptr =NULL;
-			Nonblocking_Send_Ctrl_ptr =&( map_fd_NonBlockIO_iter->second->io_nonblockBuff.nonBlockingSendCtrl );
+			Nonblocking_Send_Ctrl_ptr = &(map_fd_NonBlockIO_iter->second->io_nonblockBuff.nonBlockingSendCtrl);
 			int _send_byte =0 ;
 
 			if(Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY ){

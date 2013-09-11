@@ -20,6 +20,7 @@ typedef enum
 */
 #define MAX_PRINT_LEN	2048
 #define _DEBUG 1
+#define NONINIT 0
 #define INITED 1
 
 
@@ -47,7 +48,7 @@ public:
 	void LogHex(int level, const char *data, unsigned long len);
 	void LogHexString(int level, const char *data, unsigned long len);
 
-	void getTickTime(LARGE_INTEGER *tickTime);
+	int getTickTime(LARGE_INTEGER *tickTime);
 	LONGLONG diffTime_us(LARGE_INTEGER startTime,LARGE_INTEGER endTime);
 	unsigned int diffTime_ms(LARGE_INTEGER startTime,LARGE_INTEGER endTime);
 	

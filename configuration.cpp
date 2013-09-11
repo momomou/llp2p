@@ -50,11 +50,13 @@ configuration::configuration(string file) : filename(file), tmp_only(false)
 		map_table["lane_depth"] = "3";
 		map_table["max_lane"] = "8";
 		map_table["min_lane"] = "1";
-		map_table["pk_ip"] = "140.114.90.146";
+		map_table["pk_ip"] = "140.114.90.154";
 		map_table["pk_port"] = "6656";
+		map_table["log_ip"] = "140.114.90.154";
+		map_table["log_port"] = "8755";
 		map_table["stream_local_port"] = "3000";
 		map_table["sub_stream_num"] = "4";
-		map_table["svc_tcp_port"] = "5566";
+		map_table["svc_tcp_port"] = "3457";
 		map_table["svc_udp_port"] = "7788";
 #ifdef _FIRE_BREATH_MOD_
 #else

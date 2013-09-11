@@ -45,7 +45,7 @@
 /************************************************************************************************************************/
 /*			Internally Macro Definition																							*/
 /************************************************************************************************************************/
-#include "ClientMacro.h"
+//#include "ClientMacro.h"
 /************************************************************************************************************************/
 /*			Internal Type Definition: Defined in Client.h																								*/
 /************************************************************************************************************************/
@@ -108,12 +108,13 @@ INT32 XInit(const char* pchIP1, const char* pchIP2, SOCKET* psServerLog, CHAR* p
 	/////////////////////////////////////////////////////////////
 
 	//Set server IP address
-	if (pchIP1 != NULL && pchIP2 != NULL)
-	{
+	if (pchIP1 != NULL && pchIP2 != NULL) {
 		sprintf(g_szServerIP1,"%s", pchIP1);
 		sprintf(g_szServerIP2,"%s", pchIP2);
 	}
 
+	printf("[XInit] 000 \n");
+	
 	//The WSAStartup function initiates use of WS2_32.DLL by a process
 #ifdef _WIN32
 	WSAStartup(MAKEWORD(2,2), &Wsadata);
@@ -133,6 +134,8 @@ INT32 XInit(const char* pchIP1, const char* pchIP2, SOCKET* psServerLog, CHAR* p
 	//receive the client build version from server
 	log_on_read_error(*psServerLog, (char*)&nClientVersion, sizeof(nClientVersion), "Receiving required version", LAB_ERR_RECEIVE);
 
+	printf("[XInit] 111 \n");
+	
 	if (ntohl(nClientVersion) != BUILD_VER) 
 	{
 		close2(*psServerLog);
@@ -152,16 +155,23 @@ INT32 XInit(const char* pchIP1, const char* pchIP2, SOCKET* psServerLog, CHAR* p
 		g_Fingerprint.nDone = false;
 	}
 
+	printf("[XInit] 222 \n");
+	
 	//if the finger print is not done, then get the fingerprint
 	if (!g_Fingerprint.nDone) 
 	{
+		printf("[XInit] !g_Fingerprint.nDone \n");
 		memset(&g_Fingerprint, 0, sizeof(g_Fingerprint));
 		g_Fingerprint.nServerVer = g_nServerVersion;
 		g_Fingerprint.nGAddr = g_nClientIP;
 		g_Fingerprint.nClientVer = BUILD_VER;
-
+		
+		printf("[XInit] g_ServerInfo.nIP1: %s \n", inet_ntoa(*(struct in_addr *)&g_ServerInfo.nIP1));
+		printf("[XInit] g_ServerInfo.nIP2: %s \n", inet_ntoa(*(struct in_addr *)&g_ServerInfo.nIP2));
 		log_on_write_error(*psServerLog,  (char*)g_chClientID, sizeof(g_chClientID), "sending client ID", LAB_ERR_SEND);
 		log_on_read_error(*psServerLog, (char*)&g_ServerInfo, sizeof(g_ServerInfo), "Receiving server config", LAB_ERR_RECEIVE);
+		printf("[XInit] g_ServerInfo.nIP1: %s \n", inet_ntoa(*(struct in_addr *)&g_ServerInfo.nIP1));
+		printf("[XInit] g_ServerInfo.nIP2: %s \n", inet_ntoa(*(struct in_addr *)&g_ServerInfo.nIP2));
 		if (strlen(g_ServerInfo.chID) == 0)
 		{
 			close2(*psServerLog);
@@ -176,7 +186,9 @@ INT32 XInit(const char* pchIP1, const char* pchIP2, SOCKET* psServerLog, CHAR* p
 
 		strcpy(g_chClientID, g_ServerInfo.chID);
 		strcpy(g_Fingerprint.chID, g_chClientID);
+		printf("[XInit()] 2220 \n");
 	 	nRetVal = XProbe(*psServerLog);
+		printf("[XInit()] 2221 \n");
 		close2(*psServerLog);
 		if (nRetVal == -1) 
 		{
@@ -187,7 +199,8 @@ INT32 XInit(const char* pchIP1, const char* pchIP2, SOCKET* psServerLog, CHAR* p
 		log_on_read_error(*psServerLog, (char*)&nClientVersion, sizeof(nClientVersion), "Receiving required version", LAB_ERR_RECEIVE);
 		log_on_read_error(*psServerLog, (char*)&nServerVersion, sizeof(nServerVersion), "Receiving server version", LAB_ERR_RECEIVE);
 		log_on_read_error(*psServerLog, (char*)&g_nClientIP, sizeof(g_nClientIP), "Receiving client IP", LAB_ERR_RECEIVE);
-	} 
+	}
+	printf("[XInit()] 333 \n");
 	printf("02  g_ServerInfo.chID: %s \n", g_ServerInfo.chID);
 	
 	log_on_write_error(*psServerLog,  (char*)g_chClientID, sizeof(g_chClientID), "sending client ID", LAB_ERR_SEND);
@@ -924,6 +937,7 @@ LAB_ERR_ACCEPT:
  ***********************************************************************/
 INT32 XPredict(SOCKET sServerLog, SOCKET *psAux, struct sockaddr_in *pAddrGlobal, struct sockaddr_in *pAddrLocal) 
 {
+	printf("[XPredict] *** \n");
     SOCKET sEcho = (SOCKET) -1;
     INT32 nOne = 1;
 #ifdef _WIN32    
@@ -1010,6 +1024,7 @@ LAB_ERR:
  ***********************************************************************/
 INT32 XTryConnect(SOCKET sServerLog, SOCKET sAuxServer, struct sockaddr *pAddrPeer, INT32 nAddrPeerLen, INT32 nMiliSec) 
 {
+	printf("[XTryConnect] *** \n");
 	struct sockaddr_in AnyAddr;
     INT32 nRetVal = 0;
 #ifdef _WIN32
@@ -1118,6 +1133,7 @@ INT32 XProbe(SOCKET sServerLog)
 #ifdef _WIN32
     ZeroMemory(&OSVer, sizeof(OSVERSIONINFOEX));
     OSVer.dwOSVersionInfoSize = sizeof (OSVERSIONINFOEX);
+	printf("[XProbe] 000 \n");
     if( !GetVersionEx((OSVERSIONINFO *)&OSVer)) 
 	{
         OSVer.dwOSVersionInfoSize = sizeof (OSVERSIONINFO);
@@ -1131,6 +1147,7 @@ INT32 XProbe(SOCKET sServerLog)
 			OSVer.wServicePackMinor = 0;
         }
     }
+	printf("[XProbe] 111 \n");
     _snprintf(chBuf, 128, "START %s: WIN32 %d.%d.%d.%d.%d, %s", 
         g_chClientID,
 		OSVer.dwPlatformId,
@@ -1144,35 +1161,21 @@ INT32 XProbe(SOCKET sServerLog)
 #endif
 
     log1(sServerLog, "%s", chBuf);
-	/*
-	do {                                                                                    
-		struct timeb __log_buft;                                                            
-		char __log_buf[2048] = {0};   
-		ftime(&__log_buft);
-		printf("%03d \n", __log_buft.millitm);
-		char aaa[2048]={0};
-		char bbb[2048]={0};
-		sprintf(aaa, "%8d . %8d", 123, 4567);
-		_snprintf(bbb, 2048, "%lld.%u", __log_buft.time, __log_buft.millitm);
-
-		_snprintf(__log_buf, 2048, "%lld.%03d:%s:%d:%s \n", __log_buft.time, __log_buft.millitm, "client.c", __LINE__, (chBuf));
-		printf("123 \n");
-		write2((sServerLog), __log_buf, (INT32) strlen(__log_buf));
-		if (TEST_DEBUG && g_pDbgFile != NULL) fprintf(g_pDbgFile, "LOGGED: %s", __log_buf);
-	} while(false);
-	*/
-
+	printf("[XProbe] 222 \n");
     if (XProbeNAT(sServerLog) == ERR_FAIL) 
 	{
+		printf("[XProbe] XProbeNAT failed \n");
         nErr = ERR_FAIL;
     }
 	else
 	{
+		printf("[XProbe] 2220 \n");
 		g_Fingerprint.nServerVer = g_nServerVersion;
 		g_Fingerprint.nClientVer = BUILD_VER;
 		strcpy(g_Fingerprint.chID, g_chClientID);
 		g_Fingerprint.nDone = true;
 		XGenFingerprint(chPrint,MAX_FINGERPRINT_LEN);
+		printf("Fingerprint: %s \n", chPrint);
 		log1(sServerLog, "FINGERPRINT: %s", chPrint);
 		g_Fingerprint.nGAddr = g_nClientIP;		
 		if (XWriteFingerprint(sServerLog) == ERR_FAIL) 
@@ -1180,7 +1183,7 @@ INT32 XProbe(SOCKET sServerLog)
 		else
 			nErr = ERR_NONE;
 	}
-
+	printf("[XProbe] 333 \n");
 	if (nErr == ERR_FAIL) 
 	{
 		g_Fingerprint.nDone = false;
@@ -1200,10 +1203,11 @@ INT32 XProbe(SOCKET sServerLog)
 INT32 XProbeNAT(SOCKET sServerLog) 
  {
      INT32 nRetry = 0;
-
+	printf("[XProbeNAT] 000 \n");
      if (XCheckConeTCP(sServerLog) == ERR_FAIL) 
 	 { 
-		 nRetry++; 
+		 nRetry++;
+		printf("[XProbeNAT] nRetry: %d \n", nRetry);
 #ifdef _WIN32
 		 Sleep(PROBE_FAIL_SLEEP_SEC * 1000); 
 #else
@@ -1249,13 +1253,15 @@ INT32 XCheckConeTCP(SOCKET sServerLog)
 	AddrLocal.sin_port = 0;
 
 	//Bind 1 valid port and try to detect NAT characteristics.
-    for(i = 0; i < 4; i++)
+    for(i = 0; i < 2; i++)
 	{
+		printf("[XCheckConeTCP] i: %d \n", i);
         log_on_error(sEcho = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP), "Creating echo socket", LAB_DONE);
         log_on_error(setsockopt(sEcho,SOL_SOCKET,SO_REUSEADDR,(char *)&nOne,sizeof(nOne)), "Setting SO_REUSEADDR", LAB_DONE);
-
+		printf("[XCheckConeTCP] 111 \n");
 LAB_TRY_BIND:
-        if (AddrLocal.sin_port == 0) 
+        printf("[XCheckConeTCP] 222 \n");
+		if (AddrLocal.sin_port == 0) 
 		{
             AddrLocal.sin_port = htons(uwTryBindPort);
             uwTryBindPort++;
@@ -1264,10 +1270,12 @@ LAB_TRY_BIND:
         goto LAB_SOCK_READY;
 
 LAB_BIND_ERR:
+		printf("[XCheckConeTCP] 333 \n");
         AddrLocal.sin_port = 0;
         goto LAB_TRY_BIND;
 
 LAB_SOCK_READY:
+		printf("[XCheckConeTCP] 444 \n");
         uwPortLocal[i] = ntohs(AddrLocal.sin_port);
 		XCheckConeTCPProbe(sServerLog, sEcho, i, &unAddrGlobal[i], &uwPortGlobal[i]);
 #ifdef _WIN32
@@ -1300,6 +1308,7 @@ LAB_DONE:
  ***********************************************************************/
 void XCheckConeTCPProbe(SOCKET sServerLog, SOCKET sEcho, INT32 nSeq, UINT32 *punResAddr, UINT16 *puwResPort) 
 {
+	printf("[XCheckConeTCPProbe] *** \n");
     struct sockaddr_in AddrEcho;
     struct sockaddr_in AddrLocal;
 #ifdef _WIN32
@@ -1325,6 +1334,11 @@ void XCheckConeTCPProbe(SOCKET sServerLog, SOCKET sEcho, INT32 nSeq, UINT32 *pun
 				IPPORT(AddrLocal.sin_addr.s_addr, AddrLocal.sin_port),
 				IPPORT(AddrEcho.sin_addr.s_addr, AddrEcho.sin_port)
 			 );
+	printf("[XCheckConeTCPProbe] Sending TCP probe %d: %d.%d.%d.%d:%d => %d.%d.%d.%d:%d \n",
+				nSeq + 1,
+				IPPORT(AddrLocal.sin_addr.s_addr, AddrLocal.sin_port),
+				IPPORT(AddrEcho.sin_addr.s_addr, AddrEcho.sin_port)
+			 );
 #else
 	snprintf(chBuf, 256, "Sending TCP probe %d: %d.%d.%d.%d:%d => %d.%d.%d.%d:%d",
 				nSeq + 1,
@@ -1332,8 +1346,11 @@ void XCheckConeTCPProbe(SOCKET sServerLog, SOCKET sEcho, INT32 nSeq, UINT32 *pun
 				IPPORT(AddrEcho.sin_addr.s_addr, AddrEcho.sin_port)
 			);
 #endif
+	printf("[XCheckConeTCPProbe] 111 \n");
 	log_on_error(connect(sEcho, (struct sockaddr *)&AddrEcho, sizeof(AddrEcho)), chBuf, LAB_DONE);
-    log_on_read_error(sEcho, &Rep, sizeof(Rep), "Reading server response", LAB_DONE);
+    printf("[XCheckConeTCPProbe] 222 \n");
+	log_on_read_error(sEcho, &Rep, sizeof(Rep), "Reading server response", LAB_DONE);
+	printf("[XCheckConeTCPProbe] 333 \n");
 #ifdef _WIN32
 	_snprintf(chBuf, 256, "PROBE TCP %d: %d.%d.%d.%d:%d (%d.%d.%d.%d:%d) => %d.%d.%d.%d:%d",
 				nSeq,

@@ -43,6 +43,8 @@ private:
 	int _send_byte;
 	int _expect_len;
 	int _offset;
+	int firstRecvReqSreamID;
+
 
 	FILE *file_ptr;
 	FILE *file_ptr_test;

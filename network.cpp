@@ -71,6 +71,9 @@ unsigned long network::getLocalIpv4()
 		switch(AI->ai_family) {
 			case AF_INET:
 				ip = ((struct sockaddr_in *)AI->ai_addr)->sin_addr.s_addr;
+				struct in_addr localIP;
+				memcpy(&localIP, &ip, sizeof(struct in_addr));
+				cout << "network::getLocalIpv4 ip:" << inet_ntoa(localIP) << "\n";
 				return ip; // 找到，提早返回 
 		}
 	}
@@ -121,7 +124,11 @@ void network::fd_del_hdl_map_delete(int sock)
 
 void network::epoll_creater(void) 
 {
+#ifdef _FIRE_BREATH_MOD_
+	epfd = epoll_create(MAXFDS, &epollVar);
+#else
 	epfd = epoll_create(MAXFDS);
+#endif
 }
 
 #ifdef _WIN32
@@ -130,7 +137,13 @@ void network::epoll_waiter(int timeout, list<int> *fd_list)
 	int cfd;
 	basic_class *bc_ptr;
 
+#ifdef _FIRE_BREATH_MOD_
+	nfds = epoll_wait(epfd, events, EVENTSIZE, timeout, fd_list, &epollVar);
+#else
 	nfds = epoll_wait(epfd, events, EVENTSIZE, timeout, fd_list);
+#endif
+
+	
 	if(nfds == -1){
         //printf("epoll_wait failed\n");
 		if(_error_cfd ->size() == 0 ){ return ;}
@@ -165,19 +178,28 @@ void network::epoll_dispatcher(void)
 		if (_map_fd_bc_tbl_iter != _map_fd_bc_tbl.end()) {
 			//DBG_PRINTF("here\n");
 			bc_ptr = _map_fd_bc_tbl_iter->second;
-
+			
+			//printf("nfds: %d, i: %d ", nfds, i);
+			struct sockaddr_in addr;
+			int addrLen=sizeof(struct sockaddr_in),
+				aa;
+			//aa=getsockname(cfd, (struct sockaddr *)&addr, &addrLen);
+			//printf("  aa:%2d  cfd: %2d , SrcAddr: %s:%d \n", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+			aa=getpeername(cfd, (struct sockaddr *)&addr, &addrLen);
+			//printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d  ", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+			
 			if (events[i].events & (EPOLLRDHUP | EPOLLERR)) {
 				//printf("%d sock error\n",cfd);
 				// EPOLLRDHUP => This socket is closed by client (client has sent a FIN), we have to close it.
 				cout << "something wrong: fd = " << cfd << " error:"<<WSAGetLastError()<< endl;
 				//PAUSE
 				_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
-				_peer_ptr->data_close(cfd, "This socket is closed by client (client has sent a FIN)",DONT_CARE);
 				continue;
 			}
 			
-			if(events[i].events & EPOLLIN)
-				//printf("%d sock in\n",cfd);
+			if(events[i].events & EPOLLIN) {
+				//printf("%d sock in  ",cfd);
+				//printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d  \n", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 				if (bc_ptr->handle_pkt_in(cfd) == RET_SOCK_ERROR) {		// readable
                     printf("%s,handle in sock error\n",__FUNCTION__);
 					if(_map_fd_bc_tbl.find(cfd) != _map_fd_bc_tbl.end()){
@@ -185,9 +207,10 @@ void network::epoll_dispatcher(void)
 					}
 					close(cfd);
                 }
-
-			if(events[i].events & EPOLLOUT)
-				//printf("%d sock out\n",cfd);
+			}
+			if(events[i].events & EPOLLOUT) {
+				//printf("%d sock out  ",cfd);
+				//printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d  \n", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 				if (bc_ptr->handle_pkt_out(cfd) == RET_SOCK_ERROR) {		// writable
 					printf("%s,handle out sock error\n",__FUNCTION__);
 					if(_map_fd_bc_tbl.find(cfd) != _map_fd_bc_tbl.end()){
@@ -195,11 +218,11 @@ void network::epoll_dispatcher(void)
 					}
 					close(cfd);
 				}
-
-			if(events[i].events & ~(EPOLLIN | EPOLLOUT))
+			}
+			if(events[i].events & ~(EPOLLIN | EPOLLOUT)) {
 				//printf("%d error\n",cfd);
 				bc_ptr->handle_pkt_error(cfd);		// error
-
+			}
 		} else {
 			// can't fd in map table?
 		}
@@ -214,8 +237,16 @@ void network::epoll_control(int sock, int op, unsigned int event)
 	set_nonblocking(sock);
 	ev.data.fd = sock;
 	ev.events = event | EPOLLRDHUP | EPOLLERR;			// We forece to monitor EPOLLRDHUP and EPOLLERR event.
+	
+#ifdef _FIRE_BREATH_MOD_
+	epoll_ctl(epfd, op, sock, &ev, &epollVar);
+	ret = epoll_ctl(epfd, op, sock, &ev, &epollVar);
+#else
 	epoll_ctl(epfd, op, sock, &ev);
 	ret = epoll_ctl(epfd, op, sock, &ev);
+#endif
+
+	
 	if(ret == -1) {
 		printf("!!!epoll_ctl failed with sock:%d, errno:%d\n",sock, errno);
 		//perror("failed with error");
@@ -331,7 +362,7 @@ void network::peer_set(peer *peer_ptr)
 int network::close(int sock) 
 {
 //	DBG_PRINTF("here\n");
-
+	
 	_map_fd_bc_tbl_iter = _map_fd_bc_tbl.find(sock);
 	
 	if (_map_fd_bc_tbl_iter == _map_fd_bc_tbl.end()) {
@@ -343,7 +374,7 @@ int network::close(int sock)
 		//PAUSE
 	}
 	
-	cout << "sock close fd_size = " << _map_fd_bc_tbl.size() << endl;
+	debug_printf("close socket %d, now _map_fd_bc_tbl.size() = %d \n", sock, _map_fd_bc_tbl.size());
 	epoll_control(sock, EPOLL_CTL_DEL, 0);
 //	cout << "sock close fd_size = " << _map_fd_bc_tbl.size() << endl;
 	
@@ -366,47 +397,51 @@ int network::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 
 //	LARGE_INTEGER teststart,testend;
 
-
 	recv_rt_val = recv(sock, send_info->recv_ctl_info.buffer + send_info->recv_ctl_info.offset, send_info->recv_ctl_info.expect_len, 0);
 
-
-
 	if (recv_rt_val < 0) {
-
-
-#ifdef _WIN32 
-			if (WSAGetLastError() == WSAEWOULDBLOCK) {
-#else
-			if (errno == EINTR || errno == EAGAIN) {
-#endif		
-
+		#ifdef _WIN32 
+		int socket_error = WSAGetLastError();
+		if (socket_error == WSAEWOULDBLOCK) {
+		#else
+		if (errno == EINTR || errno == EAGAIN) {
+		#endif		
 			if(send_info ->recv_packet_state == READ_HEADER_READY){
 				send_info ->recv_packet_state = READ_HEADER_RUNNING;
-//printf("READ_HEADER_RUNNING\n");
+				//printf("READ_HEADER_RUNNING\n");
 			}else if(send_info ->recv_packet_state == READ_HEADER_RUNNING){
-//printf("READ_HEADER_RUNNING\n");
+				//printf("READ_HEADER_RUNNING\n");
 				//also RUNNING
 			}else if(send_info ->recv_packet_state == READ_HEADER_OK){
 				printf("READ_HEADER_OK");
 				PAUSE
 			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_READY){
 				send_info ->recv_packet_state = READ_PAYLOAD_RUNNING;
-//printf("READ_PAYLOAD_RUNNING\n");
+				//printf("READ_PAYLOAD_RUNNING\n");
 			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_RUNNING){
-//printf("READ_PAYLOAD_RUNNING\n");
+				//printf("READ_PAYLOAD_RUNNING\n");
 				//also RUNNING
 			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_OK){
 				printf("READ_PAYLOAD_OK");
 				PAUSE
 			}
 
-//			send_info->recv_ctl_info.ctl_state = RUNNING;
+			//send_info->recv_ctl_info.ctl_state = RUNNING;
 			return RET_OK;
 		} else {
+			#ifdef _WIN32 
+			debug_printf("WSAGetLastError() = %d \n", socket_error);
+			#else
+			#endif
 			return RET_SOCK_ERROR;
 		}
 	} else if (recv_rt_val == 0) {
 		cout << "recv 0 byte from sock: " << sock << ", expect len = " << send_info->recv_ctl_info.expect_len << endl;
+		#ifdef _WIN32 
+		int socket_error = WSAGetLastError();
+		debug_printf("WSAGetLastError() = %d \n", socket_error);
+		#else
+		#endif
 		if (send_info->recv_ctl_info.expect_len == 0) {
 
 			if(send_info ->recv_packet_state == READ_HEADER_READY){
@@ -414,7 +449,7 @@ int network::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 				PAUSE
 			}else if(send_info ->recv_packet_state == READ_HEADER_RUNNING){
 				send_info ->recv_packet_state = READ_HEADER_OK ;
-//printf("READ_HEADER_OK\n");
+				//printf("READ_HEADER_OK\n");
 
 			}else if(send_info ->recv_packet_state == READ_HEADER_OK){
 				printf("READ_HEADER_OK");
@@ -424,98 +459,91 @@ int network::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 				PAUSE
 			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_RUNNING){
 				send_info ->recv_packet_state = READ_PAYLOAD_OK ;
-//printf("READ_PAYLOAD_OK\n");
+				//printf("READ_PAYLOAD_OK\n");
 			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_OK){
 				printf("READ_PAYLOAD_OK");
 				PAUSE
 			}
 
-//			send_info->recv_ctl_info.ctl_state = READY;
+			//send_info->recv_ctl_info.ctl_state = READY;
 			return RET_OK;
 		} else {
 
 			if(send_info ->recv_packet_state == READ_HEADER_READY){
 				send_info ->recv_packet_state = READ_HEADER_RUNNING;
-//printf("READ_HEADER_RUNNING\n");
+				//printf("READ_HEADER_RUNNING\n");
 			}else if(send_info ->recv_packet_state == READ_HEADER_RUNNING){
 				//also RUNNING
-//printf("READ_HEADER_RUNNING\n");
+				//printf("READ_HEADER_RUNNING\n");
 			}else if(send_info ->recv_packet_state == READ_HEADER_OK){
 				printf("READ_HEADER_OK");
 				PAUSE
 			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_READY){
 				send_info ->recv_packet_state = READ_PAYLOAD_RUNNING;
-//printf("READ_PAYLOAD_RUNNING\n");
+				//printf("READ_PAYLOAD_RUNNING\n");
 			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_RUNNING){
 				//also RUNNING
-//printf("READ_PAYLOAD_RUNNING\n");
+				//printf("READ_PAYLOAD_RUNNING\n");
 			}else if(send_info ->recv_packet_state ==READ_PAYLOAD_OK){
 				printf("READ_PAYLOAD_OK");
 				PAUSE
 			}
 
-//			send_info->recv_ctl_info.ctl_state = RUNNING;
-//here maybe a sock error
+			//send_info->recv_ctl_info.ctl_state = RUNNING;
+			//here maybe a sock error
 			return RET_SOCK_ERROR;
-//			return RET_OK;
-
+			//return RET_OK;
 		}
-
 	}else if (recv_rt_val == send_info->recv_ctl_info.expect_len) {
 
-//			QueryPerformanceCounter(&teststart);
+		//QueryPerformanceCounter(&teststart);
 
 		if(send_info ->recv_packet_state == READ_HEADER_READY){
 			send_info ->recv_packet_state = READ_HEADER_OK;
-//printf("READ_HEADER_OK\n");
+			//printf("READ_HEADER_OK\n");
 		}else if(send_info ->recv_packet_state == READ_HEADER_RUNNING){
 			send_info ->recv_packet_state = READ_HEADER_OK;
-//printf("READ_HEADER_OK\n");
+			//printf("READ_HEADER_OK\n");
 		}else if(send_info ->recv_packet_state == READ_HEADER_OK){
 			printf("READ_HEADER_OK");
 			PAUSE
 		}else if(send_info ->recv_packet_state ==READ_PAYLOAD_READY){
 
 			send_info ->recv_packet_state = READ_PAYLOAD_OK;
-
-//printf("READ_PAYLOAD_OK\n");
-
+			//printf("READ_PAYLOAD_OK\n");
 		}else if(send_info ->recv_packet_state ==READ_PAYLOAD_RUNNING){
 			send_info ->recv_packet_state = READ_PAYLOAD_OK;
-//printf("READ_PAYLOAD_OK\n");
+			//printf("READ_PAYLOAD_OK\n");
 		}else if(send_info ->recv_packet_state ==READ_PAYLOAD_OK){
 			printf("READ_PAYLOAD_OK");
 			PAUSE
 		}
-
 		return recv_rt_val;
-
 	} else {	
 		send_info->recv_ctl_info.expect_len -= recv_rt_val;
 		send_info->recv_ctl_info.offset += recv_rt_val;
 
 		if(send_info ->recv_packet_state == READ_HEADER_READY){
 			send_info ->recv_packet_state = READ_HEADER_RUNNING;
-//printf("READ_HEADER_RUNNING\n");
+			//printf("READ_HEADER_RUNNING\n");
 		}else if(send_info ->recv_packet_state == READ_HEADER_RUNNING){
 			send_info ->recv_packet_state = READ_HEADER_RUNNING;
-//printf("READ_HEADER_RUNNING\n");
+			//printf("READ_HEADER_RUNNING\n");
 		}else if(send_info ->recv_packet_state == READ_HEADER_OK){
 			printf("READ_HEADER_OK");
 			PAUSE
 		}else if(send_info ->recv_packet_state ==READ_PAYLOAD_READY){
 			send_info ->recv_packet_state = READ_PAYLOAD_RUNNING;
-//printf("READ_PAYLOAD_RUNNING\n");
+			//printf("READ_PAYLOAD_RUNNING\n");
 		}else if(send_info ->recv_packet_state ==READ_PAYLOAD_RUNNING){
 			send_info ->recv_packet_state = READ_PAYLOAD_RUNNING;
-//printf("READ_PAYLOAD_RUNNING\n");
+			//printf("READ_PAYLOAD_RUNNING\n");
 		}else if(send_info ->recv_packet_state ==READ_PAYLOAD_OK){
 			printf("READ_PAYLOAD_OK");
 			PAUSE
 		}
 
-
-//		send_info->recv_ctl_info.ctl_state = RUNNING;
+		//send_info->recv_ctl_info.ctl_state = RUNNING;
 		return recv_rt_val;
 	}
 

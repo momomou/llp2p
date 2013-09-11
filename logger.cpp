@@ -1,5 +1,7 @@
 #include "logger.h"
 #include "common.h"
+#include <stdio.h>
+#include <string.h>
 
 static const char *levels[] = {
   "CRIT", "ERROR", "WARNING", "INFO",
@@ -45,15 +47,99 @@ char *logger::get_now_time()
 
 void logger::start_log_record(int time) 
 {
-	char*   szPath[MAX_PATH]= {'\0'};
+	int logNumber=0;
+	char temp[20]={'\0'};
+	char temp_number[20]={'\0'};
+	memset(temp,0x00,20);
+	memset(temp_number,0x00,20);
+
+	char *logNumber_ptr;
+	char *   szPath[MAX_PATH]= {'\0'};
+#ifdef _FIRE_BREATH_MOD_
+	GetEnvironmentVariableA ("APPDATA" ,(LPSTR)szPath,   MAX_PATH);  
+	strcat((char*)szPath,"\\LLP2P\\");
+	CreateDirectoryA((char*)szPath,NULL);
+	strcat((char*)szPath,"P2PLog.txt");
+#else
+	strcat((char*)szPath,"C:/P2PLog.txt");
+#endif
+	_systime = time;
+
+	while(1){
+		_fp = fopen((char*)szPath, "r");
+		if(!_fp){
+			break;
+		}else{
+
+			logNumber_ptr = strstr((char*)szPath ,"P2PLog");
+			strcat(temp,"P2PLog");
+			sprintf(temp_number,"%d",logNumber++)	;
+			strcat(temp,temp_number);
+			strcat(temp,".txt");
+			printf("%s\n",logNumber_ptr);
+			memcpy(logNumber_ptr,temp,20);
+			printf("PATH = %s  \n",szPath);
+			memset(temp,0x00,20);
+			memset(temp_number,0x00,20);
+
+		}
+	}
+
+	printf("PATH = %s  \n",szPath);
+	_fp = fopen((char*)szPath, "w");
+	if(!_fp) {
+		cout << "Cannot write log file" << endl;
+		//PAUSE
+//		::exit(0);
+	}
+
+//	_binary_fp = fopen(LOGBINARYFILE, "wb");
+//	if(_binary_fp==NULL) {
+//		cout << "Cannot write binary log file" << endl;
+//		::exit(0);
+//	}
+}
+
+/*
+void logger::start_log_record(int time) 
+{
+	int logNumber=0;
+	char temp[20]={'\0'};
+	char temp_number[20]={'\0'};
+	memset(temp,0x00,20);
+	memset(temp_number,0x00,20);
+
+	char *logNumber_ptr;
+	char *   szPath[MAX_PATH]= {'\0'};
 #ifdef _FIRE_BREATH_MOD_
 	GetEnvironmentVariableA ("APPDATA" ,(LPSTR)szPath,   MAX_PATH);  
 	strcat((char*)szPath,"\\LLP2P\\");
 	CreateDirectoryA((char*)szPath,NULL);
 #endif
 	strcat((char*)szPath,"P2PLog.txt");
-	printf("PATH = %s  \n",szPath);
 	_systime = time;
+
+	while(1){
+		_fp = fopen((char*)szPath, "r");
+		if(!_fp){
+			break;
+		}else{
+
+			logNumber_ptr = strstr((char*)szPath ,"P2PLog");
+			strcat(temp,"P2PLog");
+			sprintf(temp_number,"%d",logNumber++)	;
+			strcat(temp,temp_number);
+			strcat(temp,".txt");
+			printf("%s\n",logNumber_ptr);
+			memcpy(logNumber_ptr,temp,20);
+			printf("PATH = %s  \n",szPath);
+			memset(temp,0x00,20);
+			memset(temp_number,0x00,20);
+
+		}
+	}
+
+	printf("PATH = %s  \n",szPath);
 	_fp = fopen((char*)szPath, "w");
 	if(!_fp) {
 		cout << "Cannot write log file" << endl;
@@ -66,7 +152,7 @@ void logger::start_log_record(int time)
 //		::exit(0);
 //	}
 }
-
+*/
 void logger::stop_log_record() 
 {
 
@@ -77,7 +163,7 @@ void logger::stop_log_record()
 
 	fprintf(_fp, "===================================================================================================\n");
 	fflush(_fp);
-	fclose(_fp);
+//	fclose(_fp);
 //	fflush(_binary_fp);
 //	fclose(_binary_fp);
 }
@@ -86,6 +172,7 @@ void logger::write_log_format(const char* fmt, ...)
 {
 	va_list ap;
 	int d;
+	double f;
 	unsigned int u;
 	char *s;
 	unsigned long long int llu;
@@ -108,6 +195,10 @@ void logger::write_log_format(const char* fmt, ...)
 			case 'd':           /* int */
 				d = va_arg(ap, int);
 				fprintf(_fp, "%d", d);
+				break;
+			case 'f':           /* double */
+				f = va_arg(ap, double);
+				fprintf(_fp, "%f", f);
 				break;
 			case 'u':           /* unsigned int */
 				u = va_arg(ap, unsigned int);
@@ -384,7 +475,7 @@ DWORD logger::diffgetTime_ms(DWORD startTime,DWORD endTime)
 
 
 #ifdef WIN32
-void logger::getTickTime(LARGE_INTEGER *tickTime)
+int logger::getTickTime(LARGE_INTEGER *tickTime)
 {
 	bool fail =QueryPerformanceCounter(tickTime);
 	if(fail == 0){
@@ -392,6 +483,7 @@ void logger::getTickTime(LARGE_INTEGER *tickTime)
 		printf("QueryPerformanceCounter fail GetLastError = %d\n",GetLastError());
 //		PAUSE
 	}
+	return fail;
 }
 #endif
 
@@ -413,6 +505,11 @@ unsigned int logger::diffTime_ms(LARGE_INTEGER startTime,LARGE_INTEGER endTime)
     LARGE_INTEGER CUPfreq;
     LONGLONG llLastTime;
     QueryPerformanceFrequency(&CUPfreq);
+//	double diff =(endTime.QuadPart - startTime.QuadPart);
+	//if (diff<0){
+	//	diff = abs(diff);
+	//	PAUSE
+	//}
     llLastTime = (unsigned int)  (1000 * (endTime.QuadPart - startTime.QuadPart) / CUPfreq.QuadPart);
 
     return llLastTime;
@@ -448,11 +545,17 @@ double logger::set_diff_timmer()
 #ifdef WIN32
 void logger::timerGet(struct timerStruct *timmer)
 {
-
-	getTickTime(&(timmer ->tickTime));
+	if (getTickTime(&(timmer->tickTime)) == 0) {
+		timmer->initTickFlag = NONINIT ;
+		debug_printf("initTickFlag timmer->initTickFlag =NONINIT\n");
+		//PAUSE
+	}
+	else{
+		timmer->initTickFlag=INITED;
+	}
 
 	timmer ->clockTime = gettimeofday_ms() ;
-	timmer->initFlag =INITED ;
+	timmer->initClockFlag =INITED ;
 }
 #endif
 
@@ -461,19 +564,47 @@ void logger::timerGet(struct timerStruct *timmer)
 unsigned int logger::diff_TimerGet_ms(struct timerStruct *start,struct timerStruct *end)
 {
 
-	if(start ->initFlag != INITED ){
-		printf("start timer not INITED \n");
-		PAUSE
+	if(start ->initClockFlag != INITED ){
+		printf("start timer initClockFlag  not INITED \n");
+		//PAUSE
 	}
 
-	if(end ->initFlag != INITED ){
+	if(end ->initClockFlag != INITED ){
 		printf("end timer not INITED \n");
-		PAUSE
+		//PAUSE
 	}
+
+	if(start ->initTickFlag != INITED ){
+		//printf("start timer initTickFlag  not INITED \n");
+		timerMod = MOD_TIME__CLOCK;
+		//PAUSE
+	}
+
+	if(end ->initTickFlag != INITED ){
+		//printf("start timer initTickFlag  not INITED \n");
+		timerMod = MOD_TIME__CLOCK;
+		//PAUSE
+	}
+
+	unsigned int tickReturn = diffTime_ms(start->tickTime, end->tickTime);
+	unsigned int clockReturn = diffgetTime_ms(start->clockTime, end->clockTime);
+
+	//program run 10 hours for debug~
+	if(tickReturn >= 36000000){
+		printf("tickReturn =%u  clockReturn = %u\n",tickReturn,clockReturn);
+//		PAUSE
+		timerMod = MOD_TIME__CLOCK;
+	}
+
+
+	if(tickReturn < 2)
+		tickReturn=2;
+	if(clockReturn < 2)
+		clockReturn=2;
 
 	if(timerMod == MOD_TIME_TICK)
-		return diffTime_ms(start->tickTime ,end->tickTime);
+		return tickReturn;
 	else
-		return diffgetTime_ms(start->clockTime,end->clockTime) ;
+		return clockReturn ;
 }
 #endif

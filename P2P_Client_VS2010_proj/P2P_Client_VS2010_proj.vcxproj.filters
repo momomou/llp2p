@@ -28,6 +28,9 @@
     <Filter Include="原始程式檔\libBitStreamHTTP">
       <UniqueIdentifier>{688c163e-4f93-4f64-8300-1177970bbfe7}</UniqueIdentifier>
     </Filter>
+    <Filter Include="原始程式檔\stunt">
+      <UniqueIdentifier>{fbfac7de-6459-4a12-8e85-f90beb7cdaad}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\peer_mgr.h">
@@ -120,25 +123,25 @@
     <ClInclude Include="..\peer_communication.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
-    <ClInclude Include="..\Client.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="..\ClientAPI.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="..\ClientMacro.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="..\io_nat_punch.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="..\nat_interface.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
     <ClInclude Include="..\io_nonblocking.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="..\logger_client.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stunt\tcp_punch.h">
+      <Filter>原始程式檔\stunt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stunt\ClientMacro_v2.h">
+      <Filter>原始程式檔\stunt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stunt_mgr.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stunt\stuntdef.h">
+      <Filter>原始程式檔\stunt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\io_accept_nat.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>
@@ -235,22 +238,19 @@
     <ClCompile Include="..\peer_communication.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
-    <ClCompile Include="..\Sample.cpp">
-      <Filter>原始程式檔</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Client.cpp">
-      <Filter>原始程式檔</Filter>
-    </ClCompile>
-    <ClCompile Include="..\io_nat_punch.cpp">
-      <Filter>原始程式檔</Filter>
-    </ClCompile>
-    <ClCompile Include="..\nat_interface.cpp">
-      <Filter>原始程式檔</Filter>
-    </ClCompile>
     <ClCompile Include="..\io_nonblocking.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
     <ClCompile Include="..\logger_client.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stunt\tcp_punch.cpp">
+      <Filter>原始程式檔\stunt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stunt_mgr.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\io_accept_nat.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
   </ItemGroup>

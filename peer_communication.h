@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "basic_class.h"
+#include "stunt_mgr.h"
 #include <iostream>
 #include <map>
 
@@ -15,6 +16,7 @@ class io_accept;
 class io_connect;
 class logger_client;
 class io_nonblocking;
+class stunt_mgr;
 
 class peer_communication:public basic_class{
 public:
@@ -29,6 +31,7 @@ public:
 	io_accept * get_io_accept_handler();
 	void accept_check(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, unsigned long session_id);
 	void fd_close(int sock);
+	//int tcpPunch_connection(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, int flag, unsigned long session_id);
 
 	virtual int handle_pkt_in(int sock);
 	virtual int handle_pkt_out(int sock);
@@ -65,6 +68,7 @@ public:
 	io_accept *_io_accept_ptr;
 	io_connect *_io_connect_ptr;
 	io_nonblocking *_io_nonblocking_ptr;
+	stunt_mgr *_stunt_mgr_ptr;
 	list<int> *fd_list_ptr;
 
 };

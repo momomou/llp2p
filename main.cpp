@@ -18,6 +18,7 @@
 #include "io_connect.h"
 #include "io_accept.h"
 #include "logger_client.h"
+#include "stunt_mgr.h"
 using namespace std;
 
 #ifdef _FIRE_BREATH_MOD_
@@ -30,7 +31,33 @@ using namespace std;
 
 
 
-const char version[] = "1.0.0";
+const char version[] = "1.0.0.0";
+
+
+#ifdef _FIRE_BREATH_MOD_
+
+typedef struct
+{
+    volatile sig_atomic_t handle_sig_alarm;
+
+	volatile sig_atomic_t srv_shutdown;
+
+	int errorRestartFlag;
+	//static logger_client *logger_client_ptr = NULL;
+	volatile unsigned short streamingPort;
+	list<int> *fd_list;
+	pk_mgr *pk_mgr_ptr_copy;
+	volatile sig_atomic_t is_Pk_mgr_ptr_copy_delete;
+	volatile sig_atomic_t http_srv_ready;
+	volatile sig_atomic_t threadCtl;    // 0 can open thread  ,1 cant open
+
+} GlobalVars;
+
+
+map<int, GlobalVars*> map_chid_globalVar;
+
+
+#else
 
 //struct globalVar{
 static volatile sig_atomic_t handle_sig_alarm = 0;
@@ -40,16 +67,9 @@ static int errorRestartFlag = 0;
 static volatile unsigned short streamingPort = 0;
 list<int> fd_list;
 
-#ifdef _FIRE_BREATH_MOD_
-static  pk_mgr *pk_mgr_ptr_copy = NULL;
-static volatile sig_atomic_t is_Pk_mgr_ptr_copy_delete = TRUE;
-static volatile sig_atomic_t http_srv_ready = 0;
-static volatile sig_atomic_t threadCtl = 0;    // 0 can open thread  ,1 cant open 
 #endif
 //};
 
-map<int , struct globeVar *> map_streamPort_globeVar ;
-map<int , struct globeVar *> ::iterator map_streamPort_globeVar_iter ;
 
 #ifdef _FIRE_BREATH_MOD_
 #else
@@ -67,21 +87,21 @@ void signal_handler(int sig)
 	{
 		case SIGTERM: 
 			srv_shutdown = 1; 
-//			logger_client_ptr->log_exit();
+			//logger_client_ptr->log_exit();
 			break;
 		case SIGINT:
 			srv_shutdown = 1;
-//			logger_client_ptr->log_exit();
+			//logger_client_ptr->log_exit();
 			break;
 #ifndef _WIN32
 		case SIGALRM: 
 			handle_sig_alarm = 1; 
-//			logger_client_ptr->log_exit();
+			//logger_client_ptr->log_exit();
 			break;
 #endif
 		case SIGSEGV:
 			srv_shutdown = 1;
-//			logger_client_ptr->log_exit();
+			//logger_client_ptr->log_exit();
 #ifdef _WIN32
 			MessageBox(NULL, _T("SIGSEGV"), _T("EXIT"), MB_OK | MB_ICONSTOP);
 #else
@@ -92,9 +112,9 @@ void signal_handler(int sig)
 			break;
 		case SIGABRT:
 			srv_shutdown = 1;
-//			logger_client_ptr->log_exit();
+			//logger_client_ptr->log_exit();
 #ifdef _WIN32
-//			MessageBox(NULL, _T("SIGABRT"), _T("EXIT"), MB_OK | MB_ICONSTOP);
+			//MessageBox(NULL, _T("SIGABRT"), _T("EXIT"), MB_OK | MB_ICONSTOP);
 #else
 			printf("SIGABRT\n");
 			PAUSE
@@ -165,62 +185,79 @@ void llp2pAPI::testEvent()
 
 int llp2pAPI::start(int chid)
 {
-	//thread is running
-	if(threadCtl){
-		return FALSE;
-	//threadCtl == 0
-	}else{
-		threadCtl = TRUE;  //lock
-		http_srv_ready = 0;
-		srv_shutdown = 0;
-		_beginthread(launchThread, 0, (void*)chid);
-		return TRUE;
+	if(map_chid_globalVar.count(chid) > 0)
+	{
+		map_chid_globalVar[chid]->threadCtl++;
+		return 3;
 	}
+	else
+	{
+		GlobalVars *temp = (GlobalVars*) malloc (sizeof(GlobalVars));
+		temp->fd_list = new list<int>;
+		temp->handle_sig_alarm = 0;
+		temp->srv_shutdown = 0;
+		temp->errorRestartFlag = 0;
+		temp->streamingPort = 0;
+		temp->pk_mgr_ptr_copy = NULL;
+		temp->is_Pk_mgr_ptr_copy_delete = TRUE;
+		temp->http_srv_ready = 0;
+		temp->threadCtl = 1;
+		map_chid_globalVar[chid] = temp;
+		_beginthread(launchThread, 0, (void*)chid);	
+		return 2;
+	}
+	return TRUE;
+}
 
+void llp2pAPI::stop(int chid)
+{
+	if(chid < 1 || map_chid_globalVar.count(chid) <= 0)
+	{
+		return;
+	}
+	map_chid_globalVar[chid]->threadCtl--;
+	if(map_chid_globalVar[chid]->threadCtl <= 0)
+	{
+		map_chid_globalVar[chid]->srv_shutdown = 1;
+	}
 //	return;
 }
 
-void llp2pAPI::stop()
+int llp2pAPI::isReady(int chid)
 {
-    srv_shutdown = 1;
-//	return;
-}
-
-int llp2pAPI::isReady()
-{
-	while(!http_srv_ready)
-		Sleep(10);
+//	while(!http_srv_ready)
+//		Sleep(10);
 //	Sleep(500);
-    return http_srv_ready;
+    return map_chid_globalVar[chid]->http_srv_ready;
 }
 
-int llp2pAPI::isStreamInChannel(int streamID){
+int llp2pAPI::isStreamInChannel(int streamID, int chid){
 
-	for(int i=0 ; i<=30;i++){
-		if(is_Pk_mgr_ptr_copy_delete ==FALSE){
-			map<int, struct update_stream_header *>::iterator  map_streamID_header_iter;
-			map_streamID_header_iter = pk_mgr_ptr_copy ->map_streamID_header.find(streamID);
-			//		return TRUE;
-			if(map_streamID_header_iter != pk_mgr_ptr_copy ->map_streamID_header.end()){
-				return TRUE;
-			}else{
-				return FALSE ;
-			}
+
+	if(map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete ==FALSE){
+		map<int, struct update_stream_header *>::iterator  map_streamID_header_iter;
+		map_streamID_header_iter = map_chid_globalVar[chid]->pk_mgr_ptr_copy ->map_streamID_header.find(streamID);
+		//		return TRUE;
+		if(map_streamID_header_iter != map_chid_globalVar[chid]->pk_mgr_ptr_copy ->map_streamID_header.end()){
+			return TRUE;
 		}else{
-			//	return FALSE;
+			return FALSE ;
 		}
-		Sleep(100);
+	}else{
+		return FALSE;
 	}
+
+
 
 	return TRUE;
 }
 
-unsigned short llp2pAPI::streamingPortIs()
+unsigned short llp2pAPI::streamingPortIs(int chid)
 {
-	if(is_Pk_mgr_ptr_copy_delete){
+	if(map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete){
 		return 0;
 	}else{
-		return streamingPort;
+		return map_chid_globalVar[chid]->streamingPort;
 	}
 }
 
@@ -236,7 +273,7 @@ int llp2pAPI::valid(){
 void launchThread(void * arg)
 {
 	int a = (int)arg;
-	threadCtl = mainFunction(a);
+	mainFunction(a);
 //	return;
 }
 
@@ -251,7 +288,8 @@ int main(int argc, char **argv){
 
 //	while((!srv_shutdown)){
 
-		int svc_fd_tcp, svc_fd_udp;
+		int svc_fd_tcp;		// listening-socket for peers 
+		int	svc_fd_udp;
 		unsigned long html_size;
 		int optval = 1;
 		struct sockaddr_in sin;
@@ -262,30 +300,41 @@ int main(int argc, char **argv){
 		string config_file("");
 
 		configuration *prep = NULL;
-		logger *log_ptr = NULL;
 		network *net_ptr = NULL;
-		pk_mgr *pk_mgr_ptr = NULL;
+		logger *log_ptr = NULL;					// record log on local file
+		logger_client *logger_client_ptr = NULL;	// send log Info to server
 		peer_mgr *peer_mgr_ptr = NULL;
-		logger_client *logger_client_ptr=NULL;
-
-//		rtmp_server *rtmp_svr = NULL;
-//		rtmp *rtmp_ptr = NULL;
-//		amf *amf_ptr = NULL;
-//		rtmp_supplement *rtmp_supplement_ptr = NULL;
-
+		stunt_mgr *stunt_mgr_ptr = NULL;
+		pk_mgr *pk_mgr_ptr = NULL;
+		//rtmp_server *rtmp_svr = NULL;
+		//rtmp *rtmp_ptr = NULL;
+		//amf *amf_ptr = NULL;
+		//rtmp_supplement *rtmp_supplement_ptr = NULL;
 		bit_stream_server *bit_stream_server_ptr =NULL;
 		peer_communication *peer_communication_ptr = NULL;
 
 		config_file = "config.ini";
 
+		// Create constructors
 		prep = new configuration(config_file);
+#ifdef _FIRE_BREATH_MOD_
+		net_ptr = new network(&(map_chid_globalVar[chid]->errorRestartFlag),map_chid_globalVar[chid]->fd_list);
+#else
 		net_ptr = new network(&errorRestartFlag,&fd_list);
+#endif
 		log_ptr = new logger();
-		logger_client_ptr = new logger_client();
 		log_ptr->logger_set(net_ptr);
+		logger_client_ptr = new logger_client(log_ptr);
+#ifdef _FIRE_BREATH_MOD_
+		peer_mgr_ptr = new peer_mgr(map_chid_globalVar[chid]->fd_list);
+		stunt_mgr_ptr = new stunt_mgr(map_chid_globalVar[chid]->fd_list);
+#else
 		peer_mgr_ptr = new peer_mgr(&fd_list);
-		if( (!prep) || (!net_ptr) || (!log_ptr) || (!logger_client_ptr) || (!peer_mgr_ptr) ){
-			printf("new (!prep) || (!net_ptr) || (!log_ptr) || (!logger_client_ptr) || (!peer_mgr_ptr) error \n");
+		stunt_mgr_ptr = new stunt_mgr(&fd_list);
+#endif
+
+		if( !prep || !net_ptr || !log_ptr || !logger_client_ptr || !peer_mgr_ptr || !stunt_mgr_ptr){
+			printf("new (!prep) || (!net_ptr) || (!log_ptr) || (!logger_client_ptr) || (!peer_mgr_ptr) || (!stunt_mgr_ptr) error \n");
 		}
 		
 #ifdef _FIRE_BREATH_MOD_
@@ -303,12 +352,16 @@ int main(int argc, char **argv){
 		cout << "svc_tcp_port=" << svc_tcp_port << endl;
 		cout << "svc_udp_port=" << svc_udp_port << endl;
 		cout << "stream_local_port=" << stream_local_port << endl;
-
-		pk_mgr_ptr = new pk_mgr(html_size, &fd_list, net_ptr , log_ptr , prep , logger_client_ptr);
+#ifdef _FIRE_BREATH_MOD_
+		pk_mgr_ptr = new pk_mgr(html_size, map_chid_globalVar[chid]->fd_list, net_ptr , log_ptr , prep , logger_client_ptr, stunt_mgr_ptr);
+#else
+		pk_mgr_ptr = new pk_mgr(html_size, &fd_list, net_ptr , log_ptr , prep , logger_client_ptr, stunt_mgr_ptr);
+#endif
 		if(!pk_mgr_ptr){
 			printf("pk_mgr_ptr error !!!!!!!!!!!!!!!\n");
 		}
 
+		
 		net_ptr->epoll_creater();
 		log_ptr->start_log_record(SYS_FREQ);
 
@@ -324,6 +377,7 @@ int main(int argc, char **argv){
 
 		logger_client_ptr->set_net_obj(net_ptr);
 		logger_client_ptr->set_pk_mgr_obj(pk_mgr_ptr);
+		logger_client_ptr->set_prep_obj(prep);
 
 
 #ifndef _WIN32
@@ -334,7 +388,7 @@ int main(int argc, char **argv){
 
 #ifdef _WIN32
 		WSADATA wsaData;										// Winsock initial data
-		if(WSAStartup(MAKEWORD(1,1),&wsaData)) {
+		if(WSAStartup(MAKEWORD(2, 2),&wsaData)) {
 			printf("WSAStartup ERROR\n");
 			WSACleanup();
 			exit(0);
@@ -383,8 +437,11 @@ int main(int argc, char **argv){
 		}else if(mode==mode_BitStream  || mode == mode_HTTP){
 			printf("mode_BitStream\n");
 
-
+#ifdef _FIRE_BREATH_MOD_
+			bit_stream_server_ptr = new bit_stream_server ( net_ptr,log_ptr,pk_mgr_ptr ,map_chid_globalVar[chid]->fd_list);
+#else
 			bit_stream_server_ptr = new bit_stream_server ( net_ptr,log_ptr,pk_mgr_ptr ,&fd_list);
+#endif
 			if(!bit_stream_server_ptr){
 				printf("bit_stream_server_ptr error !!!!!!!!!!!!\n");
 			}
@@ -392,9 +449,13 @@ int main(int argc, char **argv){
 			unsigned short port_tcp;
 			ss_tmp << stream_local_port;
 			ss_tmp >> port_tcp;
+#ifdef _FIRE_BREATH_MOD_
+			map_chid_globalVar[chid]->streamingPort = bit_stream_server_ptr ->init(0,port_tcp);
+			log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"new bit_stream_server ok at port ",map_chid_globalVar[chid]->streamingPort);
+#else
 			streamingPort = bit_stream_server_ptr ->init(0,port_tcp);
-			log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"new bit_stream_server ok at port ",streamingPort);
-
+			log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"new bit_stream_server ok at port ",streamingPort);
+#endif
 		}else if(mode == mode_RTSP){
 			printf("mode_RTSP\n");
 		}
@@ -415,8 +476,9 @@ int main(int argc, char **argv){
 		sin.sin_family = AF_INET;
 		sin.sin_addr.s_addr = INADDR_ANY;
 //		sin.sin_port = htons((unsigned short)atoi(svc_tcp_port.c_str()));
-		unsigned short ptop_port = (unsigned short)atoi(svc_tcp_port.c_str());
+		unsigned short ptop_port = (unsigned short)atoi(svc_tcp_port.c_str());		// listen-port for peer connection
 
+		// find the listen-port which can be used
 		while(1){
 			sin.sin_port = htons(ptop_port);
 
@@ -479,13 +541,16 @@ int main(int argc, char **argv){
 
 		net_ptr->set_fd_bcptr_map(svc_fd_tcp, dynamic_cast<basic_class *>(peer_communication_ptr->get_io_accept_handler()));
 
-
+#ifdef _FIRE_BREATH_MOD_
+		(map_chid_globalVar[chid]->fd_list)->push_back(svc_fd_tcp);
+#else
 		fd_list.push_back(svc_fd_tcp);
+#endif
 		pk_mgr_ptr->init(ptop_port);
 		logger_client_ptr->log_init();
 
 
-		int testServerfd =0;
+		/*int testServerfd =0;
 		int errorcount =0;
 		while(1){
 			testServerfd = pk_mgr_ptr ->build_connection("127.0.0.1",stream_local_port);
@@ -504,18 +569,25 @@ int main(int argc, char **argv){
 				printf("connectfail  errorcount=%d\n",errorcount);
 				log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"connectfail  errorcount",errorcount);
 			}
-		}
+		}*/
 
 #ifdef _FIRE_BREATH_MOD_
-		pk_mgr_ptr_copy =pk_mgr_ptr ;
-		http_srv_ready = 1;
-		is_Pk_mgr_ptr_copy_delete = FALSE;
+		map_chid_globalVar[chid]->pk_mgr_ptr_copy =pk_mgr_ptr ;
+		map_chid_globalVar[chid]->http_srv_ready = 1;
+		map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete = FALSE;
+		while((!(map_chid_globalVar[chid]->srv_shutdown))  &&  (!(map_chid_globalVar[chid]->errorRestartFlag))) {
+#else
+		while((!srv_shutdown)  &&  (!errorRestartFlag)) {
 #endif
 
-		while((!srv_shutdown)  /*&&  (!errorRestartFlag)*/) {
-
 #ifdef _WIN32
+
+	#ifdef _FIRE_BREATH_MOD_
+			net_ptr->epoll_waiter(1000, map_chid_globalVar[chid]->fd_list);
+	#else
 			net_ptr->epoll_waiter(1000, &fd_list);
+	#endif
+
 #else
 			net_ptr->epoll_waiter(1000);
 #endif
@@ -524,8 +596,11 @@ int main(int argc, char **argv){
 			pk_mgr_ptr->time_handle();
 		}
 
+#ifdef _FIRE_BREATH_MOD_
+		log_ptr->write_log_format("s =>u s d s d \n", __FUNCTION__,__LINE__,"srv_shutdown",map_chid_globalVar[chid]->srv_shutdown,"errorRestartFlag",map_chid_globalVar[chid]->errorRestartFlag);
+#else
 		log_ptr->write_log_format("s =>u s d s d \n", __FUNCTION__,__LINE__,"srv_shutdown",srv_shutdown,"errorRestartFlag",errorRestartFlag);
-
+#endif
 
 		net_ptr->garbage_collection();
 		log_ptr->write_log_format("s => s (s)\n", (char*)__PRETTY_FUNCTION__, "PF", "graceful exit!!");
@@ -548,9 +623,9 @@ int main(int argc, char **argv){
 		net_ptr =NULL;	
 
 #ifdef _FIRE_BREATH_MOD_
-		is_Pk_mgr_ptr_copy_delete = TRUE;
-		pk_mgr_ptr_copy =NULL;
-		http_srv_ready = 0;
+		map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete = TRUE;
+		map_chid_globalVar[chid]->pk_mgr_ptr_copy =NULL;
+		map_chid_globalVar[chid]->http_srv_ready = 0;
 #endif
 		if(pk_mgr_ptr)
 			delete pk_mgr_ptr;
@@ -577,16 +652,29 @@ int main(int argc, char **argv){
 			printf("Some Thing Error Wait %d Sec To Restart ............\n",10-i );
 //			Sleep(1000);
 		}
-		errorRestartFlag =0;
 
+#ifdef _FIRE_BREATH_MOD_
+		map_chid_globalVar[chid]->errorRestartFlag =0;
+#else
+		errorRestartFlag =0;
+#endif
 
 //	}
 
+#ifdef _FIRE_BREATH_MOD_
+	map_chid_globalVar[chid]->streamingPort = 0;
+	map_chid_globalVar[chid]->handle_sig_alarm = 0;
+	map_chid_globalVar[chid]->srv_shutdown = 0;
+	map_chid_globalVar[chid]->errorRestartFlag = 0;
+	delete map_chid_globalVar[chid]->fd_list;
+	free(map_chid_globalVar[chid]);
+	map_chid_globalVar.erase(chid);
+#else
 	streamingPort = 0;
 	handle_sig_alarm = 0;
 	srv_shutdown = 0;
 	errorRestartFlag = 0;
-
+#endif
 	return EXIT_SUCCESS;
 
 }

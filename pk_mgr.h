@@ -14,6 +14,7 @@ class rtsp_viewer;
 class stream;
 class peer;
 class logger_client;
+class stunt_mgr;
 
 
 class pk_mgr:public basic_class {
@@ -27,12 +28,13 @@ public:
 	list <int> streamID_list;
 	struct peer_connect_down_t *pkDownInfoPtr;
 	struct timerStruct start,end;
-	volatile int Xcount ;
+	volatile int Xcount;						// Number of average received packets per unit time
 	unsigned long totalMod ;
 	unsigned long reSynTime;
 	struct timerStruct lastSynStartclock;
 	unsigned long pkt_count ;
 	unsigned long totalbyte;
+	int synLock;
 
 	unsigned long fisttimestamp;
 	bool firstIn;
@@ -40,16 +42,17 @@ public:
 	struct timerStruct sleepTimer;
 	struct timerStruct reSynTimer;
 
-	LARGE_INTEGER teststart,testend;
-	LARGE_INTEGER syn_round_start;
+//	LARGE_INTEGER teststart,testend;
+//	LARGE_INTEGER syn_round_start;
+	
 
 	//temp parent 
-	multimap <unsigned long, struct peer_info_t *> map_pid_peer_info; 	// <pid, struct peer_info_t *>
+	multimap <unsigned long, struct peer_info_t *> map_pid_peer_info;
 	//temp child
 	multimap <unsigned long, struct peer_info_t *> map_pid_child_peer_info;
 
-	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		// <pid, struct peer_info_t *>
-	map<unsigned long, struct peer_connect_down_t *> map_pid_peerDown_info ; //// <pid, struct peer_connect_down_t *>
+	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		 // real child-peer
+	map<unsigned long, struct peer_connect_down_t *> map_pid_peerDown_info ; // real parent-peer
 
 	//about player  ,delete by bit_stream_server
 	map<int, stream *> _map_stream_media;	// <strm_addr, stream *>
@@ -61,7 +64,10 @@ public:
 	//streamID , media_header
 	map<int, struct update_stream_header *> map_streamID_header;
 
-	struct chunk_level_msg_t *level_msg_ptr ;
+	// substreamID, peer-info
+	map<unsigned long, struct peer_info_t> map_substream_peerInfo;
+
+	struct chunk_level_msg_t *level_msg_ptr;
 	unsigned long lane_member;
 
 //	struct chunk_bitstream_t *_chunk_bitstream;
@@ -85,17 +91,24 @@ public:
 	int _sock; 		//PK socket
 
 
-
+	// Variables of synchronization
+	struct timerStruct syn_round_start;
 	unsigned long syn_round_time;
 	struct syn_struct syn_table;
+
+
+
 	void syn_table_init(int pk_sock);
 	void send_syn_token_to_pk(int pk_sock);
 	void syn_recv_handler(struct syn_token_receive* syn_struct_back_token);
 
 
+	// For debug
+	void PrintSubstreamInfo();
+
 	void delay_table_init();
 	void source_delay_detection(int sock, unsigned long sub_id, unsigned int seq_now);
-	void quality_source_delay_count(int sock, unsigned long sub_id, unsigned int seq_now);
+	void quality_source_delay_count(int sock, unsigned long substream_id, unsigned int seq_now);
 	void reset_source_delay_detection(unsigned long sub_id);
 	void set_rescue_state(unsigned long sub_id,int state);
 	int check_rescue_state(unsigned long sub_id,int state);
@@ -110,7 +123,7 @@ public:
 
 	unsigned long stream_number;	//channel 下stream的個數
 	
-	pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , logger *log_ptr , configuration *prep , logger_client * logger_client_ptr);
+	pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , logger *log_ptr , configuration *prep , logger_client * logger_client_ptr, stunt_mgr *stunt_mgr);
 	~pk_mgr();
 
 	void init(unsigned short ptop_port);
@@ -192,6 +205,7 @@ private:
 
 	unsigned long _html_size;
 
+	stunt_mgr *_stunt_mgr_ptr;
 	logger_client * _logger_client_ptr;
 	network *_net_ptr;
 	logger *_log_ptr;
@@ -203,9 +217,12 @@ private:
 	FILE *pkmgrfile_ptr ;
 	FILE *performance_filePtr ;
 
+	unsigned long my_pid;
+	unsigned long my_level;
 	unsigned long _manifest;
 	bool pkSendCapacity;
 	unsigned long lastPKtimer;
+	int sentStartDelay;
 
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 

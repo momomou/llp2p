@@ -52,8 +52,14 @@ struct epoll_event
   epoll_data_t data;    /* User data variable */
 };
 
-int epoll_create (int __size);
-int epoll_ctl (int __epfd, int __op, int __fd, struct epoll_event *__events);
-int epoll_wait (int __epfd, struct epoll_event *__events, int __maxevents, int __timeout, list<int> *fd_list);
+#ifdef _FIRE_BREATH_MOD_
+	int epoll_create (int __size, EpollVars* epollVar);
+	int epoll_ctl (int __epfd, int __op, int __fd, struct epoll_event *__events, EpollVars* epollVar);
+	int epoll_wait (int __epfd, struct epoll_event *__events, int __maxevents, int __timeout, list<int> *fd_list, EpollVars* epollVar);
+#else
+	int epoll_create (int __size);
+	int epoll_ctl (int __epfd, int __op, int __fd, struct epoll_event *__events);
+	int epoll_wait (int __epfd, struct epoll_event *__events, int __maxevents, int __timeout, list<int> *fd_list);
+#endif
 
 #endif

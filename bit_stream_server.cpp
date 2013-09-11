@@ -74,6 +74,7 @@ unsigned short bit_stream_server::init(int stream_id, unsigned short bitStreamSe
 	sin.sin_addr.s_addr = INADDR_ANY;
 //	sin.sin_port = htons(bitStreamServerPort);
 
+	// find a port which can be used, default value is 3000
 	while(1){
 		sin.sin_port = htons(bitStreamServerPort);
 
@@ -170,7 +171,7 @@ int bit_stream_server::handle_pkt_in(int sock)
 			return RET_ERROR;
 
 		}else{				
-		printf("\nnew bit_stream_httpout successfully\n");
+		printf("new bit_stream_httpout successfully  socket =%d \n",new_fd);
 		_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__," new bit_stream_httpout successfully");
 		_pk_mgr_ptr ->add_stream( new_fd,(stream*)_bit_stream_httpout_ptr, STRM_TYPE_MEDIA);
 
@@ -204,18 +205,18 @@ void bit_stream_server::handle_pkt_error(int sock)
 
 void bit_stream_server::handle_sock_error(int sock, basic_class *bcptr)
 {
-	if(mode == mode_BitStream){
-		delete dynamic_cast<bit_stream_out *> (bcptr);
-	}else 	if(mode == mode_HTTP){
-		delete dynamic_cast<bit_stream_httpout *> (bcptr);
-	}else 	if(mode == mode_RTMP){
+//	if(mode == mode_BitStream){
 //		delete dynamic_cast<bit_stream_out *> (bcptr);
-	}
+//	}else 	if(mode == mode_HTTP){
+//		delete dynamic_cast<bit_stream_httpout *> (bcptr);
+//	}else 	if(mode == mode_RTMP){
+////		delete dynamic_cast<bit_stream_out *> (bcptr);
+//	}
 //	_net_ptr->fd_bcptr_map_delete(sock);
 //	del_seed(sock);
 	data_close(sock, "player obj closed!!");
-	_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__," player obj closed!!");
-	_pk_mgr_ptr->del_stream(sock,(stream *)bcptr, STRM_TYPE_MEDIA);
+	_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__," bitstream server obj closed!!");
+//	_pk_mgr_ptr->del_stream(sock,(stream *)bcptr, STRM_TYPE_MEDIA);
 }
 
 void bit_stream_server::handle_job_realtime()
