@@ -1,0 +1,67 @@
+                                                                                                                                                                                                                                                                                                                                                   
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+                                                                                                                                                                                                                                                                                                   +--cmd             <unsigned char>                                                                                                             
+                                                                                                                                                                                                                                                                                                   +--stream          <unsigned char 3 bit>                                                           
+                                                                                                                                                                                                                                                                                                   +--payload_type    <unsigned char 5 bit>                                                           
+                                                                                                                                                                                                  +--buffer <char*>                                                                                +--rsv_1           <unsigned char 1 bit>                      
+                                                                                                                                                                                                  |                                            +--header <struct chunk_header_t>--P2P main header--+--mf              <unsigned char 1 bit> 
+                                                                                                                                                                                                  +--chunk_ptr <struct chunk_t*>---------------|                                                   +--part_seq        <unsigned char 6 bit>                                                                                   
+                                                                                                                                                                                                  |                                            +--buf <unsigned char[0]>                           +--stream_id       <unsigned char>                
+                                                                                                                                           +--recv_packet_state <enum pkg_nonblocking_ctl_state>  +--offset <unsigned int>                                                                         +--sequence_number <unsigned int> 
+                                                                                      +--nonBlockingRecv     <struct nonblocking_ctrl>-----|                                                      |                                                                                                +--timestamp       <unsigned int>                        
+                                                                                      |                                                    +--recv_ctl_info <Network_nonblocking_ctl>-------------+--total_len <unsigned int>                                                                      +--length          <unsigned long> 
+                                               +--io_nonblockBuff <Nonblocking_Buff>--+--nonBlockingSendData <struct nonblocking_ctrl>                                                            |  
+                                               |                                      |                                                                                                           +--expect_len <unsigned int>                                                        
+                                               |                                      +--nonBlockingSendCtrl <struct nonblocking_ctrl>                                                            |    
+                                               |                                                                                                                                                  +--serial_num <unsigned int>                                                                                                                                      
+map_fd_NonBlockIO <int, struct innonBlocking>--+--outPutQue <queue<struct chunk_t*>>                                                                                                              |                                                                  
+                                               |                                                                                                                                                  +--ctl_state <network_nonblocking_ctl_state>                        
+                                               +--ioFinishFlag <unsigned long>                                                                                                                                                                                                                                
+                                                                                                                                          
+                                                                                                                                          
+                                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                          +--pid           <unsigned long>      
+                                                                          +--level         <unsigned long>   
+                                                                          +--public_ip     <unsigned long>        
+                                                                          +--private_ip    <unsigned long>         
+                                                                          +--tcp_port      <unsigned short>        
+                              +--peerInfo       <struct peer_info_t>------+--udp_port      <unsigned short>                                                  
+                              |                                           +--public_port   <unsigned short>         
+                              +rescueStatsArry  <int [PARAMETER_M]>       +--private_port  <unsigned short>                                                                 
+                              |                                           +--upnp_acess    <unsigned long>        
+                              +timeOutLastSeq   <volatile unsigned int>   +--NAT_type      <unsigned long>                                              
+<struct peer_connect_down_t>--|                                           +--manifest      <unsigned long>                                     
+                              +timeOutNewSeq    <volatile unsigned int>                                                                                                                                           
+                              |                                                                                                                                            
+                              +lastTriggerCount <volatile unsigned int>                                                      
+                              |                                                       
+                              +outBuffCount     <volatile unsigned int>                                                       
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+Rescue觸發原因
+1. source_delay_detection，封包的delay過大的時候會觸發rescue
+2. pk_mgr(2289) packet lost太多，當收到(Xcount*BUFF_SIZE*PARAMETER_X)多個packet之後會檢查packet lost的數量，如果
+	超過((CHUNK_LOSE*PARAMETER_X*Xcount)/sub_stream_num)這個數目就觸發rescue                                                              
+3.                                                                                     
+                                   
+尋找rescue觸發點:	"Rescue triggered"      
+尋找source delay的值:	"source delay"
+
+[ERROR] 有error發生
+[DEBUG] 可能有問題的點
+[PROBLEM] 系統不該出現的狀況卻發生
+[QUESTION] 疑惑的點 
+
+best reducing ratio: 0.4%
+best seed/total ratio: 0.74%                       
+                                                
