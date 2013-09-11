@@ -1,7 +1,6 @@
 /*
 對於manifest 的概念 ,他只代表sub-stream ID的表示法
 每個 peer 應該顧好自己的 manifest table  確保每個sub -straem 都有來源
-
 */
 
 
