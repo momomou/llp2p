@@ -30,7 +30,6 @@ using namespace std;
 #endif
 
 
-
 const char version[] = "1.0.0.0";
 
 
@@ -279,13 +278,61 @@ void launchThread(void * arg)
 
 #endif
 
-
 #ifdef _FIRE_BREATH_MOD_
 int mainFunction(int chid){
 #else
 int main(int argc, char **argv){
 #endif
+	/*
+	map<int, int> aa;
+	map<int, int>::iterator aa_iter;
+	
+	aa[1] = 11;
+	aa[2] = 22;
+	aa[3] = 33;
+	aa[4] = 44;
+	
+	printf("aa.size = %d \n", aa.size());
+	
+	for (aa_iter = aa.begin(); aa_iter != aa.end(); aa_iter++) {
+		printf("aa[%d] = %d \n", aa_iter->first, aa_iter->second);
+		if (aa_iter == aa.end()) {
+			map<int, int>::iterator iter = aa_iter;
+			printf("delete aa[%d] = %d \n", aa_iter->first, aa_iter->second);
+			//aa_iter--;
+			aa.erase(iter);
+			
+		}
+	}
+	
+	for (aa_iter = aa.begin(); aa_iter != aa.end(); aa_iter++) {
+		printf("aa[%d] = %d \n", aa_iter->first, aa_iter->second);
+	}
+	
+	
+	
+	
+	UINT32 u32 = -2;
+	int x=5, y=2;
+	printf("(%f) \n", (double)x/y);
+	
+	void *ppp;
+	printf("sizeof(long) = %d, sizeof(int) = %d %d \n", sizeof(long int), sizeof(int), sizeof(INT64));
+	
+	 printf("sizeof(short)     = %d\n", sizeof(short));
+        printf("sizeof(int)       = %d\n", sizeof(int));
+        printf("sizeof(long)      = %d\n", sizeof(long));
+        printf("sizeof(long long) = %d\n\n", sizeof(long long));
+ 
+        printf("sizeof(size_t)    = %d\n", sizeof(size_t));
+        printf("sizeof(off_t)     = %d\n", sizeof(off_t));
+        printf("sizeof(void *)    = %d\n", sizeof(void *));
+		
+		PAUSE
+	*/
 
+
+	
 //	while((!srv_shutdown)){
 
 		int svc_fd_tcp;		// listening-socket for peers 
@@ -333,7 +380,7 @@ int main(int argc, char **argv){
 		stunt_mgr_ptr = new stunt_mgr(&fd_list);
 #endif
 
-		if( !prep || !net_ptr || !log_ptr || !logger_client_ptr || !peer_mgr_ptr || !stunt_mgr_ptr){
+		if ( !prep || !net_ptr || !log_ptr || !logger_client_ptr || !peer_mgr_ptr || !stunt_mgr_ptr) {
 			printf("new (!prep) || (!net_ptr) || (!log_ptr) || (!logger_client_ptr) || (!peer_mgr_ptr) || (!stunt_mgr_ptr) error \n");
 		}
 		
@@ -357,7 +404,7 @@ int main(int argc, char **argv){
 #else
 		pk_mgr_ptr = new pk_mgr(html_size, &fd_list, net_ptr , log_ptr , prep , logger_client_ptr, stunt_mgr_ptr);
 #endif
-		if(!pk_mgr_ptr){
+		if (!pk_mgr_ptr) {
 			printf("pk_mgr_ptr error !!!!!!!!!!!!!!!\n");
 		}
 
@@ -370,7 +417,7 @@ int main(int argc, char **argv){
 		pk_mgr_ptr->peer_mgr_set(peer_mgr_ptr);
 
 		peer_communication_ptr = new peer_communication(net_ptr,log_ptr,prep,peer_mgr_ptr,peer_mgr_ptr->get_peer_object(),pk_mgr_ptr,logger_client_ptr);
-		if(!peer_communication_ptr){
+		if (!peer_communication_ptr) {
 			printf("peer_commuication_ptr error!!!!!!!!!!\n");
 		}
 		peer_mgr_ptr->peer_communication_set(peer_communication_ptr);
@@ -403,8 +450,8 @@ int main(int argc, char **argv){
 		signal(SIGABRT, signal_handler);
 #endif
 
-		if(mode==mode_RTMP){
-/*
+		if (mode == mode_RTMP) {
+			/*
 			printf("mode_RTMP\n");
 			amf_ptr = new amf(log_ptr);
 			if (!amf_ptr) {
@@ -431,10 +478,11 @@ int main(int argc, char **argv){
 			}
 			rtmp_svr->init(1,stream_local_port);
 			printf("new rtmp_svr successfully\n");
-*/
+			*/
 
-			//mode BitStream
-		}else if(mode==mode_BitStream  || mode == mode_HTTP){
+		//mode BitStream
+		}
+		else if (mode == mode_BitStream || mode == mode_HTTP) {
 			printf("mode_BitStream\n");
 
 #ifdef _FIRE_BREATH_MOD_
@@ -442,7 +490,7 @@ int main(int argc, char **argv){
 #else
 			bit_stream_server_ptr = new bit_stream_server ( net_ptr,log_ptr,pk_mgr_ptr ,&fd_list);
 #endif
-			if(!bit_stream_server_ptr){
+			if (!bit_stream_server_ptr) {
 				printf("bit_stream_server_ptr error !!!!!!!!!!!!\n");
 			}
 			stringstream ss_tmp;
@@ -456,18 +504,17 @@ int main(int argc, char **argv){
 			streamingPort = bit_stream_server_ptr ->init(0,port_tcp);
 			log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"new bit_stream_server ok at port ",streamingPort);
 #endif
-		}else if(mode == mode_RTSP){
+		}
+		else if(mode == mode_RTSP){
 			printf("mode_RTSP\n");
 		}
 
-
-
 		svc_fd_tcp = socket(AF_INET, SOCK_STREAM, 0);
-		if(svc_fd_tcp < 0) {
+		if (svc_fd_tcp < 0) {
 			log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"create tcp srv socket fail");
 		}
 		svc_fd_udp = socket(AF_INET, SOCK_DGRAM, 0);
-		if(svc_fd_udp< 0){
+		if (svc_fd_udp < 0){
 			log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"create udp srv socket fail");
 		}
 
@@ -475,31 +522,32 @@ int main(int argc, char **argv){
 
 		sin.sin_family = AF_INET;
 		sin.sin_addr.s_addr = INADDR_ANY;
-//		sin.sin_port = htons((unsigned short)atoi(svc_tcp_port.c_str()));
+		//sin.sin_port = htons((unsigned short)atoi(svc_tcp_port.c_str()));
 		unsigned short ptop_port = (unsigned short)atoi(svc_tcp_port.c_str());		// listen-port for peer connection
 
 		// find the listen-port which can be used
-		while(1){
+		while (1) {
 			sin.sin_port = htons(ptop_port);
 
 			if (net_ptr->bind(svc_fd_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == 0) {
-				log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"Server bind at TCP port: ",ptop_port);
+				log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Server bind at TCP port", ptop_port);
 				cout << "Server bind at TCP port: " << ptop_port << endl;
 				setsockopt(svc_fd_tcp, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval , sizeof(optval));
-			}else{
+			}
+			else {
 				printf("Server bind at TCP port:  REEOR  !!!!!\n",ptop_port);
-				log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"Server bind at TCP port: FIRST REEOR  !!!!! ",ptop_port);
+				log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "Server bind at TCP port", ptop_port, "error");
 				ptop_port++;
 				continue;
 			}
 
-
 			if (listen(svc_fd_tcp, MAX_POLL_EVENT) == 0) {
 				cout << "Server LISTRN SUCCESS at TCP port: " << ptop_port << endl;
-				log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"Server LISTRN SUCCESS at TCP port:",ptop_port);		
+				log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Server listen at TCP port", ptop_port);		
 				break;
-			}else{
-				log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"Server LISTRN  ERROR! at TCP port:",ptop_port);		
+			}
+			else {
+				log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "Server listen at TCP port", ptop_port, "error");		
 				cout << "TCP PORT :" << svc_tcp_port << " listen error! " << endl;
 				ptop_port++;
 				continue;
@@ -509,11 +557,9 @@ int main(int argc, char **argv){
 		net_ptr->set_nonblocking(svc_fd_tcp);
 
 		cout << "tst_speed_svr " << version << " (Compiled Time: "__DATE__ << " "__TIME__")" << endl;
+		log_ptr->write_log_format("s(u) s (s)\n", __FUNCTION__, __LINE__, "PF", "ready now");
 
-
-		log_ptr->write_log_format("s => s (s)\n", (char*)__PRETTY_FUNCTION__, "PF", "ready now");
-
-		if(!log_ptr->check_arch_compatible()) {
+		if (!log_ptr->check_arch_compatible()) {
 			cout << "Hardware Architecture is not support." << endl;
 			PAUSE
 			log_ptr->exit(0, "Hardware Architecture is not support.");
@@ -527,7 +573,7 @@ int main(int argc, char **argv){
 		interval.it_value.tv_usec = 0;
 
 		// setup periodic timer (3 second) 
-		if(setitimer(ITIMER_REAL, &interval, NULL)) {
+		if (setitimer(ITIMER_REAL, &interval, NULL)) {
 			log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"setitimer ERROR ");		
 			return -1;
 		}
@@ -572,7 +618,7 @@ int main(int argc, char **argv){
 		}*/
 
 #ifdef _FIRE_BREATH_MOD_
-		map_chid_globalVar[chid]->pk_mgr_ptr_copy =pk_mgr_ptr ;
+		map_chid_globalVar[chid]->pk_mgr_ptr_copy = pk_mgr_ptr ;
 		map_chid_globalVar[chid]->http_srv_ready = 1;
 		map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete = FALSE;
 		while((!(map_chid_globalVar[chid]->srv_shutdown))  &&  (!(map_chid_globalVar[chid]->errorRestartFlag))) {
@@ -606,51 +652,58 @@ int main(int argc, char **argv){
 		log_ptr->write_log_format("s => s (s)\n", (char*)__PRETTY_FUNCTION__, "PF", "graceful exit!!");
 		log_ptr->stop_log_record();
 
-		if(prep) 
+		if (prep) { 
 			delete prep;
-		prep =NULL;
+		}
+		prep = NULL;
 
-		if(bit_stream_server_ptr)
+		if (bit_stream_server_ptr) {
 			delete bit_stream_server_ptr;
-		bit_stream_server_ptr =NULL;
+		}
+		bit_stream_server_ptr = NULL;
 
-		if(peer_communication_ptr)
+		if (peer_communication_ptr) {
 			delete peer_communication_ptr;
-		peer_communication_ptr =NULL;
+		}
+		peer_communication_ptr = NULL;
 
-		if(net_ptr)
+		if (net_ptr) {
 			delete net_ptr;
-		net_ptr =NULL;	
+		}
+		net_ptr = NULL;	
 
 #ifdef _FIRE_BREATH_MOD_
 		map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete = TRUE;
 		map_chid_globalVar[chid]->pk_mgr_ptr_copy =NULL;
 		map_chid_globalVar[chid]->http_srv_ready = 0;
 #endif
-		if(pk_mgr_ptr)
+		if (pk_mgr_ptr) {
 			delete pk_mgr_ptr;
-		pk_mgr_ptr =NULL;
+		}
+		pk_mgr_ptr = NULL;
 
 //		if(rtmp_svr)
 //			delete rtmp_svr;
 //		rtmp_svr =NULL;
 
-		if(peer_mgr_ptr) 
+		if (peer_mgr_ptr) {
 			delete peer_mgr_ptr;
-		peer_mgr_ptr=NULL;
+		}
+		peer_mgr_ptr = NULL;
 
-		if(log_ptr)
+		if (log_ptr) {
 			delete log_ptr;
-		log_ptr =NULL;
+		}
+		log_ptr = NULL;
 
-		if(logger_client_ptr)
+		if (logger_client_ptr) {
 			delete logger_client_ptr;
-		logger_client_ptr =NULL;
+		}
+		logger_client_ptr = NULL;
 
-//		PAUSE
-		for(int i= 0 ; i< 10;i++){
+		for (int i = 0; i < 10; i++) {
 			printf("Some Thing Error Wait %d Sec To Restart ............\n",10-i );
-//			Sleep(1000);
+		//Sleep(1000);
 		}
 
 #ifdef _FIRE_BREATH_MOD_

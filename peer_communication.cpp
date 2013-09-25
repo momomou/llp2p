@@ -62,8 +62,9 @@ peer_communication::~peer_communication(){
 
 	for(session_id_candidates_set_iter = session_id_candidates_set.begin() ;session_id_candidates_set_iter !=session_id_candidates_set.end();session_id_candidates_set_iter++){
 		
-		for(int i=0;i< session_id_candidates_set_iter->second->peer_num;i++)
+		for(int i = 0; i < session_id_candidates_set_iter->second->peer_num; i++) {
 			delete session_id_candidates_set_iter->second->list_info->level_info[i];
+		}
 		delete session_id_candidates_set_iter->second->list_info;
 		delete session_id_candidates_set_iter->second;
 	}
@@ -90,297 +91,244 @@ void peer_communication::set_self_info(unsigned long public_ip){
 	self_info->private_ip = _net_ptr->getLocalIpv4();
 }
 
-int peer_communication::set_candidates_handler(unsigned long rescue_manifest,struct chunk_level_msg_t *testing_info,unsigned int candidates_num,int flag){	//flag 0 rescue peer, flag 1 candidate's peer
+//flag 0 rescue peer, flag 1 candidate's peer
+int peer_communication::set_candidates_handler(unsigned long rescue_manifest, struct chunk_level_msg_t *testing_info, unsigned int candidates_num, int flag)
+{	
+	_log_ptr->write_log_format("s(u) s d s d s d s d \n", __FUNCTION__, __LINE__,
+															"session_id =", session_id_count,
+															"manifest =", rescue_manifest,
+															"role =", flag, 
+															"list_number =", candidates_num);
+	for (int i = 0; i < candidates_num; i++) {
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "list pid", testing_info->level_info[i]->pid);
+	}
 	
-	_log_ptr->write_log_format("s =>u \n", __FUNCTION__,__LINE__);
-	_log_ptr->write_log_format("s =>u s s d s d s d s d\n", __FUNCTION__,__LINE__,"set_candidates_handler","session_id : ",session_id_count,", manifest : ",rescue_manifest,", role: ",flag,", list_number: ",candidates_num);
-	for(int i=0;i<candidates_num;i++){
-		//fprintf(peer_com_log,"list pid : %d, public_ip : %d, private_ip: %d\n",testing_info->level_info[i]->pid,testing_info->level_info[i]->public_ip,testing_info->level_info[i]->private_ip);
-		_log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"list pid : ",testing_info->level_info[i]->pid);
+	if (candidates_num < 1) {
+		_log_ptr->write_log_format("s(u) s (u) \n", __FUNCTION__, __LINE__, "[ERROR] candidates_num cannot less than 1", candidates_num);
+		PAUSE
 	}
-
-//candidates_num always not zero
-	if((candidates_num==0)&&(flag==0)){
-		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"rescue peer call peer API, but list is empty");
-		if((total_manifest & rescue_manifest)==1){
-			
-			_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d d \n","error : re-rescue for some sub stream : %d %d in set_candidates_test",total_manifest,rescue_manifest);
-			_logger_client_ptr->log_exit();
-		}
-		else{
-			printf("rescue manifest: %d already rescue manifest: %d\n",rescue_manifest,total_manifest);
-			_log_ptr->write_log_format("s =>u s d s d\n", __FUNCTION__,__LINE__,"rescue manifest: ",rescue_manifest," already rescue manifest: ",total_manifest);
-			total_manifest = total_manifest | rescue_manifest;	//total_manifest has to be erased in stop_attempt_connect
-		
-			session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
-			if(session_id_candidates_set_iter != session_id_candidates_set.end()){
-				
-				_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : session id already in the record in set_candidates_test");
-				_logger_client_ptr->log_exit();
-			}
-			else{
-				session_id_candidates_set[session_id_count] = new struct peer_com_info;
-				if(!(session_id_candidates_set[session_id_count] ) ){
-					printf("peer_communication::session_id_candidates_set[session_id_count]   new error \n");
-					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set[session_id_count]    new error");
-					PAUSE
-				}
-				session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
-				if(session_id_candidates_set_iter == session_id_candidates_set.end()){
-					
-					_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : session id cannot find in the record in set_candidates_test\n");
-					_logger_client_ptr->log_exit();
-				}
-
-				int level_msg_size,offset;
-				offset = 0;
-				level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + candidates_num * sizeof(struct level_info_t *);
-
-				session_id_candidates_set_iter->second->peer_num = candidates_num;
-				session_id_candidates_set_iter->second->manifest = rescue_manifest;
-				session_id_candidates_set_iter->second->role = 0;
-				session_id_candidates_set_iter->second->list_info = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
-				if(!(session_id_candidates_set_iter->second->list_info ) ){
-					printf("peer_communication::session_id_candidates_set_iter->second->list_info   new error \n");
-					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set_iter->second->list_info   new error");
-					PAUSE
-				}
-				memset(session_id_candidates_set_iter->second->list_info, 0x0, level_msg_size);
-				memcpy(session_id_candidates_set_iter->second->list_info, testing_info, (level_msg_size - candidates_num * sizeof(struct level_info_t *)));
-
-				offset += (level_msg_size - candidates_num * sizeof(struct level_info_t *));
-
-				for(int i=0;i<candidates_num;i++){
-					session_id_candidates_set_iter->second->list_info->level_info[i] = new struct level_info_t;
-					if(!(session_id_candidates_set_iter->second->list_info ) ){
-						printf("peer_communication::session_id_candidates_set_iter->second->list_info->level_info[i]   new error \n");
-						_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set_iter->second->list_info->level_info[i]  new error");
-						PAUSE
-					}
-					memset(session_id_candidates_set_iter->second->list_info->level_info[i], 0x0 , sizeof(struct level_info_t));
-					memcpy(session_id_candidates_set_iter->second->list_info->level_info[i], testing_info->level_info[i] , sizeof(struct level_info_t));
-					offset += sizeof(struct level_info_t);
-				}
-			}
-			session_id_count++;
-		}
-		return (session_id_count-1);
-	}
-	else if((candidates_num==0)&&(flag==1)){
-		
-		_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","unknow state in set_candidates_handler\n");
-		_logger_client_ptr->log_exit();
-	}
-
-
+	
 	// I am the child of the candidate-peer
-	if(flag == 0){
-		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"rescue peer call peer API\n");
-		if((total_manifest & rescue_manifest)==1){
+	if (flag == 0) {
+		if ((total_manifest & rescue_manifest) == 1) {
 			
 			_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d d \n","error : re-rescue for some sub stream : %d %d in set_candidates_test\n",total_manifest,rescue_manifest);
 			_logger_client_ptr->log_exit();
 		}
-		else{
-			printf("rescue manifest: %d already rescue manifest: %d\n",rescue_manifest,total_manifest);
-			_log_ptr->write_log_format("s =>u s d s d\n", __FUNCTION__,__LINE__,"rescue manifest: ",rescue_manifest," already rescue manifest: ",total_manifest);
+		else {
+			debug_printf2("rescue manifest: %d already rescue manifest: %d \n", rescue_manifest, total_manifest);
+			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "rescue-peer calls peer_communication");
+			_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "rescue manifest", rescue_manifest, "already rescue manifest", total_manifest);
 			total_manifest = total_manifest | rescue_manifest;	//total_manifest has to be erased in stop_attempt_connect
 		
 			session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
-			if(session_id_candidates_set_iter != session_id_candidates_set.end()){
-				
-				_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : session id already in the record in set_candidates_test\n");
+			if (session_id_candidates_set_iter != session_id_candidates_set.end()) {
+				_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] session id already in the record in set_candidates_test");
+				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s \n", "[ERROR] session id already in the record in set_candidates_test \n");
 				_logger_client_ptr->log_exit();
 			}
 			else{
 				session_id_candidates_set[session_id_count] = new struct peer_com_info;
-				if(!(session_id_candidates_set[session_id_count]) ){
-					printf("peer_communication::session_id_candidates_set[session_id_count]   new error \n");
-					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set[session_id_count]  new error");
+				if (!session_id_candidates_set[session_id_count]) {
+					debug_printf("session_id_candidates_set[session_id_count]  new error \n");
+					_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "session_id_candidates_set[session_id_count]  new error");
+					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s \n", "session_id_candidates_set[session_id_count]  new error \n");
 					PAUSE
 				}
 
 				session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
-				if(session_id_candidates_set_iter == session_id_candidates_set.end()){
-					
+				if (session_id_candidates_set_iter == session_id_candidates_set.end()) {
 					_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : session id cannot find in the record in set_candidates_test\n");
 					_logger_client_ptr->log_exit();
 				}
 
-				int level_msg_size,offset;
-				offset = 0;
+				int level_msg_size;
+				int offset = 0;
 				level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + candidates_num * sizeof(struct level_info_t *);
 
-				session_id_candidates_set_iter->second->peer_num = candidates_num;
-				session_id_candidates_set_iter->second->manifest = rescue_manifest;
-				session_id_candidates_set_iter->second->role = 0;
-				session_id_candidates_set_iter->second->list_info = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
-				if(!(session_id_candidates_set_iter->second->list_info) ){
-					printf("peer_communication::session_id_candidates_set_iter->second->list_info]   new error \n");
-					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set_iter->second->list_info  new error");
+				session_id_candidates_set[session_id_count]->peer_num = candidates_num;
+				session_id_candidates_set[session_id_count]->manifest = rescue_manifest;
+				session_id_candidates_set[session_id_count]->role = 0;
+				session_id_candidates_set[session_id_count]->list_info = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
+				if (!session_id_candidates_set[session_id_count]->list_info) {
+					debug_printf("session_id_candidates_set[session_id_count]->list_info   new error \n");
+					_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "session_id_candidates_set[session_id_count]->list_info  new error");
+					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s \n", "session_id_candidates_set[session_id_count]->list_info  new error \n");
 					PAUSE
 				}
-				memset(session_id_candidates_set_iter->second->list_info, 0x0, level_msg_size);
-				memcpy(session_id_candidates_set_iter->second->list_info, testing_info, (level_msg_size - candidates_num * sizeof(struct level_info_t *)));
+				memset(session_id_candidates_set[session_id_count]->list_info, 0, level_msg_size);
+				memcpy(session_id_candidates_set[session_id_count]->list_info, testing_info, (level_msg_size - candidates_num * sizeof(struct level_info_t *)));
 
 				offset += (level_msg_size - candidates_num * sizeof(struct level_info_t *));
 
-				for(int i=0;i<candidates_num;i++){
-					printf("candidates_num: %d, i: %d \n", candidates_num, i);
-					session_id_candidates_set_iter->second->list_info->level_info[i] = new struct level_info_t;
-					if(!(session_id_candidates_set_iter->second->list_info->level_info[i]) ){
-						printf("peer_communication::session_id_candidates_set_iter->second->list_info->level_info[i]  new error \n");
-						_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set_iter->second->list_info->level_info[i]  new error");
+				for (int i = 0; i < candidates_num; i++) {
+					debug_printf("candidates_num: %d, i: %d \n", candidates_num, i);
+					session_id_candidates_set[session_id_count]->list_info->level_info[i] = new struct level_info_t;
+					if (!session_id_candidates_set[session_id_count]->list_info->level_info[i]) {
+						printf("session_id_candidates_set[session_id_count]->list_info->level_info[i]  new error \n");
+						_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "session_id_candidates_set[session_id_count]->list_info->level_info[i]  new error");
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s \n", "session_id_candidates_set[session_id_count]->list_info->level_info[i]  new error \n");
 						PAUSE
 					}
-					memset(session_id_candidates_set_iter->second->list_info->level_info[i], 0x0 , sizeof(struct level_info_t));
-					memcpy(session_id_candidates_set_iter->second->list_info->level_info[i], testing_info->level_info[i] , sizeof(struct level_info_t));
+					memset(session_id_candidates_set[session_id_count]->list_info->level_info[i], 0, sizeof(struct level_info_t));
+					memcpy(session_id_candidates_set[session_id_count]->list_info->level_info[i], testing_info->level_info[i], sizeof(struct level_info_t));
+					
+					_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] pid =", session_id_candidates_set[session_id_count]->list_info->level_info[i]->pid);
 					offset += sizeof(struct level_info_t);
 				}
 
-				for(int i=0;i<candidates_num;i++){
+				for (int i = 0; i < candidates_num; i++) {
 					struct in_addr privateIP;
 					struct in_addr publicIP;
 					memcpy(&privateIP, &testing_info->level_info[i]->private_ip, sizeof(struct in_addr));
 					memcpy(&publicIP, &testing_info->level_info[i]->public_ip, sizeof(struct in_addr));
 					
-					cout << "candidate_num:" << candidates_num;
-					cout << "  privateIP: " << inet_ntoa(privateIP);
-					cout << ", publicIP: " << inet_ntoa(publicIP) << "\n";
-					printf("testing_info->level_info[0]->pid: %u \n", testing_info->level_info[i]->pid);
-					
-					if((self_info->private_ip == self_info->public_ip)&&(testing_info->level_info[i]->private_ip ==testing_info->level_info[i]->public_ip)){	//self public ip , candidate public ip
-						printf("all public ip active connect\n");
-						_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"all public ip active connect");
-						non_blocking_build_connection(testing_info->level_info[i],0,rescue_manifest,testing_info->level_info[i]->pid,0,session_id_count);
+					//self public ip , candidate public ip
+					if (self_info->private_ip == self_info->public_ip && testing_info->level_info[i]->private_ip == testing_info->level_info[i]->public_ip) {	
+						debug_printf2("all public ip active connect \n");
+						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "candidate-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are not behind NAT, active connect");
+						non_blocking_build_connection(testing_info->level_info[i], 0, rescue_manifest,testing_info->level_info[i]->pid, 0, session_id_count);
 					}
-					else if((self_info->private_ip == self_info->public_ip)&&(testing_info->level_info[i]->private_ip !=testing_info->level_info[i]->public_ip)){	//self public ip , candidate private ip
-						printf("candidate is private ip passive connect\n");
-						_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"candidate is private ip passive connect");
+					//self public ip , candidate private ip
+					else if (self_info->private_ip == self_info->public_ip && testing_info->level_info[i]->private_ip != testing_info->level_info[i]->public_ip) {	
+						debug_printf2("candidate is private ip passive connect\n");
+						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "candidate-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Candidate-peer is behind NAT, passive connect");
 						accept_check(testing_info->level_info[i],0,rescue_manifest,testing_info->level_info[i]->pid,session_id_count);
 					}
-					else if((self_info->private_ip != self_info->public_ip)&&(testing_info->level_info[i]->private_ip ==testing_info->level_info[i]->public_ip)){	//self private ip , candidate public ip
-						printf("rescue peer is private ip active connect\n");
-						_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"rescue peer is public ip active connect");
+					//self private ip , candidate public ip
+					else if (self_info->private_ip != self_info->public_ip && testing_info->level_info[i]->private_ip == testing_info->level_info[i]->public_ip) {	
+						debug_printf2("rescue peer is private ip active connect\n");
+						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "candidate-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Rescue-peer is behind NAT, active connect");
 						non_blocking_build_connection(testing_info->level_info[i],0,rescue_manifest,testing_info->level_info[i]->pid,0,session_id_count);
 					}
-					else if((self_info->private_ip != self_info->public_ip)&&(testing_info->level_info[i]->private_ip !=testing_info->level_info[i]->public_ip)){	//self private ip , candidate private ip
-						printf("all private ip use NAT module\n");
-						_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"all private ip use NAT module");
+					//self private ip , candidate private ip
+					else if (self_info->private_ip != self_info->public_ip && testing_info->level_info[i]->private_ip != testing_info->level_info[i]->public_ip) {	
 						// if both are in the same NAT
-						if(self_info->public_ip == testing_info->level_info[i]->public_ip){
-							printf("same NAT device active connect\n");
-							_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"same NAT device active connect");
+						if (self_info->public_ip == testing_info->level_info[i]->public_ip) {
+							_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__,"candidate-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are behind NAT(identical private IP)");
 							non_blocking_build_connection(testing_info->level_info[i],0,rescue_manifest,testing_info->level_info[i]->pid,1,session_id_count);
-						} else {
-							printf("---------------TCP-Punch connect (actually listener)----------------- \n");
+						}
+						else {
+							debug_printf2("---------------TCP-Punch connect (actually listener)----------------- \n");
+							_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "candidate-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are behind NAT(different private IP)");
 							_stunt_mgr_ptr->tcpPunch_connection(testing_info->level_info[i], 0, rescue_manifest, testing_info->level_info[i]->pid, 0, session_id_count);
 							//accept_check(testing_info->level_info[i], 0, rescue_manifest, testing_info->level_info[0]->pid, session_id_count);
 						}
 					}
-					else{
-						
-						_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : unknown state in rescue peer\n");
+					else {
+						_log_ptr->write_log_format("s(u) s \n", __FUNCTION__,__LINE__, "[ERROR] unknown state in rescue peer");
+							
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s \n", "[ERROR] unknown state in rescue peer \n");
 						_logger_client_ptr->log_exit();
 					}
 				}
 			}
 			session_id_count++;
 		}
-	
-	// I am the parent of the candidate-peer
 	}
-	else if(flag == 1){
-		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"candidate calls peer_com API");
-		if((candidates_num>1)||((candidates_num==0))){
+	// I am the parent of the candidate-peer
+	else if (flag == 1) {
+		if (candidates_num > 1 || candidates_num == 0) {
 			
 			_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : candidate num must be 1\n");
 			_logger_client_ptr->log_exit();
 		}
-		else{
-			printf("candidate manifest: %d \n",rescue_manifest);
-			_log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"candidate manifest: ",rescue_manifest);
+		else {
+			debug_printf2("candidate manifest: %d \n", rescue_manifest);
+			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "candidate-peer calls peer_communication");
+			_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "rescue manifest =", rescue_manifest);
 		
 			session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
-			if(session_id_candidates_set_iter != session_id_candidates_set.end()){
-				
-				_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : session id in the record in set_candidates_test\n");
+			if (session_id_candidates_set_iter != session_id_candidates_set.end()) {
+				_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] session id in the record in set_candidates_test");
+				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s \n", "[ERROR] session id in the record in set_candidates_test \n");
 				_logger_client_ptr->log_exit();
 			}
-			else{
+			else {
 				session_id_candidates_set[session_id_count] = new struct peer_com_info;
-				if(!(session_id_candidates_set[session_id_count]) ){
+				if (!session_id_candidates_set[session_id_count]) {
 					printf("peer_communication::session_id_candidates_set[session_id_count]  new error \n");
-					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set[session_id_count]  new error");
+					_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "session_id_candidates_set[session_id_count]  new error");
+					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s \n", "session_id_candidates_set[session_id_count]  new error \n");
 					PAUSE
-				}
+				}  
 				session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
-				if(session_id_candidates_set_iter == session_id_candidates_set.end()){
-					
-					_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : session id cannot find in the record in set_candidates_test\n");
+				if (session_id_candidates_set_iter == session_id_candidates_set.end()) {
+					_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] session id cannot find in the record in set_candidates_test");
+					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s \n", "[ERROR] session id cannot find in the record in set_candidates_test \n");
 					_logger_client_ptr->log_exit();
 				}
 
-				int level_msg_size,offset;
-				offset = 0;
+				int level_msg_size;
+				int offset = 0;
 				level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + candidates_num * sizeof(struct level_info_t *);
 
-				session_id_candidates_set_iter->second->peer_num = candidates_num;
-				session_id_candidates_set_iter->second->manifest = rescue_manifest;
-				session_id_candidates_set_iter->second->role = 1;
-				session_id_candidates_set_iter->second->list_info = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
-				if(!(session_id_candidates_set_iter->second->list_info) ){
-					printf("peer_communication::session_id_candidates_set_iter->second->list_info new error \n");
-					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set_iter->second->list_info new error");
+				session_id_candidates_set[session_id_count]->peer_num = candidates_num;
+				session_id_candidates_set[session_id_count]->manifest = rescue_manifest;
+				session_id_candidates_set[session_id_count]->role = 1;
+				session_id_candidates_set[session_id_count]->list_info = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
+				if (!session_id_candidates_set[session_id_count]->list_info) {
+					debug_printf2("session_id_candidates_set[session_id_count]->second->list_info new error \n");
+					_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "session_id_candidates_set[session_id_count]->list_info new error");
+					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s \n", "session_id_candidates_set[session_id_count]->list_info new error \n");
 					PAUSE
 				}
-				memset(session_id_candidates_set_iter->second->list_info, 0x0, level_msg_size);
-				memcpy(session_id_candidates_set_iter->second->list_info, testing_info, (level_msg_size - candidates_num * sizeof(struct level_info_t *)));
+				memset(session_id_candidates_set[session_id_count]->list_info, 0, level_msg_size);
+				memcpy(session_id_candidates_set[session_id_count]->list_info, testing_info, (level_msg_size - candidates_num * sizeof(struct level_info_t *)));
 
 				offset += (level_msg_size - candidates_num * sizeof(struct level_info_t *));
 
-				for(int i=0;i<candidates_num;i++){
-					printf("candidates_num: %d, i: %d \n", candidates_num, i);
-					session_id_candidates_set_iter->second->list_info->level_info[i] = new struct level_info_t;
-					if(!(session_id_candidates_set_iter->second->list_info->level_info[i] ) ){
-						printf("peer_communication::session_id_candidates_set_iter->second->list_info->level_info[i]  new error \n");
-						_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," session_id_candidates_set_iter->second->list_info->level_info[i]  new error");
+				for (int i = 0; i < candidates_num; i++) {
+					debug_printf2("candidates_num: %d, i: %d \n", candidates_num, i);
+					session_id_candidates_set[session_id_count]->list_info->level_info[i] = new struct level_info_t;
+					if (!session_id_candidates_set[session_id_count]->list_info->level_info[i]) {
+						debug_printf2("session_id_candidates_set[session_id_count]->list_info->level_info[i]  new error \n");
+						_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "session_id_candidates_set[session_id_count]->list_info->level_info[i]  new error");
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s \n", "session_id_candidates_set[session_id_count]->list_info->level_info[i]  new error \n");
 						PAUSE
 					}
-					memset(session_id_candidates_set_iter->second->list_info->level_info[i], 0x0 , sizeof(struct level_info_t));
-					memcpy(session_id_candidates_set_iter->second->list_info->level_info[i], testing_info->level_info[i] , sizeof(struct level_info_t));
+					memset(session_id_candidates_set[session_id_count]->list_info->level_info[i], 0, sizeof(struct level_info_t));
+					memcpy(session_id_candidates_set[session_id_count]->list_info->level_info[i], testing_info->level_info[i], sizeof(struct level_info_t));
 					offset += sizeof(struct level_info_t);
 				}
-				printf("testing_info->level_info[0]->pid: %u \n", testing_info->level_info[0]->pid);
-				if((self_info->private_ip == self_info->public_ip)&&(testing_info->level_info[0]->private_ip ==testing_info->level_info[0]->public_ip)){	//self public ip , rescue peer public ip
-					printf("all public ip passive connect in cnadidate\n");
-					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"all public ip passive connect in candidate");
+				
+				struct in_addr privateIP;
+				struct in_addr publicIP;
+				memcpy(&privateIP, &testing_info->level_info[0]->private_ip, sizeof(struct in_addr));
+				memcpy(&publicIP, &testing_info->level_info[0]->public_ip, sizeof(struct in_addr));
+				
+				//self public ip , rescue peer public ip
+				if (self_info->private_ip == self_info->public_ip && testing_info->level_info[0]->private_ip == testing_info->level_info[0]->public_ip) {	
+					debug_printf2("all public ip passive connect in cnadidate\n");
+					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "rescue-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are not behind NAT, passive connect");
 					accept_check(testing_info->level_info[0],1,rescue_manifest,testing_info->level_info[0]->pid,session_id_count);
 				}
-				else if((self_info->private_ip == self_info->public_ip)&&(testing_info->level_info[0]->private_ip !=testing_info->level_info[0]->public_ip)){	//self public ip , rescue peer private ip
-					printf("rescue peer is private ip passive connect in cnadidate\n");
-					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"rescue peer is private ip passive connect in candidate");
+				//self public ip , rescue peer private ip
+				else if (self_info->private_ip == self_info->public_ip && testing_info->level_info[0]->private_ip != testing_info->level_info[0]->public_ip) {	
+					debug_printf2("rescue peer is private ip passive connect in cnadidate\n");
+					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "rescue-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Rescue-peer is behind NAT, passive connect");
 					accept_check(testing_info->level_info[0],1,rescue_manifest,testing_info->level_info[0]->pid,session_id_count);
 				}
-				else if((self_info->private_ip != self_info->public_ip)&&(testing_info->level_info[0]->private_ip ==testing_info->level_info[0]->public_ip)){	//self private ip , rescue peer public ip
-					printf("candidate is private ip active connect in cnadidate\n");
-					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"candidate is private ip active connect in candidate");
+				//self private ip , rescue peer public ip
+				else if (self_info->private_ip != self_info->public_ip && testing_info->level_info[0]->private_ip == testing_info->level_info[0]->public_ip) {	
+					debug_printf2("candidate is private ip active connect in cnadidate\n");
+					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "rescue-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Candidate-peer is behind NAT, active connect");
 					non_blocking_build_connection(testing_info->level_info[0],1,rescue_manifest,testing_info->level_info[0]->pid,0,session_id_count);
 				}
-				else if((self_info->private_ip != self_info->public_ip)&&(testing_info->level_info[0]->private_ip !=testing_info->level_info[0]->public_ip)){	//self private ip , rescue peer private ip
-					printf("all private ip use NAT module in cnadidate\n");
-					_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"all private ip use NAT module in candidate");
-					if(self_info->public_ip == testing_info->level_info[0]->public_ip){
-							printf("same NAT device passive connect in cnadidate\n");
-							_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"same NAT device passive connect in candidate");
-							accept_check(testing_info->level_info[0],1,rescue_manifest,testing_info->level_info[0]->pid,session_id_count);
-					} else {
-							printf("---------------TCP-Punch listen (actually connecter)----------------- \n");
-							_stunt_mgr_ptr->accept_check_nat(testing_info->level_info[0],1,rescue_manifest,testing_info->level_info[0]->pid,session_id_count);
+				//self private ip , rescue peer private ip
+				else if (self_info->private_ip != self_info->public_ip && testing_info->level_info[0]->private_ip != testing_info->level_info[0]->public_ip) {	
+					// if both are in the same NAT
+					if (self_info->public_ip == testing_info->level_info[0]->public_ip) {
+						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__, __LINE__,"rescue-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are behind NAT(identical private IP)");
+						accept_check(testing_info->level_info[0], 1, rescue_manifest,testing_info->level_info[0]->pid, session_id_count);
+					}
+					else {
+						debug_printf2("---------------TCP-Punch listen (actually connecter)----------------- \n");
+						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "rescue-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are behind NAT(different private IP)");
+						_stunt_mgr_ptr->accept_check_nat(testing_info->level_info[0], 1, rescue_manifest,testing_info->level_info[0]->pid, session_id_count);
 					}
 				}
-				else{
-					
+				else {
 					_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : unknown state in candidate's peer\n");
 					_logger_client_ptr->log_exit();
 				}
@@ -388,9 +336,9 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest,str
 			session_id_count++;
 		}
 	}
-	else{
-		
-		_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : unknow flag in set_candidates_test\n");
+	else {
+		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] unknow flag in set_candidates_test");
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s \n", "[ERROR] unknow flag in set_candidates_test \n");
 		_logger_client_ptr->log_exit();
 	}
 
@@ -1097,10 +1045,10 @@ int peer_communication::handle_pkt_out(int sock)	//first write, then set fd to r
 	
 	map_fd_info_iter = map_fd_info.find(sock);
 	if (map_fd_info_iter == map_fd_info.end()) {
-		
 		_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","cannot find map_fd_info_iter structure in peer_communication::handle_pkt_out\n");
 		_logger_client_ptr->log_exit();
-	} else {
+	}
+	else {
 		printf("map_fd_info_iter->second->flag: %d \n", map_fd_info_iter->second->flag);
 		if(map_fd_info_iter->second->flag == 0){	//this fd is rescue peer
 			//send peer con
@@ -1153,9 +1101,7 @@ int peer_communication::handle_pkt_out(int sock)	//first write, then set fd to r
 				_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);	
 				
 			}else if (map_fd_NonBlockIO_iter ->second->io_nonblockBuff.nonBlockingSendCtrl.recv_packet_state == READY){
-				cout << "sock = " << sock << endl;
-				printf("PAUSE %s:%d \n", __FUNCTION__, __LINE__);
-				//PAUSE
+				
 				_net_ptr->set_nonblocking(sock);
 				_net_ptr->epoll_control(sock, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);	
 				_net_ptr->set_fd_bcptr_map(sock, dynamic_cast<basic_class *> (_peer_ptr));

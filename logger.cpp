@@ -4,16 +4,14 @@
 #include <string.h>
 
 static const char *levels[] = {
-  "CRIT", "ERROR", "WARNING", "INFO",
-  "DEBUG", "DEBUG2"
+  "CRIT", "ERROR", "WARNING", "INFO", "DEBUG", "DEBUG2"
 };
 
 void logger::timer() 
 {
 	timerMod =MOD_TIME__CLOCK ;
-	if(--_systime == 0) {
-		write_log_format("s => [U/U]\n", 
-		"Rate[KB]", _net_ptr->send_byte/SIG_FREQ/1024, _net_ptr->recv_byte/SIG_FREQ/1024);
+	if (--_systime == 0) {
+		write_log_format("s => [U/U]\n", "Rate[KB]", _net_ptr->send_byte/SIG_FREQ/1024, _net_ptr->recv_byte/SIG_FREQ/1024);
 		_systime = SYS_FREQ;
 	}
 }
@@ -23,19 +21,18 @@ void logger::time_init()
 	last_alarm = time(NULL);
 }
 
-bool logger::handleAlarm() {
+bool logger::handleAlarm()
+{
 	time_t now = time(NULL);
 
-	if(now - last_alarm) {
+	if (now - last_alarm) {
 		last_alarm = now;
 		//this->timer();			// call periodical task
 		return true;
 	}
-	
 	return false;
 }
  
-
 char *logger::get_now_time() 
 {
 	time_t T;
@@ -76,18 +73,18 @@ void logger::start_log_record(int time)
 			sprintf(temp_number,"%d",logNumber++)	;
 			strcat(temp,temp_number);
 			strcat(temp,".txt");
-			printf("%s\n",logNumber_ptr);
+			debug_printf("%s\n",logNumber_ptr);
 			memcpy(logNumber_ptr,temp,20);
-			printf("PATH = %s  \n",szPath);
+			debug_printf("PATH = %s  \n",szPath);
 			memset(temp,0x00,20);
 			memset(temp_number,0x00,20);
 
 		}
 	}
 
-	printf("PATH = %s  \n",szPath);
+	debug_printf("PATH = %s  \n",szPath);
 	_fp = fopen((char*)szPath, "w");
-	if(!_fp) {
+	if (!_fp) {
 		cout << "Cannot write log file" << endl;
 		//PAUSE
 //		::exit(0);
@@ -100,76 +97,19 @@ void logger::start_log_record(int time)
 //	}
 }
 
-/*
-void logger::start_log_record(int time) 
-{
-	int logNumber=0;
-	char temp[20]={'\0'};
-	char temp_number[20]={'\0'};
-	memset(temp,0x00,20);
-	memset(temp_number,0x00,20);
-
-	char *logNumber_ptr;
-	char *   szPath[MAX_PATH]= {'\0'};
-#ifdef _FIRE_BREATH_MOD_
-	GetEnvironmentVariableA ("APPDATA" ,(LPSTR)szPath,   MAX_PATH);  
-	strcat((char*)szPath,"\\LLP2P\\");
-	CreateDirectoryA((char*)szPath,NULL);
-#endif
-	strcat((char*)szPath,"P2PLog.txt");
-	_systime = time;
-
-	while(1){
-		_fp = fopen((char*)szPath, "r");
-		if(!_fp){
-			break;
-		}else{
-
-			logNumber_ptr = strstr((char*)szPath ,"P2PLog");
-			strcat(temp,"P2PLog");
-			sprintf(temp_number,"%d",logNumber++)	;
-			strcat(temp,temp_number);
-			strcat(temp,".txt");
-			printf("%s\n",logNumber_ptr);
-			memcpy(logNumber_ptr,temp,20);
-			printf("PATH = %s  \n",szPath);
-			memset(temp,0x00,20);
-			memset(temp_number,0x00,20);
-
-		}
-	}
-
-	printf("PATH = %s  \n",szPath);
-	_fp = fopen((char*)szPath, "w");
-	if(!_fp) {
-		cout << "Cannot write log file" << endl;
-//		::exit(0);
-	}
-
-//	_binary_fp = fopen(LOGBINARYFILE, "wb");
-//	if(_binary_fp==NULL) {
-//		cout << "Cannot write binary log file" << endl;
-//		::exit(0);
-//	}
-}
-*/
 void logger::stop_log_record() 
 {
-
-	if(_fp== NULL)
+	if (_fp == NULL) {
 		return;
-//	if(_binary_fp== NULL)
-//		return;
+	}
 
 	fprintf(_fp, "===================================================================================================\n");
 	fflush(_fp);
-//	fclose(_fp);
-//	fflush(_binary_fp);
-//	fclose(_binary_fp);
 }
 
 void logger::write_log_format(const char* fmt, ...) 
 {
+#ifdef WRITE_LOG
 	va_list ap;
 	int d;
 	double f;
@@ -178,16 +118,14 @@ void logger::write_log_format(const char* fmt, ...)
 	unsigned long long int llu;
 	struct in_addr pip;
 
-	if(_fp== NULL)
+	if (_fp== NULL) {
 		return;
-//	if(_binary_fp== NULL)
-//		return;
-
+	}
 
 	fprintf(_fp,"[%s] ", get_now_time());
 
-	for(va_start(ap, fmt); *fmt; fmt++) {
-		switch(*fmt) {
+	for (va_start(ap, fmt); *fmt; fmt++) {
+		switch (*fmt) {
 			case 's':           /* string */
 				s = va_arg(ap, char *);
 				fprintf(_fp, "%s", s);
@@ -223,8 +161,8 @@ void logger::write_log_format(const char* fmt, ...)
 
 	fflush(_fp);
 	va_end(ap);
+#endif
 }
-
 
 void logger::write_binary(unsigned int sequence_number)
 {
@@ -232,39 +170,27 @@ void logger::write_binary(unsigned int sequence_number)
 	tm *ptm;
 	time(&now);
 	ptm = gmtime(&now);
-	
-//	fwrite(ptm ,sizeof(tm) , 1, _binary_fp);
-//	fwrite(&sequence_number ,sizeof(unsigned int) , 1, _binary_fp);
 }
-
 
 void logger::exit(int status, const char *action) 
 {
-	write_log_format("s => s (s)\n", "log Terminate", "exit()", action);
+	write_log_format("s(u) s (s) \n", __FUNCTION__,__LINE__, "log terminate by", action);
 	stop_log_record();
 	_net_ptr->garbage_collection();
-	printf("logger error\n");
+	debug_printf("logger error\n");
 	*(_net_ptr->_errorRestartFlag) =RESTART;
-//	PAUSE
-	//::exit(status);
 }
-
 
 bool logger::check_arch_compatible() 
 {
-
-	if(!is_little_endian()) {
+	if (!is_little_endian()) {
 		return false;
 	}
-
-	if(sizeof(int) != 4) {
+	if (sizeof(int) != 4) {
 		return false;
 	}
-
-	
 	return true;
 }
-
 
 int logger::set_resource_limit(int maxfds) 
 {	
@@ -274,9 +200,7 @@ int logger::set_resource_limit(int maxfds)
 void logger::logger_set(network *net_ptr )
 {
 	_net_ptr = net_ptr;
-
 }
-
 
 logger::logger()
 {
@@ -287,9 +211,8 @@ logger::logger()
 
 logger::~logger() 
 {
-	printf("==============deldet logger success==========\n");
+	debug_printf("==============deldet logger success==========\n");
 }
-
 
 int logger::is_little_endian() 
 {
@@ -300,37 +223,40 @@ int logger::is_little_endian()
 void logger::LogPrintf(const char *format, ...)
 {
 	char str[MAX_PRINT_LEN]="";
-        int len;
+    int len;
 	va_list args;
 	va_start(args, format);
 	len = vsnprintf(str, MAX_PRINT_LEN-1, format, args);
 	va_end(args);
 
-	if ( _debuglevel==LOGCRIT )
+	if (_debuglevel == LOGCRIT) {
 		return;
-
+	}
 	if (_neednl) {
 		putc('\n', _fp);
 		_neednl = 0;
 	}
 
-	if (len > MAX_PRINT_LEN-1)
-		len = MAX_PRINT_LEN-1;
+	if (len > MAX_PRINT_LEN - 1) {
+		len = MAX_PRINT_LEN - 1;
+	}
 	fprintf(_fp, "%s", str);
-	if (str[len-1] == '\n')
+	if (str[len-1] == '\n') {
 		fflush(_fp);
+	}
 }
 
 void logger::LogStatus(const char *format, ...)
 {
-	char str[MAX_PRINT_LEN]="";
+	char str[MAX_PRINT_LEN] = "";
 	va_list args;
 	va_start(args, format);
 	vsnprintf(str, MAX_PRINT_LEN-1, format, args);
 	va_end(args);
 
-	if ( _debuglevel==LOGCRIT )
+	if ( _debuglevel==LOGCRIT ) {
 		return;
+	}
 
 	fprintf(_fp, "%s", str);
 	fflush(_fp);
@@ -340,7 +266,6 @@ void logger::LogStatus(const char *format, ...)
 void logger::Log(int level, const char *format, ...)
 {
 #ifdef _DEBUG
-
 	char str[MAX_PRINT_LEN]="";
 	va_list args;
 	va_start(args, format);
@@ -348,28 +273,26 @@ void logger::Log(int level, const char *format, ...)
 	va_end(args);
 
 	// Filter out 'no-name'
-	if ( _debuglevel<LOGALL && strstr(str, "no-name" ) != NULL )
+	if ( _debuglevel<LOGALL && strstr(str, "no-name" ) != NULL ) {
 		return;
-
-	if ( level <= _debuglevel ) {
+	}
+	if (level <= _debuglevel) {
 		if (_neednl) {
 			putc('\n', _fp);
 			_neednl = 0;
 		}
 		fprintf(_fp, "%s: %s\n", levels[level], str);
-
 		fflush(_fp);
-
 	}
 #endif
 }
 
 void logger::LogHex(int level, const char *data, unsigned long len)
 {
-	unsigned long i;
-	if ( level > _debuglevel )
+	if (level > _debuglevel) {
 		return;
-	for(i=0; i<len; i++) {
+	}
+	for	(unsigned long i = 0; i < len; i++) {
 		LogPrintf("%02X ", (unsigned char)data[i]);
 	}
 	LogPrintf("\n");
@@ -384,19 +307,22 @@ void logger::LogHexString(int level, const char *data, unsigned long len)
 	char	line[BP_LEN];
 	unsigned long i;
 
-	if ( !data || level > _debuglevel )
+	if (!data || level > _debuglevel ) {
 		return;
+	}
 
 	/* in case len is zero */
 	line[0] = '\n';
 	line[1] = '\0';
 
-	for ( i = 0 ; i < len ; i++ ) {
+	for (i = 0 ; i < len ; i++) {
 		int n = i % 16;
 		unsigned off;
 
-		if( !n ) {
-			if( i ) LogPrintf( "%s", line );
+		if (!n) {
+			if (i) {
+				LogPrintf( "%s", line );
+			}
 			memset( line, ' ', sizeof(line)-2 );
 			line[sizeof(line)-2] = '\n';
 			line[sizeof(line)-1] = '\0';
@@ -416,9 +342,10 @@ void logger::LogHexString(int level, const char *data, unsigned long len)
 
 		off = BP_GRAPH + n + ((n >= 8)?1:0);
 
-		if ( isprint( (unsigned char) data[i] )) {
+		if (isprint((unsigned char)data[i])) {
 			line[BP_GRAPH + n] = data[i];
-		} else {
+		}
+		else {
 			line[BP_GRAPH + n] = '.';
 		}
 	}
@@ -477,10 +404,10 @@ DWORD logger::diffgetTime_ms(DWORD startTime,DWORD endTime)
 #ifdef WIN32
 int logger::getTickTime(LARGE_INTEGER *tickTime)
 {
-	bool fail =QueryPerformanceCounter(tickTime);
-	if(fail == 0){
-		timerMod =MOD_TIME__CLOCK ;
-		printf("QueryPerformanceCounter fail GetLastError = %d\n",GetLastError());
+	bool fail = QueryPerformanceCounter(tickTime);
+	if (fail == 0) {
+		timerMod = MOD_TIME__CLOCK ;
+		debug_printf("QueryPerformanceCounter fail GetLastError = %d\n", GetLastError());
 //		PAUSE
 	}
 	return fail;
@@ -494,7 +421,7 @@ LONGLONG logger::diffTime_us(LARGE_INTEGER startTime,LARGE_INTEGER endTime)
     LARGE_INTEGER CUPfreq;
     LONGLONG llLastTime;
     QueryPerformanceFrequency(&CUPfreq);
-    llLastTime = 1000000 * (endTime.QuadPart - startTime.QuadPart) / CUPfreq.QuadPart;
+    llLastTime = 1000000 *(endTime.QuadPart - startTime.QuadPart) / CUPfreq.QuadPart;
     return llLastTime;
 }
 #endif
@@ -505,7 +432,7 @@ unsigned int logger::diffTime_ms(LARGE_INTEGER startTime,LARGE_INTEGER endTime)
     LARGE_INTEGER CUPfreq;
     LONGLONG llLastTime;
     QueryPerformanceFrequency(&CUPfreq);
-//	double diff =(endTime.QuadPart - startTime.QuadPart);
+	//double diff =(endTime.QuadPart - startTime.QuadPart);
 	//if (diff<0){
 	//	diff = abs(diff);
 	//	PAUSE
@@ -550,37 +477,35 @@ void logger::timerGet(struct timerStruct *timmer)
 		debug_printf("initTickFlag timmer->initTickFlag =NONINIT\n");
 		//PAUSE
 	}
-	else{
+	else {
 		timmer->initTickFlag=INITED;
 	}
-
-	timmer ->clockTime = gettimeofday_ms() ;
-	timmer->initClockFlag =INITED ;
+	timmer->clockTime = gettimeofday_ms();
+	timmer->initClockFlag = INITED;
 }
 #endif
 
 
 #ifdef WIN32
-unsigned int logger::diff_TimerGet_ms(struct timerStruct *start,struct timerStruct *end)
+unsigned int logger::diff_TimerGet_ms(struct timerStruct *start, struct timerStruct *end)
 {
-
-	if(start ->initClockFlag != INITED ){
-		printf("start timer initClockFlag  not INITED \n");
+	if (start->initClockFlag != INITED) {
+		debug_printf("start timer initClockFlag  not INITED \n");
 		//PAUSE
 	}
 
-	if(end ->initClockFlag != INITED ){
-		printf("end timer not INITED \n");
+	if (end->initClockFlag != INITED) {
+		debug_printf("end timer not INITED \n");
 		//PAUSE
 	}
 
-	if(start ->initTickFlag != INITED ){
+	if (start->initTickFlag != INITED) {
 		//printf("start timer initTickFlag  not INITED \n");
 		timerMod = MOD_TIME__CLOCK;
 		//PAUSE
 	}
 
-	if(end ->initTickFlag != INITED ){
+	if (end->initTickFlag != INITED) {
 		//printf("start timer initTickFlag  not INITED \n");
 		timerMod = MOD_TIME__CLOCK;
 		//PAUSE
@@ -590,21 +515,23 @@ unsigned int logger::diff_TimerGet_ms(struct timerStruct *start,struct timerStru
 	unsigned int clockReturn = diffgetTime_ms(start->clockTime, end->clockTime);
 
 	//program run 10 hours for debug~
-	if(tickReturn >= 36000000){
-		printf("tickReturn =%u  clockReturn = %u\n",tickReturn,clockReturn);
-//		PAUSE
+	if (tickReturn >= 36000000) {
+		debug_printf("tickReturn = %u  clockReturn = %u \n", tickReturn, clockReturn);
 		timerMod = MOD_TIME__CLOCK;
 	}
 
-
-	if(tickReturn < 2)
-		tickReturn=2;
-	if(clockReturn < 2)
-		clockReturn=2;
-
-	if(timerMod == MOD_TIME_TICK)
+	if (tickReturn < 2) {
+		tickReturn = 2;
+	}
+	if (clockReturn < 2) {
+		clockReturn = 2;
+	}
+	
+	if (timerMod == MOD_TIME_TICK) {
 		return tickReturn;
-	else
-		return clockReturn ;
+	}
+	else {
+		return clockReturn;
+	}
 }
 #endif

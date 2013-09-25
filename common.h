@@ -1,8 +1,19 @@
 //#ifndef _FIRE_BREATH_MOD_
 //#define _FIRE_BREATH_MOD_ 
 //#endif
+
 #ifndef DEBUG
-#define DEBUG 
+#define DEBUG
+#endif
+
+/*
+#ifndef DEBUG2
+#define DEBUG2
+#endif
+*/
+
+#ifndef WRITE_LOG
+#define WRITE_LOG		// write log.txt
 #endif
 
 #ifndef __COMMON_H__
@@ -32,10 +43,10 @@
 // BUFF_SIZE sec
 #define BUFF_SIZE		2
 //CHUNK_LOSE sec, mean lose about CHUNK_LOSE sec packet
-#define CHUNK_LOSE		1	//
+#define CHUNK_LOSE		2	//
 
 //source delay PARAMETER ms
-#define MAX_DELAY 1500
+#define MAX_DELAY 2000
 //SOURCE_DELAY_CONTINUOUS sec, mean  about SOURCE_DELAY_CONTINUOUS sec packet all dalay out of bound
 #define SOURCE_DELAY_CONTINUOUS 0.5
 
@@ -218,6 +229,22 @@ using std::bitset;
 #else
     #define debug_printf2(str, ...)
 #endif 
+
+/****************************************************/
+/*		Type Definition								*/
+/****************************************************/
+#ifdef _WIN32
+#else
+	typedef int8_t      INT8;
+	typedef int16_t     INT16;
+	typedef int32_t     INT32;
+	typedef int64_t     INT64;
+	typedef uint8_t     UINT8;
+	typedef uint16_t    UINT16;
+	typedef uint32_t    UINT32;
+	typedef uint64_t    UINT64;
+#endif
+
 
 #define LOGFILE			"log.txt"
 #define LOGBINARYFILE	"logbinary.txt"
@@ -553,7 +580,7 @@ struct peer_connect_down_t {
 	struct peer_info_t peerInfo;
 	int rescueStatsArry[PARAMETER_M];
 	volatile unsigned int timeOutLastSeq;
-	volatile unsigned int timeOutNewSeq;
+	volatile unsigned int timeOutNewSeq;		// Sequence number received from this parent so far
 	volatile unsigned int lastTriggerCount;
 	volatile unsigned int outBuffCount;
 	
@@ -760,7 +787,7 @@ struct peer_latency_measure {
 
 struct syn_struct{
 	int init_flag; // 0:not init, 1:send, 2:init complete
-	unsigned long client_abs_start_time;	// Synchronized time relative to PK
+	UINT32 client_abs_start_time;	// Synchronized time relative to PK
 	unsigned long start_seq;
 
 	//timer
@@ -774,8 +801,8 @@ struct source_delay {
 	//timer
 	struct timerStruct client_end_time;
 	unsigned long end_seq_num;
-	unsigned int end_seq_abs_time;
-	int first_pkt_recv;
+	UINT32 end_seq_abs_time;
+	bool first_pkt_recv;
 	int rescue_state;			//0 normal 1 rescue trigger 2 testing
 	int delay_beyond_count;		// Counter++ if delay more than MAX_DELAY
 //	int delay time

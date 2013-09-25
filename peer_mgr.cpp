@@ -23,7 +23,7 @@ peer_mgr::peer_mgr(list<int> *fd_list)
 
 peer_mgr::~peer_mgr() 
 {
-	printf("==============deldet peer_mgr success==========\n");
+	debug_printf("==============deldet peer_mgr success==========\n");
 
 	if(peer_ptr)
 		delete peer_ptr;
@@ -83,10 +83,10 @@ int peer_mgr::build_connection(struct level_info_t *level_info_ptr, unsigned lon
 //只用來接收 CHNK_CMD_PEER_CON的資訊  並把fd 加入監聽
 int peer_mgr::handle_pkt_in(int sock)
 {
-	printf("-----------------peer_mgr::handle_pkt_in--------------------------");
+	debug_printf("-----------------peer_mgr::handle_pkt_in--------------------------");
 	
 	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","cannot inside this scope in peer_mgr::handle_pkt_in\n");
-	printf("peer_mgr::pkt_in \n");
+	debug_printf("peer_mgr::pkt_in \n");
 	_logger_client_ptr->log_exit();
 	return RET_OK;
 }
@@ -165,7 +165,7 @@ void peer_mgr::clear_ouput_buffer(unsigned long pid)
 		}
 	}
 	
-	printf("clear_ouput_buffer size = %d \n",queue_out_data_ptr->size());
+	debug_printf("clear_ouput_buffer size = %d \n",queue_out_data_ptr->size());
 	_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"clear_ouput_buffer size =",queue_out_data_ptr->size());
 
 
@@ -199,7 +199,7 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 	if(fd_queue_iter !=  peer_ptr ->map_fd_out_ctrl.end()){
 		queue_out_ctrl_ptr =fd_queue_iter ->second;
 	}else{
-		printf("fd not here\n");
+		debug_printf("fd not here\n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd not here");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
 		PAUSE
@@ -210,13 +210,13 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 
 	chunk_delay_ptr = new struct chunk_delay_test_t;
 	if(!(chunk_delay_ptr ) ){
-		printf("peer_mgr::chunk_delay_ptr  new error \n");
+		debug_printf("peer_mgr::chunk_delay_ptr  new error \n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_delay_ptr new error");
 		PAUSE
 	}
 	struct chunk_t * html_buf = (struct chunk_t*)new unsigned char [BIG_CHUNK];
 	if(!(html_buf ) ){
-		printf("peer_mgr::html_buf  new error \n");
+		debug_printf("peer_mgr::html_buf  new error \n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"html_buf new error");
 		PAUSE
 	}
@@ -244,7 +244,7 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 	if (chunk_delay_ptr)
 		delete chunk_delay_ptr;
 
-	printf("sent test delay OK !!  len = %d\n",html_buf ->header.length);
+	debug_printf("sent test delay OK !!  len = %d\n",html_buf ->header.length);
 	_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"sent test delay OK !!");
 
 /*
@@ -298,7 +298,7 @@ int peer_mgr::handle_test_delay(unsigned long manifest)
 			map_pid_fd_iter = peer_ptr ->map_in_pid_fd.find(pid);
 			if(map_pid_fd_iter != peer_ptr ->map_in_pid_fd.end() ){
 				sock =peer_ptr ->map_in_pid_fd [pid] ;
-				printf("pid : %d sock : %d iter : %d\n",pid,sock,map_pid_fd_iter->second);
+				debug_printf("pid : %d sock : %d iter : %d\n",pid,sock,map_pid_fd_iter->second);
 //				_log_ptr->write_log_format("s =>u s u s d s u \n", __FUNCTION__,__LINE__,"pid",pid,"sock",sock,map_pid_fd_iter->second,"manifest",manifest);
 
 				connect_num++;
@@ -320,7 +320,7 @@ int peer_mgr::handle_test_delay(unsigned long manifest)
 		list_array = (unsigned long *)new unsigned char[(sizeof(unsigned long) * list_num)];
 		offset = 0;
 		if(!(list_array ) ){
-			printf("peer_mgr::list_array  new error \n");
+			debug_printf("peer_mgr::list_array  new error \n");
 			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"list_array new error");
 			PAUSE
 		}
@@ -336,7 +336,7 @@ int peer_mgr::handle_test_delay(unsigned long manifest)
 		connect_array = (unsigned long *)new unsigned char[(sizeof(unsigned long) * connect_num)];
 		offset = 0;
 		if(!(connect_array ) ){
-			printf("peer_mgr::connect_array  new error \n");
+			debug_printf("peer_mgr::connect_array  new error \n");
 			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"connect_array new error");
 			PAUSE
 		}
@@ -385,7 +385,7 @@ void peer_mgr::send_manifest_to_parent(unsigned long manifestValue,unsigned long
 	if(map_pid_fd_iter !=  peer_ptr ->map_in_pid_fd.end()){
 		parentSock =map_pid_fd_iter ->second;
 	}else{
-		printf("pid not here");
+		debug_printf("pid not here");
 		PAUSE
 		return;
 	}
@@ -394,7 +394,7 @@ void peer_mgr::send_manifest_to_parent(unsigned long manifestValue,unsigned long
 	if(fd_queue_iter !=  peer_ptr ->map_fd_out_ctrl.end()){
 	queue_out_ctrl_ptr =fd_queue_iter ->second;
 	}else{
-		printf("fd not here\n");
+		debug_printf("fd not here\n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd not here");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
 		PAUSE
@@ -404,7 +404,7 @@ void peer_mgr::send_manifest_to_parent(unsigned long manifestValue,unsigned long
 
 	chunk_manifestSetPtr = new struct chunk_manifest_set_t;
 	if(!(chunk_manifestSetPtr ) ){
-		printf("peer_mgr::chunk_manifestSetPtr  new error \n");
+		debug_printf("peer_mgr::chunk_manifestSetPtr  new error \n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_manifestSetPtr new error");
 		PAUSE
 	}
@@ -462,12 +462,12 @@ void peer_mgr::handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr)
 
 	rescuePeerInfoPtr ->manifest = chunk_ptr ->manifest ;
 
-	printf("children pid= %u set manifest=%d\n",rescuePeerInfoPtr ->pid,rescuePeerInfoPtr ->manifest);
+	debug_printf("children pid= %u set manifest=%d\n",rescuePeerInfoPtr ->pid,rescuePeerInfoPtr ->manifest);
 	_log_ptr->write_log_format("s =>u s u s u\n", __FUNCTION__,__LINE__,"children pid=",rescuePeerInfoPtr ->pid,"set manifest=",rescuePeerInfoPtr ->manifest);
 
 
 	}else{
-		printf("handle_manifestSet what happen\n");
+		debug_printf("handle_manifestSet what happen\n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"handle_manifestSet what happen");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
 		PAUSE

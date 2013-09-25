@@ -14,7 +14,7 @@
 #define true						1
 #define false						0
 
-#define STUNT_SERVER_IP1			"140.114.90.154"
+#define STUNT_SERVER_IP1			"140.114.71.174"
 #define STUNT_SERVER_IP2			"127.0.0.1"
 #define SERVER_LOG_PORT				8123
 #define SERVER_COMM_PORT			8132				//server communication port: for connection message exchange

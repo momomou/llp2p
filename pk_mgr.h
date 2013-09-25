@@ -28,7 +28,7 @@ public:
 	list <int> streamID_list;
 	struct peer_connect_down_t *pkDownInfoPtr;
 	struct timerStruct start,end;
-	volatile int Xcount;						// Number of average received packets per unit time
+	volatile unsigned long Xcount;						// Number of average received packets per unit time
 	unsigned long totalMod ;
 	unsigned long reSynTime;
 	struct timerStruct lastSynStartclock;
@@ -113,7 +113,7 @@ public:
 	void set_rescue_state(unsigned long sub_id,int state);
 	int check_rescue_state(unsigned long sub_id,int state);
 
-	int peer_start_delay_count;
+	int peer_start_delay_count;		// If received first packet of each substream, peer_start_delay_count++
 	void send_capacity_init();
 	void send_capacity_to_pk(int sock);
 
