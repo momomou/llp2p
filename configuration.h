@@ -18,7 +18,7 @@ class configuration {
 
 public:
 
-	configuration();									// read-only preference
+	configuration();								// read-only preference
 	configuration(string file);						// read-write preference  
 	virtual ~configuration();
 
@@ -47,6 +47,8 @@ public:
 	void read_key(const char *key, void* & retval) const;		// find the value of parameter in config.ini   
 	
 	void read_key(const char *key, std::string & retval) const;		// find the value of parameter in config.ini  
+
+	void read_key2(const char *key, int *retval) const;		// find the value of parameter in config.ini  
 	
 
 	template <typename T>	// we only expect the T is a C++ primitive type or object, not pointer!!!
@@ -58,11 +60,13 @@ public:
 
 	virtual void dump_map() const;
 
+	map<string, string> map_table;
+
 private:
 	
 	bool tmp_only;
 	string filename;
-	map<string, string> map_table;
+	
 
 	configuration(const configuration&);                 
 	configuration operator=(const configuration&);    

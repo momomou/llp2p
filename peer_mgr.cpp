@@ -244,8 +244,8 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 	if (chunk_delay_ptr)
 		delete chunk_delay_ptr;
 
-	debug_printf("sent test delay OK !!  len = %d\n",html_buf ->header.length);
-	_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"sent test delay OK !!");
+	debug_printf("sent test delay OK !!  len = %d \n", html_buf->header.length);
+	_log_ptr->write_log_format("s =>u s d \n", __FUNCTION__, __LINE__, "sent test delay OK !!", html_buf->header.length);
 
 /*
 	if( send_byte <= 0 ) {

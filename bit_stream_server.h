@@ -5,6 +5,7 @@
 
 class network;
 class logger;
+class logger_client;
 class bit_stream_out;
 class pk_mgr;
 class bit_stream_httpout;
@@ -15,7 +16,7 @@ class bit_stream_server:public basic_class {
 public:
 	list<int> *fd_list_ptr;
 
-	bit_stream_server(network *net_ptr, logger *log_ptr, pk_mgr *pk_mgr_ptr, list<int> *fd_list);
+	bit_stream_server(network *net_ptr, logger *log_ptr, logger_client *logger_client_ptr, pk_mgr *pk_mgr_ptr, list<int> *fd_list);
 	~bit_stream_server();
 
 	unsigned short init(int stream_id, unsigned short bitStreamServerPort);
@@ -33,6 +34,7 @@ public:
 private:
 	network *_net_ptr;
 	logger *_log_ptr;
+	logger_client *_logger_client_ptr;
 	pk_mgr *_pk_mgr_ptr;
 	bit_stream_out *_bit_stream_out_ptr;
 	bit_stream_httpout *_bit_stream_httpout_ptr;

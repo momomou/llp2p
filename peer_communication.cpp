@@ -91,7 +91,7 @@ void peer_communication::set_self_info(unsigned long public_ip){
 	self_info->private_ip = _net_ptr->getLocalIpv4();
 }
 
-//flag 0 rescue peer, flag 1 candidate's peer
+//flag 0 rescue peer(caller is child), flag 1 candidate's peer(caller is parent)
 int peer_communication::set_candidates_handler(unsigned long rescue_manifest, struct chunk_level_msg_t *testing_info, unsigned int candidates_num, int flag)
 {	
 	_log_ptr->write_log_format("s(u) s d s d s d s d \n", __FUNCTION__, __LINE__,
@@ -319,6 +319,8 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest, st
 				else if (self_info->private_ip != self_info->public_ip && testing_info->level_info[0]->private_ip != testing_info->level_info[0]->public_ip) {	
 					// if both are in the same NAT
 					if (self_info->public_ip == testing_info->level_info[0]->public_ip) {
+						_log_ptr->write_log_format("s(u) s u(u) \n", __FUNCTION__, __LINE__,"my IP =", (self_info->public_ip), (self_info->private_ip));
+						_log_ptr->write_log_format("s(u) s u(u) \n", __FUNCTION__, __LINE__,"rescue-peer IP =", (testing_info->level_info[0]->public_ip), (testing_info->level_info[0]->private_ip));
 						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__, __LINE__,"rescue-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are behind NAT(identical private IP)");
 						accept_check(testing_info->level_info[0], 1, rescue_manifest,testing_info->level_info[0]->pid, session_id_count);
 					}

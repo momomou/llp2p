@@ -20,13 +20,19 @@
 
 using namespace std;
 
-stunt_mgr::stunt_mgr(list<int> *fd_list){
+stunt_mgr::stunt_mgr(list<int> *fd_list)
+{
+	printf("11 \n");
 	_tcp_punch_ptr = NULL;
+	printf("12 \n");
 	_tcp_punch_ptr = new tcp_punch();
-	
+	printf("13 \n");
 	fd_list_ptr = fd_list;
+	printf("14 \n");
 	ctrl_timeout = CTRL_TIMEOUT;
+	printf("15 \n");
 	comm_timeout = COMM_TIMEOUT;
+	printf("16 \n");
 }
 
 stunt_mgr::~stunt_mgr(){

@@ -1,6 +1,7 @@
 #include "bit_stream_server.h"
 #include "network.h"
 #include "logger.h"
+#include "logger_client.h"
 #include "pk_mgr.h"
 #include <sstream>
 #include "common.h"
@@ -15,43 +16,39 @@
 //after accept a client need call pk_mgr -> add_stream 
 
 
-bit_stream_server::bit_stream_server(network *net_ptr, logger *log_ptr, pk_mgr *pk_mgr_ptr, list<int> *fd_list )
+bit_stream_server::bit_stream_server(network *net_ptr, logger *log_ptr, logger_client *logger_client_ptr, pk_mgr *pk_mgr_ptr, list<int> *fd_list)
 {
 	_net_ptr = net_ptr;
 	_log_ptr = log_ptr;
+	_logger_client_ptr = logger_client_ptr;
 	_pk_mgr_ptr = pk_mgr_ptr;
 	fd_list_ptr = fd_list;
 	_sock_tcp = 0; 
 	_bit_stream_out_ptr = NULL;
-
-	
-
 }
 
 bit_stream_server::~bit_stream_server()
 {
 	map<int, stream *>::iterator _map_stream_iter;	// <strm_addr, stream *>
-	for(_map_stream_iter =_pk_mgr_ptr->_map_stream_media.begin() ; _map_stream_iter!=_pk_mgr_ptr->_map_stream_media.end(); _map_stream_iter++){
+	for(_map_stream_iter =_pk_mgr_ptr->_map_stream_fd_stream.begin() ; _map_stream_iter!=_pk_mgr_ptr->_map_stream_fd_stream.end(); _map_stream_iter++){
 
-		if(mode == mode_BitStream){
+		if(MODE == MODE_BitStream){
 			delete dynamic_cast<bit_stream_out *> (_map_stream_iter->second);
-		}else 	if(mode == mode_HTTP){
+		}else 	if(MODE == MODE_HTTP){
 			delete dynamic_cast<bit_stream_httpout *> (_map_stream_iter->second);
-		}else 	if(mode == mode_RTMP){
-			//		delete dynamic_cast<bit_stream_out *> (_map_stream_iter->second);
+		}else 	if(MODE == MODE_RTMP){
+			//delete dynamic_cast<bit_stream_out *> (_map_stream_iter->second);
 		}
 
 		data_close(_map_stream_iter ->first, "player obj closed!!");
-
-
 	}
-	_pk_mgr_ptr->_map_stream_media.clear();
+	_pk_mgr_ptr->_map_stream_fd_stream.clear();
 
-	printf("==============deldet bit_stream_server success==========\n");
-
+	debug_printf("==============delete bit_stream_server success==========\n");
 }
 
 //init socket to listen , set nob-locking ,start to epoll LIN
+// Return an available port for player
 unsigned short bit_stream_server::init(int stream_id, unsigned short bitStreamServerPort)
 {
 	struct sockaddr_in sin;
@@ -59,137 +56,124 @@ unsigned short bit_stream_server::init(int stream_id, unsigned short bitStreamSe
 	int iMode = 1;
 	_stream_id = stream_id;
 
-
-	printf("bitStreamServerPort = %hu\n", bitStreamServerPort);
-	_sock_tcp = socket(AF_INET, SOCK_STREAM, 0);
-
+	debug_printf("bitStreamServerPort = %hu \n", bitStreamServerPort);
 	
-	if(_sock_tcp < 0){
-		throw "create tcp srv socket fail";
-		_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"create tcp srv socket fail");
-
+	if ((_sock_tcp = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		debug_printf("[ERROR] Create socket failed \n");
+		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] Create socket failed");
+		PAUSE
 	}
-	memset(&sin, 0 ,sizeof(sin));
+	/*
+	if (setsockopt(_sock_tcp, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(int)) != 0) {
+		_log_ptr->write_log_format("s(u) s s d \n", __FUNCTION__, __LINE__,"[ERROR] Set SO_REUSEADDR failed", ". Socket error", WSAGetLastError());
+		debug_printf("[ERROR] Set SO_REUSEADDR failed. socket error %d \n", WSAGetLastError());
+		PAUSE
+	}
+	*/
+	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = INADDR_ANY;
-//	sin.sin_port = htons(bitStreamServerPort);
 
-	// find a port which can be used, default value is 3000
-	while(1){
+	// Find a available port. Default is 3000
+	for ( ; ; bitStreamServerPort++) {
 		sin.sin_port = htons(bitStreamServerPort);
-
-		if (::bind(_sock_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == 0) {
-			setsockopt(_sock_tcp, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(int));
-			_log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"bitStreamServer bind at TCP port",bitStreamServerPort);
-			printf("bitStreamServer bind at TCP port: %d\n", bitStreamServerPort);
-		} else {
-			_log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"CNANOT bitStreamServer bind at TCP port",bitStreamServerPort);
-			bitStreamServerPort++;
-			continue;
-		}	 
-
-		if (::listen(_sock_tcp, MAX_POLL_EVENT) == 0) {
-			//success break
-			_log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"bitStreamServer LISTEN at TCP port",bitStreamServerPort);
-			break;
-		}else{
-			printf("bitStreamServer :%d   listen error! \n",bitStreamServerPort);
-			_log_ptr->write_log_format("s =>u s d \n", __FUNCTION__,__LINE__,"bitStreamServer    listen error!",bitStreamServerPort);
-			bitStreamServerPort++;
+		int n = bind(_sock_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in));
+		printf("bind n: %d \n", n);
+		if (n != 0) {
+			_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "Socket bind failed at port", bitStreamServerPort, ". Socket error", WSAGetLastError());
+			debug_printf("Socket bind failed at port %d. Socket error %d \n", bitStreamServerPort, WSAGetLastError());
 			continue;
 		}
-
+		n = listen(_sock_tcp, MAX_POLL_EVENT);
+		printf("listen n: %d \n", n);
+		if (n != 0) {
+			_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "Socket listen failed at port", bitStreamServerPort, ". Socket error", WSAGetLastError());
+			debug_printf("Socket listen failed at port %d. Socket error %d \n", bitStreamServerPort, WSAGetLastError());
+			continue;
+		}
+		break;
 	}
-
-// for windows set nonblocking
-#ifdef _WIN32
-	if (::ioctlsocket(_sock_tcp,FIONBIO,(u_long FAR*)&iMode) == SOCKET_ERROR){
-		printf("socket error: _sock_tcp: %d\n", _sock_tcp);
-	}
-#endif
 	
-
 	_net_ptr->set_nonblocking(_sock_tcp);	// set to non-blocking
 	_net_ptr->epoll_control(_sock_tcp, EPOLL_CTL_ADD, EPOLLIN);
 	_net_ptr->fd_bcptr_map_set(_sock_tcp, dynamic_cast<basic_class *> (this));
 	fd_list_ptr->push_back(_sock_tcp);
-	return bitStreamServerPort;
 	
+	return bitStreamServerPort;
 }
 
 int bit_stream_server::handle_pkt_in(int sock)
 {
+	if (sock != _sock_tcp) {
+		return RET_ERROR;
+	}
+
 	int new_fd;
-	socklen_t sock_len;
+	socklen_t sock_len = sizeof(_cin);
 
-
-	if (sock != _sock_tcp)
-		return RET_ERROR;
-
-	sock_len = sizeof(_cin);
-	new_fd = _net_ptr->accept(sock, (struct sockaddr *)&_cin, &sock_len);
-	if(new_fd < 0) {
-		printf("Error occured in accept\n");
+	new_fd = accept(sock, (struct sockaddr *)&_cin, &sock_len);
+	if (new_fd < 0) {
+		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] Error occured in accept");
+		debug_printf("Error occured in accept \n");
 		return RET_ERROR;
 	}
 	
-
-//mode select mode == mode_BitStream
-	if(mode == mode_BitStream){
-
-
+	struct sockaddr_in addr;
+	int addrLen = sizeof(struct sockaddr_in);
+	int aa;
+	aa = getpeername(sock, (struct sockaddr *)&addr, &addrLen);
+	_log_ptr->write_log_format("s(u) d s d \n", __FUNCTION__, __LINE__, aa, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+	
+	if (MODE == MODE_BitStream) {
 		_bit_stream_out_ptr = new bit_stream_out(_stream_id, _net_ptr, _log_ptr, this, _pk_mgr_ptr, fd_list_ptr);
-	if (!_bit_stream_out_ptr) {
-		cout << "can not allocate _bit_stream_out!!!" << endl;
-		_net_ptr -> close (new_fd);
-		_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__," can not allocate _bit_stream_out!!!");
-		PAUSE
-		return RET_ERROR;
-	}
-	printf("new bit_stream_out successfully\n");
-	_pk_mgr_ptr ->add_stream( new_fd,(stream*)_bit_stream_out_ptr, STRM_TYPE_MEDIA);
-
-
-	_bit_stream_out_ptr->set_client_sockaddr(&_cin);
-	_net_ptr->set_nonblocking(new_fd);
-	_net_ptr->epoll_control(new_fd, EPOLL_CTL_ADD, EPOLLIN);
-	_net_ptr->fd_bcptr_map_set(new_fd, dynamic_cast<basic_class *> (_bit_stream_out_ptr));
-	fd_list_ptr->push_back(new_fd);
-
-	return RET_OK;
-
-//mode == mode_HTTP
-	}else if (mode == mode_HTTP){
-
-		_bit_stream_httpout_ptr = new bit_stream_httpout(_stream_id , _net_ptr, _log_ptr, this, _pk_mgr_ptr, fd_list_ptr ,new_fd);
-	
-		if (!_bit_stream_httpout_ptr) {				//obj create fail
-			cout << "can not allocate _bit_stream_out!!!" << endl;
-			_net_ptr -> close (new_fd);
-			_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__," can not allocate _bit_stream_out!!!");
+		if (!_bit_stream_out_ptr) {
+			debug_printf("[ERROR] new bit_stream_out error \n");
+			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] new bit_stream_out error \n");
+			_net_ptr->close(new_fd);
+			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] new bit_stream_out error");
 			PAUSE
 			return RET_ERROR;
+		}
+		
+		//debug_printf("new bit_stream_out successfully \n");
+		//_pk_mgr_ptr->add_stream(new_fd, (stream*)_bit_stream_out_ptr, STRM_TYPE_MEDIA);
 
-		}else{				
-		printf("new bit_stream_httpout successfully  socket =%d \n",new_fd);
-		_log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__," new bit_stream_httpout successfully");
-		_pk_mgr_ptr ->add_stream( new_fd,(stream*)_bit_stream_httpout_ptr, STRM_TYPE_MEDIA);
+		_bit_stream_out_ptr->set_client_sockaddr(&_cin);
+		_net_ptr->set_nonblocking(new_fd);
+		_net_ptr->epoll_control(new_fd, EPOLL_CTL_ADD, EPOLLIN);
+		_net_ptr->fd_bcptr_map_set(new_fd, dynamic_cast<basic_class *>(_bit_stream_out_ptr));
+		fd_list_ptr->push_back(new_fd);
+
+		return RET_OK;
+	}
+	else if (MODE == MODE_HTTP) {
+		_bit_stream_httpout_ptr = new bit_stream_httpout(_stream_id, _net_ptr, _log_ptr, this, _pk_mgr_ptr, fd_list_ptr, new_fd);
+		if (!_bit_stream_httpout_ptr) {
+			debug_printf("[ERROR] new bit_stream_httpout error \n");
+			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] new bit_stream_httpout error \n");
+			_net_ptr->close(new_fd);
+			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] new bit_stream_httpout error");
+			PAUSE
+			return RET_ERROR;
+		}
+					
+		//debug_printf("new bit_stream_httpout successfully socket = %d \n", new_fd);
+		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "new bit_stream_httpout successfully");
+		
+		_pk_mgr_ptr->add_stream(new_fd, (stream*)_bit_stream_httpout_ptr, STRM_TYPE_MEDIA);
 
 		_bit_stream_httpout_ptr->set_client_sockaddr(&_cin);
 		_net_ptr->set_nonblocking(new_fd);
 		_net_ptr->epoll_control(new_fd, EPOLL_CTL_ADD, EPOLLIN);
-		_net_ptr->fd_bcptr_map_set(new_fd, dynamic_cast<basic_class *> (_bit_stream_httpout_ptr));
+		_net_ptr->fd_bcptr_map_set(new_fd, dynamic_cast<basic_class *>(_bit_stream_httpout_ptr));
 		fd_list_ptr->push_back(new_fd);
-		}
-
+		
 		return RET_OK;
-	}else if (mode==mode_RTMP){
-
-	// other mode  RTSP RTMP FILE TE_SG
 	}
-
-
-
+	else if (MODE == MODE_RTMP) {
+		// other mode  RTSP RTMP FILE TE_SG
+		return RET_OK;
+	}
 }
 
 

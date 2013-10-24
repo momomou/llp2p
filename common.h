@@ -49,12 +49,13 @@
 #define MAX_DELAY 2000
 //SOURCE_DELAY_CONTINUOUS sec, mean  about SOURCE_DELAY_CONTINUOUS sec packet all dalay out of bound
 #define SOURCE_DELAY_CONTINUOUS 0.5
-
+// Time interval of calculation Xcount
+#define XCOUNT_INTERVAL		10000
 //io_accept fd remain period
 #define FD_REMAIN_PERIOD	1000
-//p
-//#define mode mode_HTTP // mode_BitStream
-#define mode mode_HTTP
+
+//#define MODE MODE_HTTP // mode_BitStream
+#define MODE MODE_HTTP
 
 //nat part
 #define MAX_ID_LEN	31					//Max Client ID Length
@@ -81,7 +82,7 @@
 */
 #define LOG_REGISTER	0x01
 #define LOG_REG_LIST	0x02
-#define LOG_REG_LIST_TESTING	0x03	
+#define LOG_REG_LIST_TESTING	0x03
 #define LOG_REG_LIST_DETECTION_TESTING_SUCCESS	0x04
 #define LOG_REG_LIST_TESTING_FAIL	0x05
 #define LOG_REG_CUT_PK	0x06
@@ -274,7 +275,7 @@ using std::bitset;
 //#define CHNK_CMD_PEER_DEP				0x10	// departure
 //#define CHNK_CMD_PEER_NOTIFY        	0x11
 //#define CHNK_CMD_PEER_LATENCY           0x12
-#define CHNK_CMD_CHN_UPDATA_DATA        0x13	// update steam id to peer
+#define CHNK_CMD_CHN_UPDATE_DATA        0x13	// update steam id to peer
 #define CHNK_CMD_PEER_RESCUE      		0x14	//rescue from pk
 #define CHNK_CMD_PEER_RESCUE_UPDATE      	0x15
 #define CHNK_CMD_PEER_RESCUE_CAPACITY      	0x16
@@ -325,12 +326,12 @@ using std::bitset;
 #define CLASS_ARY_SIZE		1
 #define CRLF_LEN			4
 
-#define mode_RTSP			1
-#define mode_RTMP			2
-#define mode_SG				3
-#define mode_BitStream		4
-#define mode_HTTP			5
-#define mode_File			6
+#define MODE_RTSP			1
+#define MODE_RTMP			2
+#define MODE_SG				3
+#define MODE_BitStream		4
+#define MODE_HTTP			5
+#define MODE_File			6
 
 #define MOD_TIME__CLOCK		1
 #define MOD_TIME_TICK		2
@@ -1113,6 +1114,7 @@ struct log_source_delay_struct{
 	unsigned int count;
 	double delay_now;
 	double average_delay;
+	double accumulated_delay;
 };
 
 struct log_in_bw_struct{
@@ -1121,10 +1123,12 @@ struct log_in_bw_struct{
 	struct timerStruct client_time; 
 };
 
+// Structure of delay-quality
 struct quality_struct{
-	unsigned long loss_pkt;
-	double quality_count;
-	unsigned long total_chunk;
+	unsigned long lost_pkt;			// Number of lost chunks in one calculation
+	double accumulated_quality;		// Accumulated quality values in one calculation
+	double average_quality;			// Average quality value in one calculation, this value would be sent to PK
+	unsigned long total_chunk;		// Number of chunks in one calculation
 };
 
 

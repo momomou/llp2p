@@ -22,6 +22,7 @@ public:
 	
 	virtual int handle_pkt_in(int sock);
 	virtual int handle_pkt_out(int sock);
+	void send_header_to_player(int sock);
 	virtual void handle_pkt_error(int sock);
 	virtual void handle_job_realtime();
 	virtual void handle_job_timer();
@@ -50,7 +51,7 @@ private:
 	FILE *file_ptr_test;
 
 	bool first_pkt;
-	bool first_HTTP_Header;
+	bool first_HTTP_Header;		// If send HTTP header and FLV header send to player, this value becomes false
 
 	Network_nonblocking_ctl _send_ctl_info;
 	queue<struct chunk_t *> _queue_output_ctrl;

@@ -797,27 +797,31 @@ int peer::handle_pkt_out(int sock)
 					chunk_ptr = NULL;
 					_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "chunk_manifestSet.manifest =", chunk_manifestSet.manifest);
 					//// 0903新增，確定送給parent manifest=0這個訊息後，刪除整個相關的table
-					if (chunk_manifestSet.manifest == 0) {
-						map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
-						map<int , unsigned long>::iterator detect_map_fd_pid_iter;
-						detect_map_fd_pid_iter = map_fd_pid.find(sock);
-						if(detect_map_fd_pid_iter == map_fd_pid.end()){
-							debug_printf("[ERROR] can not find fd pid in source_delay_detection\n");
-							PAUSE
-						}
-						pid_peerDown_info_iter = _pk_mgr_ptr->map_pid_peerDown_info.find(detect_map_fd_pid_iter->second);
-						if(pid_peerDown_info_iter == _pk_mgr_ptr->map_pid_peerDown_info.end()){
-							debug_printf("[ERROR] can not find pid peerinfo in source_delay_detection\n");
-							PAUSE
-						}
-						if (pid_peerDown_info_iter->second->peerInfo.manifest == 0) {
-							map<unsigned long, int>::iterator iter = map_in_pid_fd.find(pid_peerDown_info_iter ->first) ;
-							if (iter != map_in_pid_fd.end()) {
-								data_close(map_in_pid_fd[pid_peerDown_info_iter ->first], "manifest=0", CLOSE_PARENT) ;
-							}
-							else{
-								_log_ptr->write_log_format("s =>u s \n", __FUNCTION__, __LINE__, "[DEBUG] set parent manifest=0 but cannot find this parent's pid in map_in_pid_fd");
+					if (chunk_manifestSet.header.cmd != CHNK_CMD_PEER_TEST_DELAY) {
+						if (chunk_manifestSet.manifest == 0) {
+							map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
+							map<int , unsigned long>::iterator detect_map_fd_pid_iter;
+							detect_map_fd_pid_iter = map_fd_pid.find(sock);
+							if(detect_map_fd_pid_iter == map_fd_pid.end()){
+								debug_printf("[ERROR] can not find fd pid in source_delay_detection\n");
+								_log_ptr->write_log_format("s =>u s \n", __FUNCTION__, __LINE__, "[ERROR] can not find pid peerinfo in source_delay_detection");
 								PAUSE
+							}
+							pid_peerDown_info_iter = _pk_mgr_ptr->map_pid_peerDown_info.find(detect_map_fd_pid_iter->second);
+							if(pid_peerDown_info_iter == _pk_mgr_ptr->map_pid_peerDown_info.end()){
+								debug_printf("[ERROR] can not find pid peerinfo in source_delay_detection\n");
+								_log_ptr->write_log_format("s =>u s \n", __FUNCTION__, __LINE__, "[ERROR] can not find pid peerinfo in source_delay_detection");
+								PAUSE
+							}
+							if (pid_peerDown_info_iter->second->peerInfo.manifest == 0) {
+								map<unsigned long, int>::iterator iter = map_in_pid_fd.find(pid_peerDown_info_iter ->first) ;
+								if (iter != map_in_pid_fd.end()) {
+									data_close(map_in_pid_fd[pid_peerDown_info_iter ->first], "manifest=0", CLOSE_PARENT) ;
+								}
+								else{
+									_log_ptr->write_log_format("s =>u s \n", __FUNCTION__, __LINE__, "[DEBUG] set parent manifest=0 but cannot find this parent's pid in map_in_pid_fd");
+									PAUSE
+								}
 							}
 						}
 					}

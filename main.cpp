@@ -1,4 +1,4 @@
-
+﻿
 #include "common.h"
 #ifdef _WIN32
 	#include "EpollFake.h"
@@ -6,7 +6,7 @@
 #include "configuration.h"
 #include "logger.h"
 #include "network.h"
-#include "basic_class.h"
+#include "basic_class.h" 
 #include "pk_mgr.h"
 #include "peer_mgr.h"
 #include "peer.h"
@@ -19,6 +19,9 @@
 #include "io_accept.h"
 #include "logger_client.h"
 #include "stunt_mgr.h"
+#include "newtest.h"
+
+
 using namespace std;
 
 #ifdef _FIRE_BREATH_MOD_
@@ -26,8 +29,10 @@ using namespace std;
 #include "variant_list.h"
 #include "DOM/Document.h"
 #include "global/config.h"
-#include "llp2pAPI.h"
+//#include "llp2pAPI.h"
+#include "firebreathTestAPI.h"
 #endif
+
 
 
 const char version[] = "1.0.0.0";
@@ -45,16 +50,22 @@ typedef struct
 	//static logger_client *logger_client_ptr = NULL;
 	volatile unsigned short streamingPort;
 	list<int> *fd_list;
+	map<string, string> *map_config2;
 	pk_mgr *pk_mgr_ptr_copy;
 	volatile sig_atomic_t is_Pk_mgr_ptr_copy_delete;
 	volatile sig_atomic_t http_srv_ready;
 	volatile sig_atomic_t threadCtl;    // 0 can open thread  ,1 cant open
-
+	int a;
+	int b;
+	string c;
 } GlobalVars;
 
-
+map<string, string> map_config;
 map<int, GlobalVars*> map_chid_globalVar;
-
+void launchThread(void * arg);
+int mainFunction(int chid);
+string ssss;
+int set_config_done = 0;
 
 #else
 
@@ -133,13 +144,31 @@ void signal_handler(int sig)
 /// @brief  Echos whatever is passed from Javascript.
 ///         Go ahead and change it. See what happens!
 ///////////////////////////////////////////////////////////////////////////////
-FB::variant llp2pAPI::echo(const FB::variant& msg)
+FB::variant firebreathTestAPI::echo(const FB::variant& msg)
 {
     static int n(0);
     fire_echo("So far, you clicked this many times: ", n++);
-
+	fire_echo("tess ", 3051);
     // return "foobar";
-    return msg;
+    return "123";
+}
+
+FB::variant firebreathTestAPI::echo2(const FB::variant& msg)
+{
+    static int n(0);
+    fire_echo("So far, you clicked this many times: ", n++);
+	fire_echo("tets ", 3051);
+    // return "foobar";
+    return "2";
+} 
+
+FB::variant firebreathTestAPI::echo100(const FB::variant& msg)
+{
+    static int n(0);
+    fire_echo("So far, you clicked this many times: ", n++);
+	fire_echo("test ", 3051);
+    // return "foobar";
+    return "10001";
 }
 
 
@@ -151,9 +180,9 @@ FB::variant llp2pAPI::echo(const FB::variant& msg)
 ///         will throw a FB::script_error that will be translated into a
 ///         javascript exception in the page.
 ///////////////////////////////////////////////////////////////////////////////
-llp2pPtr llp2pAPI::getPlugin()
+firebreathTestPtr firebreathTestAPI::getPlugin()
 {
-    llp2pPtr plugin(m_plugin.lock());
+    firebreathTestPtr plugin(m_plugin.lock());
     if (!plugin) {
         throw FB::script_error("The plugin is invalid");
     }
@@ -161,28 +190,28 @@ llp2pPtr llp2pAPI::getPlugin()
 }
 
 // Read/Write property testString
-std::string llp2pAPI::get_testString()
+std::string firebreathTestAPI::get_testString()
 {
     return m_testString;
 }
 
-void llp2pAPI::set_testString(const std::string& val)
+void firebreathTestAPI::set_testString(const std::string& val)
 {
     m_testString = val;
 }
 
 // Read-only property version
-std::string llp2pAPI::get_version()
+std::string firebreathTestAPI::get_version()
 {
     return FBSTRING_PLUGIN_VERSION;
 }
 
-void llp2pAPI::testEvent()
+void firebreathTestAPI::testEvent()
 {
     fire_test();
 }
 
-int llp2pAPI::start(int chid)
+int firebreathTestAPI::start(int chid)
 {
 	if(map_chid_globalVar.count(chid) > 0)
 	{
@@ -196,11 +225,19 @@ int llp2pAPI::start(int chid)
 		temp->handle_sig_alarm = 0;
 		temp->srv_shutdown = 0;
 		temp->errorRestartFlag = 0;
-		temp->streamingPort = 0;
+		temp->streamingPort = -1;
 		temp->pk_mgr_ptr_copy = NULL;
 		temp->is_Pk_mgr_ptr_copy_delete = TRUE;
 		temp->http_srv_ready = 0;
 		temp->threadCtl = 1;
+		
+		temp->map_config2 = new map<string, string>;
+		map<string, string>::iterator iter;
+		for (iter = map_config.begin(); iter != map_config.end(); iter++) {
+			temp->map_config2->insert(pair<string, string>(iter->first, iter->second));
+		}
+		
+		
 		map_chid_globalVar[chid] = temp;
 		_beginthread(launchThread, 0, (void*)chid);	
 		return 2;
@@ -208,7 +245,7 @@ int llp2pAPI::start(int chid)
 	return TRUE;
 }
 
-void llp2pAPI::stop(int chid)
+void firebreathTestAPI::stop(int chid)
 {
 	if(chid < 1 || map_chid_globalVar.count(chid) <= 0)
 	{
@@ -219,20 +256,15 @@ void llp2pAPI::stop(int chid)
 	{
 		map_chid_globalVar[chid]->srv_shutdown = 1;
 	}
-//	return;
 }
 
-int llp2pAPI::isReady(int chid)
+int firebreathTestAPI::isReady(int chid)
 {
-//	while(!http_srv_ready)
-//		Sleep(10);
-//	Sleep(500);
     return map_chid_globalVar[chid]->http_srv_ready;
 }
 
-int llp2pAPI::isStreamInChannel(int streamID, int chid){
-
-
+int firebreathTestAPI::isStreamInChannel(int streamID, int chid)
+{
 	if(map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete ==FALSE){
 		map<int, struct update_stream_header *>::iterator  map_streamID_header_iter;
 		map_streamID_header_iter = map_chid_globalVar[chid]->pk_mgr_ptr_copy ->map_streamID_header.find(streamID);
@@ -246,95 +278,115 @@ int llp2pAPI::isStreamInChannel(int streamID, int chid){
 		return FALSE;
 	}
 
-
-
 	return TRUE;
 }
 
-unsigned short llp2pAPI::streamingPortIs(int chid)
+unsigned short firebreathTestAPI::streamingPortIs(int chid)
 {
-	if(map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete){
+	return map_chid_globalVar[chid]->streamingPort;
+	/*
+	if (map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete) {
 		return 0;
-	}else{
+	}
+	else {
 		return map_chid_globalVar[chid]->streamingPort;
 	}
+	*/
 }
 
+// Set up configuration and store in map_config
+void firebreathTestAPI::set_config(const std::string& msg)
+{
+	string ss(msg.begin()+1, msg.end()-1);
+	std::string delimiter = ",";
 
+	size_t pos = 0;
+	string token;
+	map<string, string> m;
+	while ((pos = ss.find(delimiter)) != std::string::npos) {
+		token = ss.substr(0, pos);
+		
+		int n = token.find(":");
+		string key(token.begin()+1, token.begin()+n-1);
+		string value(token.begin()+n+2, token.end()-1);
+		
+		map_config.insert(pair<string, string>(key, value));
+		ssss += key + ":" + value + "\n";
+		ss.erase(0, pos + delimiter.length());
+	}
+	token = ss.substr(0, pos);
+		
+	int n = token.find(":");
+	string key(token.begin()+1, token.begin()+n-1);
+	string value(token.begin()+n+2, token.end()-1);
+	//map_config[key] = value;
+	map_config.insert(pair<string, string>(key, value));
+	ssss += key + ":" + value + "\n";
+	
+	/*
+	string str = map_config.find("channel_id")->second;
+	istringstream is(str);
+	int chid;
+	is >> chid;
+	
+	ssss += str + "\n";
+	map<string, string>::iterator iter;
+	
+	
+	for (iter = map_config.begin(); iter != map_config.end(); iter++) {
+		
+		ssss += iter->first + ":" + iter->second + "\n";
+		map_chid_globalVar[chid]->map_config2.insert(pair<string, string>(iter->first, iter->second));
+		//map_chid_globalVar[chid]->map_config2[iter->first] = iter->second;
+	}
+	*/
+
+	set_config_done = 1;
+	return ;
+}
+
+std::string firebreathTestAPI::get_config()
+{
+	map<string, string>::iterator iter;
+	string ret_msg("");
+	for (iter = map_config.begin(); iter != map_config.end(); iter++) {
+		ret_msg += iter->first + ":" + iter->second + "\n";
+	}
+	//ssss = ret_msg;
+    return ret_msg;
+}
+
+int firebreathTestAPI::is_set_config_done()
+{
+    return set_config_done;
+}
 /*
-int llp2pAPI::valid(){
-
+int firebreathTestAPI::valid()
+{
 	return TRUE;
 }
 */
-
 
 void launchThread(void * arg)
 {
 	int a = (int)arg;
 	mainFunction(a);
-//	return;
+	//return;
 }
 
 #endif
+
 
 #ifdef _FIRE_BREATH_MOD_
 int mainFunction(int chid){
 #else
 int main(int argc, char **argv){
 #endif
-	/*
-	map<int, int> aa;
-	map<int, int>::iterator aa_iter;
-	
-	aa[1] = 11;
-	aa[2] = 22;
-	aa[3] = 33;
-	aa[4] = 44;
-	
-	printf("aa.size = %d \n", aa.size());
-	
-	for (aa_iter = aa.begin(); aa_iter != aa.end(); aa_iter++) {
-		printf("aa[%d] = %d \n", aa_iter->first, aa_iter->second);
-		if (aa_iter == aa.end()) {
-			map<int, int>::iterator iter = aa_iter;
-			printf("delete aa[%d] = %d \n", aa_iter->first, aa_iter->second);
-			//aa_iter--;
-			aa.erase(iter);
-			
-		}
-	}
-	
-	for (aa_iter = aa.begin(); aa_iter != aa.end(); aa_iter++) {
-		printf("aa[%d] = %d \n", aa_iter->first, aa_iter->second);
-	}
-	
-	
-	
-	
-	UINT32 u32 = -2;
-	int x=5, y=2;
-	printf("(%f) \n", (double)x/y);
-	
-	void *ppp;
-	printf("sizeof(long) = %d, sizeof(int) = %d %d \n", sizeof(long int), sizeof(int), sizeof(INT64));
-	
-	 printf("sizeof(short)     = %d\n", sizeof(short));
-        printf("sizeof(int)       = %d\n", sizeof(int));
-        printf("sizeof(long)      = %d\n", sizeof(long));
-        printf("sizeof(long long) = %d\n\n", sizeof(long long));
- 
-        printf("sizeof(size_t)    = %d\n", sizeof(size_t));
-        printf("sizeof(off_t)     = %d\n", sizeof(off_t));
-        printf("sizeof(void *)    = %d\n", sizeof(void *));
-		
-		PAUSE
-	*/
 
-
-	
 //	while((!srv_shutdown)){
-
+printf("** 000 \n");
+	
+	
 		int svc_fd_tcp;		// listening-socket for peers 
 		int	svc_fd_udp;
 		unsigned long html_size;
@@ -344,7 +396,7 @@ int main(int argc, char **argv){
 		string svc_tcp_port("");
 		string svc_udp_port("");
 		string stream_local_port("");
-		string config_file("");
+		string config_file("config.ini");
 
 		configuration *prep = NULL;
 		network *net_ptr = NULL;
@@ -355,40 +407,85 @@ int main(int argc, char **argv){
 		pk_mgr *pk_mgr_ptr = NULL;
 		//rtmp_server *rtmp_svr = NULL;
 		//rtmp *rtmp_ptr = NULL;
-		//amf *amf_ptr = NULL;
+		//amf *amf_ptr = NULL; 
 		//rtmp_supplement *rtmp_supplement_ptr = NULL;
 		bit_stream_server *bit_stream_server_ptr =NULL;
 		peer_communication *peer_communication_ptr = NULL;
 
-		config_file = "config.ini";
-
 		// Create constructors
-		prep = new configuration(config_file);
+		//prep = new configuration(config_file);
+		
 #ifdef _FIRE_BREATH_MOD_
-		net_ptr = new network(&(map_chid_globalVar[chid]->errorRestartFlag),map_chid_globalVar[chid]->fd_list);
+		prep = new configuration(config_file);
+		for (map<string, string>::iterator iter = map_config.begin(); iter != map_config.end(); iter++) {
+			//prep->map_table.insert(pair<string, string>(iter->first, iter->second));
+			prep->map_table[iter->first] = iter->second;
+		}
+		net_ptr = new network(&(map_chid_globalVar[chid]->errorRestartFlag), map_chid_globalVar[chid]->fd_list);
 #else
-		net_ptr = new network(&errorRestartFlag,&fd_list);
+		prep = new configuration(config_file);
+		if (prep == NULL) {
+			printf("[ERROR] prep new error \n");
+			PAUSE
+		}
+		net_ptr = new network(&errorRestartFlag, &fd_list);
+		if (net_ptr == NULL) {
+			printf("[ERROR] net_ptr new error \n");
+			PAUSE
+		}
 #endif
 		log_ptr = new logger();
+		if (log_ptr == NULL) {
+			printf("[ERROR] log_ptr new error \n");
+			PAUSE
+		}
 		log_ptr->logger_set(net_ptr);
 		logger_client_ptr = new logger_client(log_ptr);
+		if (logger_client_ptr == NULL) {
+			printf("[ERROR] logger_client_ptr new error \n");
+			PAUSE
+		}
 #ifdef _FIRE_BREATH_MOD_
 		peer_mgr_ptr = new peer_mgr(map_chid_globalVar[chid]->fd_list);
 		stunt_mgr_ptr = new stunt_mgr(map_chid_globalVar[chid]->fd_list);
 #else
+		
 		peer_mgr_ptr = new peer_mgr(&fd_list);
-		stunt_mgr_ptr = new stunt_mgr(&fd_list);
+		if (peer_mgr_ptr == NULL) {
+			printf("[ERROR] peer_mgr_ptr new error \n");
+			PAUSE
+		}
+		//stunt_mgr_ptr = new stunt_mgr(&fd_list);	// Release版本會有問題
+		//if (stunt_mgr_ptr == NULL) {
+		//	printf("[ERROR] stunt_mgr_ptr new error \n");
+		//	PAUSE
+		//}
+		
 #endif
 
-		if ( !prep || !net_ptr || !log_ptr || !logger_client_ptr || !peer_mgr_ptr || !stunt_mgr_ptr) {
-			printf("new (!prep) || (!net_ptr) || (!log_ptr) || (!logger_client_ptr) || (!peer_mgr_ptr) || (!stunt_mgr_ptr) error \n");
-		}
 		
 #ifdef _FIRE_BREATH_MOD_
 		char s[64];
 		sprintf(s,"%d",chid);
-		prep->add_key("channel_id", s);
+		//prep->add_key("channel_id", s);
 #endif
+		
+		{
+		int svc_fd_tcp2;
+		struct sockaddr_in sin2;
+		svc_fd_tcp2 = socket(AF_INET, SOCK_STREAM, 0);
+			
+		
+		memset(&sin2, 0, sizeof(struct sockaddr_in));
+		sin2.sin_family = AF_INET;
+		sin2.sin_addr.s_addr = INADDR_ANY;
+		
+		sin2.sin_port = htons(11102);
+		::bind(svc_fd_tcp2, (struct sockaddr *)&sin2, sizeof(struct sockaddr_in));
+		listen(svc_fd_tcp2, MAX_POLL_EVENT);
+		}
+		
+		log_ptr->start_log_record(SYS_FREQ);
 		
 		prep->read_key("html_size", html_size);
 		prep->read_key("svc_tcp_port", svc_tcp_port);
@@ -399,6 +496,7 @@ int main(int argc, char **argv){
 		cout << "svc_tcp_port=" << svc_tcp_port << endl;
 		cout << "svc_udp_port=" << svc_udp_port << endl;
 		cout << "stream_local_port=" << stream_local_port << endl;
+		
 #ifdef _FIRE_BREATH_MOD_
 		pk_mgr_ptr = new pk_mgr(html_size, map_chid_globalVar[chid]->fd_list, net_ptr , log_ptr , prep , logger_client_ptr, stunt_mgr_ptr);
 #else
@@ -408,9 +506,8 @@ int main(int argc, char **argv){
 			printf("pk_mgr_ptr error !!!!!!!!!!!!!!!\n");
 		}
 
-		
 		net_ptr->epoll_creater();
-		log_ptr->start_log_record(SYS_FREQ);
+		//log_ptr->start_log_record(SYS_FREQ);
 
 		peer_mgr_ptr->peer_mgr_set(net_ptr, log_ptr, prep, pk_mgr_ptr, logger_client_ptr);
 		//peer_mgr_ptr->pk_mgr_set(pk_mgr_ptr);
@@ -425,7 +522,6 @@ int main(int argc, char **argv){
 		logger_client_ptr->set_net_obj(net_ptr);
 		logger_client_ptr->set_pk_mgr_obj(pk_mgr_ptr);
 		logger_client_ptr->set_prep_obj(prep);
-
 
 #ifndef _WIN32
 		signal(SIGALRM, signal_handler);
@@ -450,9 +546,9 @@ int main(int argc, char **argv){
 		signal(SIGABRT, signal_handler);
 #endif
 
-		if (mode == mode_RTMP) {
+		if (MODE == MODE_RTMP) {
 			/*
-			printf("mode_RTMP\n");
+			printf("MODE_RTMP\n");
 			amf_ptr = new amf(log_ptr);
 			if (!amf_ptr) {
 				printf("Can't new amf class\n");
@@ -480,79 +576,79 @@ int main(int argc, char **argv){
 			printf("new rtmp_svr successfully\n");
 			*/
 
-		//mode BitStream
+		//MODE BitStream
 		}
-		else if (mode == mode_BitStream || mode == mode_HTTP) {
-			printf("mode_BitStream\n");
+		else if (MODE == MODE_BitStream || MODE == MODE_HTTP) {
+			debug_printf("MODE_BitStream \n");
 
 #ifdef _FIRE_BREATH_MOD_
-			bit_stream_server_ptr = new bit_stream_server ( net_ptr,log_ptr,pk_mgr_ptr ,map_chid_globalVar[chid]->fd_list);
+			bit_stream_server_ptr = new bit_stream_server(net_ptr,log_ptr, logger_client_ptr, pk_mgr_ptr, map_chid_globalVar[chid]->fd_list);
 #else
-			bit_stream_server_ptr = new bit_stream_server ( net_ptr,log_ptr,pk_mgr_ptr ,&fd_list);
+			bit_stream_server_ptr = new bit_stream_server(net_ptr,log_ptr, logger_client_ptr, pk_mgr_ptr, &fd_list);
 #endif
 			if (!bit_stream_server_ptr) {
-				printf("bit_stream_server_ptr error !!!!!!!!!!!!\n");
+				debug_printf("[ERROR] bit_stream_server_ptr error \n");
 			}
+			
 			stringstream ss_tmp;
 			unsigned short port_tcp;
 			ss_tmp << stream_local_port;
 			ss_tmp >> port_tcp;
 #ifdef _FIRE_BREATH_MOD_
-			map_chid_globalVar[chid]->streamingPort = bit_stream_server_ptr ->init(0,port_tcp);
-			log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"new bit_stream_server ok at port ",map_chid_globalVar[chid]->streamingPort);
+			map_chid_globalVar[chid]->streamingPort = bit_stream_server_ptr->init(0, port_tcp);
+			log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "Create bit_stream_server success. port =", map_chid_globalVar[chid]->streamingPort);
+			debug_printf("Create bit_stream_server success. port = %u", map_chid_globalVar[chid]->streamingPort);
 #else
-			streamingPort = bit_stream_server_ptr ->init(0,port_tcp);
-			log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"new bit_stream_server ok at port ",streamingPort);
+			streamingPort = bit_stream_server_ptr->init(0, port_tcp);
+			log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Create bit_stream_server success. port =", streamingPort);
+			debug_printf("Create bit_stream_server success, port = %u \n", streamingPort);
 #endif
 		}
-		else if(mode == mode_RTSP){
-			printf("mode_RTSP\n");
+		else if (MODE == MODE_RTSP) {
+			debug_printf("MODE_RTSP \n");
 		}
 
-		svc_fd_tcp = socket(AF_INET, SOCK_STREAM, 0);
-		if (svc_fd_tcp < 0) {
-			log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"create tcp srv socket fail");
+		// Create TCP socket and UDP socket
+		if ((svc_fd_tcp = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+			log_ptr->write_log_format("s(u) s s d d \n", __FUNCTION__, __LINE__,"[ERROR] Create TCP socket failed", ". Socket error", WSAGetLastError(), svc_fd_tcp);
+			debug_printf("[ERROR] Create TCP socket failed. socket error %d %d \n", WSAGetLastError(), svc_fd_tcp);
+			PAUSE
 		}
-		svc_fd_udp = socket(AF_INET, SOCK_DGRAM, 0);
-		if (svc_fd_udp < 0){
-			log_ptr->write_log_format("s =>u s  \n", __FUNCTION__,__LINE__,"create udp srv socket fail");
+		if ((svc_fd_udp = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+			log_ptr->write_log_format("s(u) s s d d \n", __FUNCTION__, __LINE__,"[ERROR] Create UDP socket failed", ". Socket error", WSAGetLastError(), svc_fd_udp);
+			debug_printf("[ERROR] Create UDP socket failed. socket error %d %d \n", WSAGetLastError(), svc_fd_udp);
+			PAUSE
 		}
-
-		memset(&sin, 0x0, sizeof(struct sockaddr_in));
-
+		
+		// Set socket SO_REUSEADDR
+		if (setsockopt(svc_fd_tcp, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval , sizeof(optval)) != 0) {
+			log_ptr->write_log_format("s(u) s s d \n", __FUNCTION__, __LINE__,"[ERROR] Set SO_REUSEADDR failed", ". Socket error", WSAGetLastError());
+			debug_printf("[ERROR] Set SO_REUSEADDR failed. socket error %d \n", WSAGetLastError());
+			PAUSE
+		}
+		
+		memset(&sin, 0, sizeof(struct sockaddr_in));
 		sin.sin_family = AF_INET;
 		sin.sin_addr.s_addr = INADDR_ANY;
-		//sin.sin_port = htons((unsigned short)atoi(svc_tcp_port.c_str()));
 		unsigned short ptop_port = (unsigned short)atoi(svc_tcp_port.c_str());		// listen-port for peer connection
 
-		// find the listen-port which can be used
-		while (1) {
+		// Find an available port
+		for ( ; ; ptop_port++) {
 			sin.sin_port = htons(ptop_port);
-
-			if (net_ptr->bind(svc_fd_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == 0) {
-				log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Server bind at TCP port", ptop_port);
-				cout << "Server bind at TCP port: " << ptop_port << endl;
-				setsockopt(svc_fd_tcp, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval , sizeof(optval));
-			}
-			else {
-				printf("Server bind at TCP port:  REEOR  !!!!!\n",ptop_port);
-				log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "Server bind at TCP port", ptop_port, "error");
-				ptop_port++;
+			if (::bind(svc_fd_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) < 0) {
+				log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "Socket bind failed at port", ptop_port, ". Socket error", WSAGetLastError());
+				debug_printf("Socket bind failed at port %d. Socket error %d \n", ptop_port, WSAGetLastError());
 				continue;
 			}
-
-			if (listen(svc_fd_tcp, MAX_POLL_EVENT) == 0) {
-				cout << "Server LISTRN SUCCESS at TCP port: " << ptop_port << endl;
-				log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Server listen at TCP port", ptop_port);		
-				break;
-			}
-			else {
-				log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "Server listen at TCP port", ptop_port, "error");		
-				cout << "TCP PORT :" << svc_tcp_port << " listen error! " << endl;
-				ptop_port++;
+			if (listen(svc_fd_tcp, MAX_POLL_EVENT) < 0) {
+				log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "Socket listen failed at port", ptop_port, ". Socket error", WSAGetLastError());
+				debug_printf("Socket listen failed at port %d. Socket error %d \n", ptop_port, WSAGetLastError());
 				continue;
 			}
+			break;
 		}
+		debug_printf("Create p2p listen-socket success, port = %u \n", ptop_port);
+		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Create p2p listen-socket success, port =", ptop_port);
 		
 		net_ptr->set_nonblocking(svc_fd_tcp);
 
@@ -564,6 +660,8 @@ int main(int argc, char **argv){
 			PAUSE
 			log_ptr->exit(0, "Hardware Architecture is not support.");
 		}
+
+	
 
 #ifndef _WIN32
 		struct itimerval interval;
@@ -621,6 +719,16 @@ int main(int argc, char **argv){
 		map_chid_globalVar[chid]->pk_mgr_ptr_copy = pk_mgr_ptr ;
 		map_chid_globalVar[chid]->http_srv_ready = 1;
 		map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete = FALSE;
+		
+		map<string, string>::iterator iter;
+		for (iter = map_config.begin(); iter != map_config.end(); iter++) {
+			log_ptr->write_log_format("s(u) s s \n", __FUNCTION__, __LINE__, (iter->first).c_str(), (iter->second).c_str());
+		}
+		for (iter = prep->map_table.begin(); iter != prep->map_table.end(); iter++) {
+			log_ptr->write_log_format("s(u) -- s s \n", __FUNCTION__, __LINE__, (iter->first).c_str(), (iter->second).c_str());
+		}
+	
+		
 		while((!(map_chid_globalVar[chid]->srv_shutdown))  &&  (!(map_chid_globalVar[chid]->errorRestartFlag))) {
 #else
 		while((!srv_shutdown)  &&  (!errorRestartFlag)) {
@@ -729,7 +837,106 @@ int main(int argc, char **argv){
 	errorRestartFlag = 0;
 #endif
 	return EXIT_SUCCESS;
-
 }
 
 
+
+
+
+/**********************************************************\
+
+  Auto-generated firebreathTestAPI.cpp
+
+\**********************************************************/
+/*
+#include "JSObject.h"
+#include "variant_list.h"
+#include "DOM/Document.h"
+#include "global/config.h"
+
+#include "firebreathTestAPI.h"
+
+#include <WinSock2.h>
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn FB::variant firebreathTestAPI::echo(const FB::variant& msg)
+///
+/// @brief  Echos whatever is passed from Javascript.
+///         Go ahead and change it. See what happens!
+///////////////////////////////////////////////////////////////////////////////
+FB::variant firebreathTestAPI::echo(const FB::variant& msg)
+{
+    static int n(0);
+    fire_echo("So far, you clicked this many times::: ", n++);
+	fire_echo("haha", 55);
+
+	int svc_fd_tcp;
+	struct sockaddr_in sin;
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = INADDR_ANY;
+	sin.sin_port = htons(3500);
+	
+	WSADATA wsaData;										// Winsock initial data
+	WSAStartup(MAKEWORD(2, 2),&wsaData);
+	svc_fd_tcp = socket(AF_INET, SOCK_STREAM, 0);
+	bind(svc_fd_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in));
+	listen(svc_fd_tcp, 5);
+				
+	printf("11 \n");
+
+    // return "foobar";
+    return msg;
+}
+FB::variant firebreathTestAPI::echo2(const FB::variant& msg)
+{
+	int nn = 0;
+    fire_echo("echo2 test ", nn);
+
+    // return "foobar";
+    return msg;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn firebreathTestPtr firebreathTestAPI::getPlugin()
+///
+/// @brief  Gets a reference to the plugin that was passed in when the object
+///         was created.  If the plugin has already been released then this
+///         will throw a FB::script_error that will be translated into a
+///         javascript exception in the page.
+///////////////////////////////////////////////////////////////////////////////
+firebreathTestPtr firebreathTestAPI::getPlugin()
+{
+    firebreathTestPtr plugin(m_plugin.lock());
+    if (!plugin) {
+        throw FB::script_error("The plugin is invalid");
+    }
+    return plugin;
+}
+
+// Read/Write property testString
+std::string firebreathTestAPI::get_testString()
+{
+    return m_testString;
+}
+
+void firebreathTestAPI::set_testString(const std::string& val)
+{
+    m_testString = val;
+}
+
+// Read-only property version
+std::string firebreathTestAPI::get_version()
+{
+    return FBSTRING_PLUGIN_VERSION;
+}
+
+void firebreathTestAPI::testEvent()
+{
+    fire_test();
+}
+
+void firebreathTestAPI::testEvent2()
+{
+    fire_test2();
+}
+*/

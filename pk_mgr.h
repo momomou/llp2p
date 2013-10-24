@@ -55,8 +55,8 @@ public:
 	map<unsigned long, struct peer_connect_down_t *> map_pid_peerDown_info ; // real parent-peer
 
 	//about player  ,delete by bit_stream_server
-	map<int, stream *> _map_stream_media;	// <strm_addr, stream *>
-	map<int, stream *>::iterator _map_stream_iter;	// <strm_addr, stream *>
+	map<int, stream *> _map_stream_fd_stream;					// <stream_fd, stream *>
+	map<int, stream *>::iterator _map_stream_fd_stream_iter;	// <stream_fd, stream *>
 
 	//substreamID,delay
 	map<unsigned long, struct source_delay *> delay_table;
@@ -131,8 +131,8 @@ public:
 	int handle_register(unsigned short ptop_port, string svc_udp_port);
 	void peer_mgr_set(peer_mgr *peer_mgr_ptr);
 	
-	void add_stream(int strm_addr, stream *strm, unsigned strm_type);
-	void del_stream(int strm_addr, stream *strm, unsigned strm_type);
+	void add_stream(int stream_fd, stream *strm, unsigned strm_type);
+	void del_stream(int stream_fd, stream *strm, unsigned strm_type);
 
 	virtual int handle_pkt_in(int sock);
 	virtual int handle_pkt_out(int sock);

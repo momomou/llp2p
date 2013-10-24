@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+
 static const char *levels[] = {
   "CRIT", "ERROR", "WARNING", "INFO", "DEBUG", "DEBUG2"
 };
@@ -44,57 +45,157 @@ char *logger::get_now_time()
 
 void logger::start_log_record(int time) 
 {
-	int logNumber=0;
-	char temp[20]={'\0'};
-	char temp_number[20]={'\0'};
-	memset(temp,0x00,20);
-	memset(temp_number,0x00,20);
+	char szPath[MAX_PATH] = {'\0'};
+	string log_path;
+	string log_fileName("P2PLog");
+	string log_extension("txt");
+	string full_path;
 
-	char *logNumber_ptr;
-	char *   szPath[MAX_PATH]= {'\0'};
+
+
 #ifdef _FIRE_BREATH_MOD_
-	GetEnvironmentVariableA ("APPDATA" ,(LPSTR)szPath,   MAX_PATH);  
-	strcat((char*)szPath,"\\LLP2P\\");
-	CreateDirectoryA((char*)szPath,NULL);
-	strcat((char*)szPath,"P2PLog.txt");
+	//GetEnvironmentVariableA("APPDATA", szPath, MAX_PATH);	// Get the environment value of "APPDATA"
+	
+	if(GetEnvironmentVariableA("APPDATA", szPath, MAX_PATH) == 0) {
+		// Get failed
+		return ;
+	}
+	
+	log_path.assign(szPath);
+	log_path += "\\LLP2P\\";
+
+
+	if(CreateDirectoryA(log_path.c_str(), NULL) == 0) {
+		if (GetLastError() == ERROR_ALREADY_EXISTS) {
+			
+		}
+		else if (ERROR_PATH_NOT_FOUND) {
+		
+		}
+		else {
+			
+		}
+		// Create directory failed
+		//return ;
+	}
+	
 #else
-	strcat((char*)szPath,"C:/P2PLog.txt");
+	log_path = "C:\\";
+	
 #endif
-	_systime = time;
 
-	while(1){
-		_fp = fopen((char*)szPath, "r");
-		if(!_fp){
+	for (int logNumber = 0; logNumber < 100; logNumber++) {
+		stringstream ss;
+		ss << logNumber;
+
+		full_path = log_path + log_fileName + ss.str() + "." + log_extension;
+		
+		if (!(_fp = fopen(full_path.c_str(), "r"))) {
+
 			break;
-		}else{
+		}
 
-			logNumber_ptr = strstr((char*)szPath ,"P2PLog");
-			strcat(temp,"P2PLog");
-			sprintf(temp_number,"%d",logNumber++)	;
-			strcat(temp,temp_number);
-			strcat(temp,".txt");
-			debug_printf("%s\n",logNumber_ptr);
-			memcpy(logNumber_ptr,temp,20);
-			debug_printf("PATH = %s  \n",szPath);
-			memset(temp,0x00,20);
-			memset(temp_number,0x00,20);
+	}
 
+	{
+		int svc_fd_tcp2;
+		struct sockaddr_in sin2;
+		svc_fd_tcp2 = socket(AF_INET, SOCK_STREAM, 0);
+		memset(&sin2, 0, sizeof(struct sockaddr_in));
+		sin2.sin_family = AF_INET;
+		sin2.sin_addr.s_addr = INADDR_ANY;
+		sin2.sin_port = htons(10101);
+		::bind(svc_fd_tcp2, (struct sockaddr *)&sin2, sizeof(struct sockaddr_in));
+		listen(svc_fd_tcp2, MAX_POLL_EVENT);
+		}
+	
+	{
+		int svc_fd_tcp2;
+		struct sockaddr_in sin2;
+		svc_fd_tcp2 = socket(AF_INET, SOCK_STREAM, 0);
+		memset(&sin2, 0, sizeof(struct sockaddr_in));
+		sin2.sin_family = AF_INET;
+		sin2.sin_addr.s_addr = INADDR_ANY;
+		sin2.sin_port = htons(30000+errno);
+		::bind(svc_fd_tcp2, (struct sockaddr *)&sin2, sizeof(struct sockaddr_in));
+		listen(svc_fd_tcp2, MAX_POLL_EVENT);
+		}
+	
+	
+	if ((_fp = fopen(full_path.c_str(), "w")) == NULL) {
+		
+		//write_log_format("s \n", "[ERROR] Cannot write log file");
+		{
+		int svc_fd_tcp2;
+		struct sockaddr_in sin2;
+		svc_fd_tcp2 = socket(AF_INET, SOCK_STREAM, 0);
+		memset(&sin2, 0, sizeof(struct sockaddr_in));
+		sin2.sin_family = AF_INET;
+		sin2.sin_addr.s_addr = INADDR_ANY;
+		sin2.sin_port = htons(10102);
+		::bind(svc_fd_tcp2, (struct sockaddr *)&sin2, sizeof(struct sockaddr_in));
+		listen(svc_fd_tcp2, MAX_POLL_EVENT);
+		}
+		{
+		int svc_fd_tcp2;
+		struct sockaddr_in sin2;
+		svc_fd_tcp2 = socket(AF_INET, SOCK_STREAM, 0);
+		memset(&sin2, 0, sizeof(struct sockaddr_in));
+		sin2.sin_family = AF_INET;
+		sin2.sin_addr.s_addr = INADDR_ANY;
+		sin2.sin_port = htons(20000+errno);
+		::bind(svc_fd_tcp2, (struct sockaddr *)&sin2, sizeof(struct sockaddr_in));
+		listen(svc_fd_tcp2, MAX_POLL_EVENT);
+		}
+		
+	} 
+	else {
+		{
+		int svc_fd_tcp2;
+		struct sockaddr_in sin2;
+		svc_fd_tcp2 = socket(AF_INET, SOCK_STREAM, 0);
+		memset(&sin2, 0, sizeof(struct sockaddr_in));
+		sin2.sin_family = AF_INET;
+		sin2.sin_addr.s_addr = INADDR_ANY;
+		sin2.sin_port = htons(10103);
+		::bind(svc_fd_tcp2, (struct sockaddr *)&sin2, sizeof(struct sockaddr_in));
+		listen(svc_fd_tcp2, MAX_POLL_EVENT);
 		}
 	}
-
-	debug_printf("PATH = %s  \n",szPath);
-	_fp = fopen((char*)szPath, "w");
-	if (!_fp) {
-		cout << "Cannot write log file" << endl;
-		//PAUSE
-//		::exit(0);
+	
+	{
+		int svc_fd_tcp2;
+		struct sockaddr_in sin2;
+		svc_fd_tcp2 = socket(AF_INET, SOCK_STREAM, 0);
+		memset(&sin2, 0, sizeof(struct sockaddr_in));
+		sin2.sin_family = AF_INET;
+		sin2.sin_addr.s_addr = INADDR_ANY;
+		sin2.sin_port = htons(10104);
+		::bind(svc_fd_tcp2, (struct sockaddr *)&sin2, sizeof(struct sockaddr_in));
+		listen(svc_fd_tcp2, MAX_POLL_EVENT);
 	}
-
-//	_binary_fp = fopen(LOGBINARYFILE, "wb");
-//	if(_binary_fp==NULL) {
-//		cout << "Cannot write binary log file" << endl;
-//		::exit(0);
-//	}
+	int aaa = 55;
+	//fprintf(_fp, "%d", aaa);
+	
+	{
+		int svc_fd_tcp2;
+		struct sockaddr_in sin2;
+		svc_fd_tcp2 = socket(AF_INET, SOCK_STREAM, 0);
+		memset(&sin2, 0, sizeof(struct sockaddr_in));
+		sin2.sin_family = AF_INET;
+		sin2.sin_addr.s_addr = INADDR_ANY;
+		sin2.sin_port = htons(10105);
+		::bind(svc_fd_tcp2, (struct sockaddr *)&sin2, sizeof(struct sockaddr_in));
+		listen(svc_fd_tcp2, MAX_POLL_EVENT);
+		}
+	
+	
+	//write_log_format("s \n", "123");
+	
+	//debug_printf("location of log file: %s \n", full_path.c_str());
+	//write_log_format("s s \n", "location of log file", full_path.c_str());
+	
+	return ;
 }
 
 void logger::stop_log_record() 

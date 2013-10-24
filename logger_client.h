@@ -56,10 +56,10 @@ public:
 	/*
 	set source delay
 	*/
-	void set_source_delay(unsigned long sub_id,unsigned long source_delay);
+	void set_source_delay(unsigned long substream_id,unsigned long source_delay);
 
 	/*
-	send max source delay
+	send max source delay to PK
 	*/
 	void send_max_source_delay();
 
@@ -74,7 +74,7 @@ public:
 	void set_in_bw(unsigned long timestamp,unsigned long pkt_size);
 
 	/*
-	send bw result
+	send qualtiy and bandwidth to PK
 	*/
 	void send_bw();
 
@@ -153,8 +153,8 @@ public:
 //	LARGE_INTEGER log_period_bw_start;
 	struct timerStruct start_out_bw_record,end_out_bw_record;
 	struct timerStruct log_period_bw_start;
-	unsigned long in_recv_len;
-	unsigned long out_send_len;
+	unsigned long accumulated_packet_size_in;		// Accumulate total size of packets in
+	unsigned long accumulated_packet_size_out;		// Accumulate total size of packets out
 	unsigned long pre_in_pkt_size;
 	unsigned long pre_out_pkt_size;
 	int log_bw_in_init_flag,log_bw_out_init_flag;
