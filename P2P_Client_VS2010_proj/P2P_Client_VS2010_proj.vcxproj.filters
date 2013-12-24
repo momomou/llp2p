@@ -256,8 +256,5 @@
     <ClCompile Include="..\io_accept_nat.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
-    <ClCompile Include="..\newtest.cpp">
-      <Filter>原始程式檔</Filter>
-    </ClCompile>
   </ItemGroup>
 </Project>

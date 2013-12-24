@@ -46,6 +46,8 @@ private:
 	int _offset;
 	int firstRecvReqSreamID;
 
+	int a;
+	int b;
 
 	FILE *file_ptr;
 	FILE *file_ptr_test;

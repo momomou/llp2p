@@ -5,6 +5,8 @@
 logger_client::logger_client(logger *log_ptr)
 {
 	self_pid = 0;
+	my_public_ip = 0;
+	my_private_port = 0;
 	previous_time_differ = 0;
 	buffer_clear_flag = 0;
 	start_delay = 0;
@@ -20,7 +22,7 @@ logger_client::logger_client(logger *log_ptr)
 	delay_list=NULL;
 	_log_ptr =log_ptr;
 	chunk_buffer = (struct chunk_t *)new unsigned char[(CHUNK_BUFFER_SIZE + sizeof(struct chunk_header_t))];
-	if(!(chunk_buffer)){
+	if (!chunk_buffer) {
 		debug_printf("chunk_buffer loggerClien new error buf_len=%u\n",(CHUNK_BUFFER_SIZE + sizeof(struct chunk_header_t)));
 		PAUSE
 	}
@@ -28,7 +30,7 @@ logger_client::logger_client(logger *log_ptr)
 	buffer_size = 0;
 
 	quality_struct_ptr = (struct quality_struct*)(new struct quality_struct);
-	if(!(quality_struct_ptr)){
+	if (!quality_struct_ptr) {
 		debug_printf("chunk_buffer loggerClien new error \n");
 		PAUSE
 	}
@@ -73,6 +75,12 @@ void logger_client::set_self_pid_channel(unsigned long pid,unsigned long channel
 	log_clear_buffer();
 }
 
+void logger_client::set_self_ip_port(unsigned long ip, unsigned short port)
+{
+	my_public_ip = ip;
+	my_private_port = port;
+}
+
 void logger_client::set_net_obj(network *net_ptr)
 {
 	_net_ptr = net_ptr;
@@ -90,8 +98,10 @@ void logger_client::set_prep_obj(configuration *prep)
 
 void logger_client::log_init()
 {
+	int retVal;
 	string log_ip("");
 	string log_port("");
+	struct sockaddr_in log_saddr;
 	
 	_prep->read_key("log_ip", log_ip);
 	_prep->read_key("log_port", log_port);
@@ -100,57 +110,44 @@ void logger_client::log_init()
 	cout << "log_ip=" << log_ip << endl;
 	cout << "log_port=" << log_port << endl;
 	
-	if((log_server_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
-		cout << "log_init init create socket failure" << endl;
+	if ((log_server_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
 #ifdef _WIN32
+		int socketErr = WSAGetLastError();
+		debug_printf("[ERROR] Create socket failed %d %d \n", log_server_sock, socketErr);
 		::WSACleanup();
-#endif
-		//exit(1);
-		debug_printf("log_init init create socket failure\n");
-		*(_net_ptr->_errorRestartFlag)=RESTART ;
+		//*(_net_ptr->_errorRestartFlag) = RESTART;
 		PAUSE
+#endif
 	}
 
-	struct sockaddr_in log_saddr;
-
-	memset((struct sockaddr_in*)&log_saddr, 0x0, sizeof(struct sockaddr_in));
-
+	memset((struct sockaddr_in*)&log_saddr, 0, sizeof(struct sockaddr_in));
 	log_saddr.sin_addr.s_addr = inet_addr(log_ip.c_str());
 	log_saddr.sin_port = htons((unsigned short)atoi(log_port.c_str()));
 	log_saddr.sin_family = AF_INET;
 
-//	_net_ptr->set_nonblocking(_sock);
+	//_net_ptr->set_nonblocking(_sock);
 
-	if(connect(log_server_sock, (struct sockaddr*)&log_saddr, sizeof(log_saddr)) < 0) {
-
+	if ((retVal = connect(log_server_sock, (struct sockaddr*)&log_saddr, sizeof(log_saddr))) < 0) {
 #ifdef _WIN32
-//win32
-		int n = WSAGetLastError();
-		if (n == WSAEWOULDBLOCK) {
-#else
-//linux
-#endif
-//		if non-blocking mode waht can i do?
-		}else{
-			cout << "build_connection failure" << endl;
-
-#ifdef _WIN32
+		int socketErr = WSAGetLastError();
+		if (socketErr == WSAEWOULDBLOCK) {
+		
+		}
+		else {
+			debug_printf("[ERROR] Building Log-server connection failed %d %d \n", retVal, socketErr);
 			::closesocket(log_server_sock);
 			::WSACleanup();
-#else
-			::close(_sock);
-#endif
-		debug_printf("log_init init build_connection failure  %d \n", n);
-		*(_net_ptr->_errorRestartFlag)=RESTART ;
-		PAUSE
+			//*(_net_ptr->_errorRestartFlag)=RESTART ;
+			PAUSE
 		}
+#else
+#endif
 	}
-
-	_net_ptr->set_nonblocking(log_server_sock);	// set to non-blocking
+	
+	_net_ptr->set_nonblocking(log_server_sock);		// set to non-blocking
 	_net_ptr->epoll_control(log_server_sock, EPOLL_CTL_ADD, EPOLLOUT);
 	_net_ptr->set_fd_bcptr_map(log_server_sock, dynamic_cast<basic_class *> (this));
 	_pk_mgr_ptr->fd_list_ptr->push_back(log_server_sock);
-
 }
 
 /*
@@ -522,9 +519,11 @@ void logger_client::log_to_server(int log_mode, ...){
 	}
 	else if(log_mode == LOG_REG_LIST_DETECTION_TESTING_SUCCESS){
 		unsigned long manifest,testing_result;
+		unsigned long select_pid;
 		manifest = va_arg(ap, unsigned long);
 		testing_result = va_arg(ap, unsigned long);
-
+		select_pid = va_arg(ap, unsigned long);
+		
 		struct log_list_detection_testing_struct *log_list_detection_testing_struct_ptr = NULL;
 		log_list_detection_testing_struct_ptr = new struct log_list_detection_testing_struct;
 		if(!(log_list_detection_testing_struct_ptr)){
@@ -540,14 +539,17 @@ void logger_client::log_to_server(int log_mode, ...){
 		log_list_detection_testing_struct_ptr->log_header.channel_id = self_channel_id;
 		log_list_detection_testing_struct_ptr->log_header.length = sizeof(struct log_list_detection_testing_struct) - sizeof(struct log_header_t);
 		log_list_detection_testing_struct_ptr->testing_result = testing_result;
+		log_list_detection_testing_struct_ptr->select_pid = select_pid;
 
 		log_buffer.push((struct log_pkt_format_struct *)log_list_detection_testing_struct_ptr);
 		buffer_size += sizeof(struct log_list_detection_testing_struct);
 	}
 	else if(log_mode == LOG_REG_LIST_TESTING_FAIL){
 		unsigned long manifest;
+		unsigned long select_pid;
 		manifest = va_arg(ap, unsigned long);
-
+		select_pid = va_arg(ap, unsigned long);
+		
 		struct log_list_testing_fail_struct *log_list_testing_fail_struct_ptr = NULL;
 		log_list_testing_fail_struct_ptr = new struct log_list_testing_fail_struct;
 		if(!(log_list_testing_fail_struct_ptr)){
@@ -562,7 +564,8 @@ void logger_client::log_to_server(int log_mode, ...){
 		log_list_testing_fail_struct_ptr->log_header.manifest = manifest;
 		log_list_testing_fail_struct_ptr->log_header.channel_id = self_channel_id;
 		log_list_testing_fail_struct_ptr->log_header.length = sizeof(struct log_list_testing_fail_struct) - sizeof(struct log_header_t);
-
+		log_list_testing_fail_struct_ptr->select_pid = select_pid;
+		
 		log_buffer.push((struct log_pkt_format_struct *)log_list_testing_fail_struct_ptr);
 		buffer_size += sizeof(struct log_list_testing_fail_struct);
 	}
@@ -754,9 +757,11 @@ void logger_client::log_to_server(int log_mode, ...){
 	}
 	else if(log_mode == LOG_RESCUE_DETECTION_TESTING_SUCCESS){
 		unsigned long manifest,testing_result;
+		unsigned long select_pid;
 		manifest = va_arg(ap, unsigned long);
 		testing_result = va_arg(ap, unsigned long);
-
+		select_pid = va_arg(ap, unsigned long);
+		
 		struct log_list_detection_testing_struct *log_list_detection_testing_struct_ptr = NULL;
 		log_list_detection_testing_struct_ptr = new struct log_list_detection_testing_struct;
 		if(!(log_list_detection_testing_struct_ptr)){
@@ -772,13 +777,16 @@ void logger_client::log_to_server(int log_mode, ...){
 		log_list_detection_testing_struct_ptr->log_header.channel_id = self_channel_id;
 		log_list_detection_testing_struct_ptr->log_header.length = sizeof(struct log_list_detection_testing_struct) - sizeof(struct log_header_t);
 		log_list_detection_testing_struct_ptr->testing_result = testing_result;
+		log_list_detection_testing_struct_ptr->select_pid = select_pid;
 
 		log_buffer.push((struct log_pkt_format_struct *)log_list_detection_testing_struct_ptr);
 		buffer_size += sizeof(struct log_list_detection_testing_struct);
 	}
 	else if(log_mode == LOG_RESCUE_LIST_TESTING_FAIL){
 		unsigned long manifest;
+		unsigned long select_pid;
 		manifest = va_arg(ap, unsigned long);
+		select_pid = va_arg(ap, unsigned long);
 
 		struct log_list_testing_fail_struct *log_list_testing_fail_struct_ptr = NULL;
 		log_list_testing_fail_struct_ptr = new struct log_list_testing_fail_struct;
@@ -794,6 +802,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		log_list_testing_fail_struct_ptr->log_header.manifest = manifest;
 		log_list_testing_fail_struct_ptr->log_header.channel_id = self_channel_id;
 		log_list_testing_fail_struct_ptr->log_header.length = sizeof(struct log_list_testing_fail_struct) - sizeof(struct log_header_t);
+		log_list_testing_fail_struct_ptr->select_pid = select_pid;
 
 		log_buffer.push((struct log_pkt_format_struct *)log_list_testing_fail_struct_ptr);
 		buffer_size += sizeof(struct log_list_testing_fail_struct);
@@ -1065,7 +1074,11 @@ void logger_client::log_to_server(int log_mode, ...){
 		log_begine_struct_ptr->log_header.manifest = manifest;
 		log_begine_struct_ptr->log_header.channel_id = self_channel_id;
 		log_begine_struct_ptr->log_header.length = sizeof(struct log_begine_struct) - sizeof(struct log_header_t);
-
+		log_begine_struct_ptr->public_ip = my_public_ip;
+		log_begine_struct_ptr->private_port = my_private_port;
+		
+		_log_ptr->write_log_format("s(u) s:d \n", __FUNCTION__, __LINE__, inet_ntoa(*(struct in_addr *)&my_public_ip), my_private_port);
+		
 		log_buffer.push((struct log_pkt_format_struct *)log_begine_struct_ptr);
 		buffer_size += sizeof(struct log_begine_struct);
 	}
@@ -1137,7 +1150,9 @@ void logger_client::log_to_server(int log_mode, ...){
 	}
 	else if(log_mode == LOG_TEST_DETECTION_FAIL){
 		unsigned long manifest;
+		unsigned long select_pid;
 		manifest = va_arg(ap, unsigned long);
+		select_pid = va_arg(ap, unsigned long);
 
 		struct log_test_detection_fail_struct *log_test_detection_fail_struct_ptr = NULL;
 		log_test_detection_fail_struct_ptr = new struct log_test_detection_fail_struct;
@@ -1153,6 +1168,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		log_test_detection_fail_struct_ptr->log_header.manifest = manifest;
 		log_test_detection_fail_struct_ptr->log_header.channel_id = self_channel_id;
 		log_test_detection_fail_struct_ptr->log_header.length = sizeof(struct log_test_detection_fail_struct) - sizeof(struct log_header_t);
+		log_test_detection_fail_struct_ptr->select_pid = select_pid;
 
 		log_buffer.push((struct log_pkt_format_struct *)log_test_detection_fail_struct_ptr);
 		buffer_size += sizeof(struct log_test_detection_fail_struct);
@@ -1282,13 +1298,13 @@ void logger_client::log_exit()
 	int _send_byte;
 
 	//blocking send
-	while (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == RUNNING ) {
+	while (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == RUNNING) {
 		_send_byte = _net_ptr->nonblock_send(log_server_sock, & (Nonblocking_Send_Ctrl_ptr->recv_ctl_info ));
 			
 		if (_send_byte <= 0) {
-			int error_val = WSAGetLastError();
-			debug_printf("send info to log server error : %d %d \n", _send_byte, error_val);
-			_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, error_val);
+			int socketErr = WSAGetLastError();
+			debug_printf("send info to log server error : %d %d \n", _send_byte, socketErr);
+			_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, socketErr);
 			*(_net_ptr->_errorRestartFlag) = RESTART;
 			PAUSE
 		}
@@ -1304,8 +1320,11 @@ void logger_client::log_exit()
 			buffer_size -= log_struct_size;
 
 			if (buffer_size < 0 || (chunk_buffer_offset+log_struct_size) > CHUNK_BUFFER_SIZE) {
-				debug_printf("[ERROR] buffer size : %d and %d (overflow)  in log_exit\n",buffer_size,(chunk_buffer_offset+log_struct_size));
-				*(_net_ptr->_errorRestartFlag)=RESTART ;
+				debug_printf("[ERROR] buffer size : %d and %d (overflow)  in log_exit \n", buffer_size, (chunk_buffer_offset+log_struct_size));
+				_log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
+				_log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
+				_log_ptr->write_log_format("s(u) s d \n\n\n", __FUNCTION__, __LINE__, "Program Restart");
+				*(_net_ptr->_errorRestartFlag) = RESTART;
 			}
 
 			memcpy((char *)(chunk_buffer->buf) + chunk_buffer_offset, log_buffer_element_ptr, log_struct_size);
@@ -1329,9 +1348,9 @@ void logger_client::log_exit()
 		_net_ptr->set_nonblocking(log_server_sock);
 
 		if (_send_byte <= 0) {
-			int error_val = WSAGetLastError();
-			debug_printf("send info to log server error : %d %d \n", _send_byte, error_val);
-			_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, error_val);
+			int socketErr = WSAGetLastError();
+			debug_printf("send info to log server error : %d %d \n", _send_byte, socketErr);
+			_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, socketErr);
 			*(_net_ptr->_errorRestartFlag) = RESTART;
 			PAUSE
 		}

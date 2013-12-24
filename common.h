@@ -2,6 +2,10 @@
 //#define _FIRE_BREATH_MOD_ 
 //#endif
 
+#ifndef __COMMON_H__
+#define __COMMON_H__
+
+
 #ifndef DEBUG
 #define DEBUG
 #endif
@@ -11,20 +15,31 @@
 #define DEBUG2
 #endif
 */
-
+/*
 #ifndef WRITE_LOG
 #define WRITE_LOG		// write log.txt
 #endif
+*/
+// Role of function caller
+#define RESCUE_PEER		0		// the function caller is child
+#define CANDIDATE_PEER	1		// the function caller is parent
 
-#ifndef __COMMON_H__
-#define __COMMON_H__
+
 
 #define FD_SETSIZE		2048
-////resuce PARAMETER////
-#define PARAMETER_X		4	// chunk packets per (1000/PARAMETER_X) ms
+
 #define PK_PID			999999
 #define STUNT_PID		999998
 #define BIG_CHUNK	8192
+
+////resuce PARAMETER////
+#define PARAMETER_X		4				// chunk packets per (1000/PARAMETER_X) ms
+#define MAX_DELAY 		20000			// source delay PARAMETER ms
+#define SOURCE_DELAY_CONTINUOUS 0.5		// The maximal permissive times that souce-delay is bigger than MAX_DELAY. SOURCE_DELAY_CONTINUOUS * x(packets/s) / substream
+// M 次測量發生N次 or 連續P次發生 則判斷需要Rescue(頻寬檢查)
+#define PARAMETER_M		8
+#define PARAMETER_N		5
+#define PARAMETER_P		3
 
 // LOG SERVER
 #define LOGPORT		8754
@@ -34,10 +49,7 @@
 #define NETWORK_TIMEOUT		5000		// Period of check peer's unnormal disconnection
 #define BASE_RESYN_TIME		20000
 
-// M 次測量發生N次 or 連續P次發生 則判斷需要Rescue
-#define PARAMETER_M		8
-#define PARAMETER_N		5
-#define PARAMETER_P		3
+
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
 // BUFF_SIZE sec
@@ -45,10 +57,8 @@
 //CHUNK_LOSE sec, mean lose about CHUNK_LOSE sec packet
 #define CHUNK_LOSE		2	//
 
-//source delay PARAMETER ms
-#define MAX_DELAY 2000
-//SOURCE_DELAY_CONTINUOUS sec, mean  about SOURCE_DELAY_CONTINUOUS sec packet all dalay out of bound
-#define SOURCE_DELAY_CONTINUOUS 0.5
+
+
 // Time interval of calculation Xcount
 #define XCOUNT_INTERVAL		10000
 //io_accept fd remain period
@@ -65,7 +75,7 @@
 
 //log part
 #define BUFFER_CONTENT_THRESHOLD 2000
-#define CHUNK_BUFFER_SIZE 5000
+#define CHUNK_BUFFER_SIZE 10000
 #define TIME_BW	500
 #define LOG_BW	1000
 #define LOG_TIMES 2
@@ -120,8 +130,8 @@ UPDTAE
 */
 #define LOG_RESCUE_TRIGGER_BACK 0x15
 #define LOG_LIST_EMPTY 0x16
-#define LOG_TEST_DELAY_FAIL 0x17
-#define LOG_TEST_DETECTION_FAIL 0x18
+#define LOG_TEST_DELAY_FAIL 0x17		// All connections building of list-peers fail  
+#define LOG_TEST_DETECTION_FAIL 0x18	// Test delay fail
 #define LOG_DATA_COME_PK 0x19
 #define LOG_DELAY_RESCUE_TRIGGER 0x1a
 #define LOG_CLIENT_BW 0x1b
@@ -219,7 +229,7 @@ using std::bitset;
 #pragma pack(1)
 
 // Defined Macro
-#define PAUSE cout << "PAUSE , Press any key to continue..." << __FUNCTION__ << ":" << __LINE__; fgetc(stdin);
+#define PAUSE for (;;) { cout << "PAUSE , Press any key to continue..." << __FUNCTION__ << ":" << __LINE__; fgetc(stdin); }
 #ifdef DEBUG
     #define debug_printf(str, ...) do { printf("(%d)\t", __LINE__); printf(str, __VA_ARGS__); } while (0)
 #else
@@ -488,23 +498,23 @@ struct chunk_header_t {
 //detection Info for each substream
 struct detectionInfo{
 	//timer
-	struct timerStruct	lastAlarm;
-	struct timerStruct	firstAlarm;
-	struct timerStruct	previousAlarm;
+	struct timerStruct	lastAlarm;			// 每一次處理rescue_detecion()結束的時刻
+	struct timerStruct	firstAlarm;			// count_X = 1 的時刻 
+	struct timerStruct	previousAlarm;		// count_X = Xcount-1 的時刻 
 
-	unsigned int	last_timestamp;
-	unsigned int	first_timestamp;
-	unsigned long	last_seq;
+	unsigned int	last_timestamp;			// 每一次處理rescue_detecion()結束的timestamp
+	unsigned int	first_timestamp;		// count_X = 1 時刻的 timestamp
+	unsigned long	last_seq;				// 每一次處理rescue_detecion()結束的seq
 
-	unsigned int	measure_N;		//第N次測量
-	unsigned int	count_X;		//X個封包量一次
+	unsigned int	measure_N;				//第N次測量
+	unsigned int	count_X;				//X個封包量一次
 
-	unsigned int	total_buffer_delay;
-	double			last_sourceBitrate;
-	double			last_localBitrate;
+	unsigned int	total_buffer_delay;		// 兩個連續封包之間的最大 source-delay
+	double			last_sourceBitrate;		// 從 count_X = 1 累積到 count_X = Xcount 的 sourceBitrate
+	double			last_localBitrate;		// 從 count_X = 1 累積到 count_X = Xcount 的 localBitrate
 	unsigned int	total_byte;
 	int				isTesting;
-	unsigned int	testing_count;	//用來測試rescue 的計數器
+	unsigned int	testing_count;			//用來測試rescue 的計數器
 	unsigned		previousParentPID;
 };
 
@@ -579,11 +589,11 @@ struct chunk_request_pkt_t{
 
 struct peer_connect_down_t {
 	struct peer_info_t peerInfo;
-	int rescueStatsArry[PARAMETER_M];
+	int rescueStatsArry[PARAMETER_M];			// 
 	volatile unsigned int timeOutLastSeq;
 	volatile unsigned int timeOutNewSeq;		// Sequence number received from this parent so far
 	volatile unsigned int lastTriggerCount;
-	volatile unsigned int outBuffCount;
+	volatile unsigned int outBuffCount;			// Counter for lost packet whose seq is out of chunk buffer
 	
 };
 
@@ -801,7 +811,7 @@ struct source_delay {
 	unsigned int source_delay_time;
 	//timer
 	struct timerStruct client_end_time;
-	unsigned long end_seq_num;
+	unsigned long end_seq_num;	// The first received packet sequence of a substream
 	UINT32 end_seq_abs_time;
 	bool first_pkt_recv;
 	int rescue_state;			//0 normal 1 rescue trigger 2 testing
@@ -1030,10 +1040,12 @@ struct log_list_testing_struct{
 struct log_list_detection_testing_struct{
 	struct log_header_t log_header;
 	unsigned long testing_result;
+	unsigned long select_pid;
 };
 
 struct log_list_testing_fail_struct{
 	struct log_header_t log_header;
+	unsigned long select_pid;
 };
 
 struct log_cut_pk_struct{
@@ -1072,6 +1084,8 @@ struct log_write_string_struct{
 
 struct log_begine_struct{
 	struct log_header_t log_header;
+	unsigned long public_ip;
+	unsigned short private_port;
 };
 
 struct log_rescue_trigger_back_struct{
@@ -1088,6 +1102,7 @@ struct log_test_delay_fail_struct{
 
 struct log_test_detection_fail_struct{
 	struct log_header_t log_header;
+	unsigned long select_pid;
 };
 
 struct log_data_come_pk_struct{

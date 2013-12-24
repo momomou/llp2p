@@ -22,7 +22,7 @@ class pk_mgr:public basic_class {
 
 
 public:
-
+	FILE *fp;
 	list<int> *fd_list_ptr;
 //	list<int> outside_rescue_list;
 	list <int> streamID_list;
@@ -32,15 +32,17 @@ public:
 	unsigned long totalMod ;
 	unsigned long reSynTime;
 	struct timerStruct lastSynStartclock;
-	unsigned long pkt_count ;
+	unsigned long pkt_count ;			// Ω XCOUNT_INTERVAL 丁ずΜchunk计秖(Τ筁耾筁)
 	unsigned long totalbyte;
 	int synLock;
 
-	unsigned long fisttimestamp;
+	unsigned long first_timestamp;		// 材Μtimestampd
 	bool firstIn;
 	struct timerStruct LastTimer;
 	struct timerStruct sleepTimer;
 	struct timerStruct reSynTimer;
+	struct timerStruct XcountTimer;
+	struct timerStruct programStartTimer;
 
 //	LARGE_INTEGER teststart,testend;
 //	LARGE_INTEGER syn_round_start;
@@ -83,6 +85,7 @@ public:
 	unsigned long sub_stream_num;
 
 	unsigned long public_ip;
+	unsigned short my_private_port;
 	unsigned long inside_lane_rescue_num;
 	unsigned long outside_lane_rescue_num;
 
@@ -118,8 +121,8 @@ public:
 	void send_capacity_to_pk(int sock);
 
 	
-	volatile unsigned int _least_sequence_number;		//程穝seq
-	volatile unsigned int _current_send_sequence_number; //程癳倒playerseq(临⊿癳)
+	volatile unsigned int _least_sequence_number;			//Μヘ玡ゎ程穝seq
+	volatile unsigned int _current_send_sequence_number;	//程癳倒playerseq(临⊿癳)
 
 	unsigned long stream_number;	//channel stream计
 	

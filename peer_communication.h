@@ -24,7 +24,7 @@ public:
 	~peer_communication();
 
 	void set_self_info(unsigned long public_ip);
-	int set_candidates_handler(unsigned long rescue_manifest,struct chunk_level_msg_t *testing_info,unsigned int candidates_num, int flag);	//parameter candidates_num may be zero 
+	int set_candidates_handler(unsigned long rescue_manifest,struct chunk_level_msg_t *testing_info,unsigned int candidates_num, int caller);	//parameter candidates_num may be zero 
 	void stop_attempt_connect(unsigned long stop_session_id);
 	void clear_fd_in_peer_com(int sock);
 	int non_blocking_build_connection(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, int flag, unsigned long session_id);

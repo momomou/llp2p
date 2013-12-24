@@ -6,8 +6,10 @@
 #include <sstream>
 #include "common.h"
 #ifdef _FIRE_BREATH_MOD_
-#include "bit_stream_out.h"
-#include "bit_stream_httpout.h"
+//#include "bit_stream_out.h"
+//#include "bit_stream_httpout.h"
+#include "libBitStream/bit_stream_out.h"
+#include "libBitStreamHTTP/bit_stream_httpout.h"
 #else
 #include "libBitStream/bit_stream_out.h"
 #include "libBitStreamHTTP/bit_stream_httpout.h"
@@ -121,7 +123,7 @@ int bit_stream_server::handle_pkt_in(int sock)
 	struct sockaddr_in addr;
 	int addrLen = sizeof(struct sockaddr_in);
 	int aa;
-	aa = getpeername(sock, (struct sockaddr *)&addr, &addrLen);
+	aa = getpeername(new_fd, (struct sockaddr *)&addr, &addrLen);
 	_log_ptr->write_log_format("s(u) d s d \n", __FUNCTION__, __LINE__, aa, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 	
 	if (MODE == MODE_BitStream) {

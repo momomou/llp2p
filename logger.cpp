@@ -279,7 +279,7 @@ void logger::exit(int status, const char *action)
 	stop_log_record();
 	_net_ptr->garbage_collection();
 	debug_printf("logger error\n");
-	*(_net_ptr->_errorRestartFlag) =RESTART;
+	*(_net_ptr->_errorRestartFlag) = RESTART;
 }
 
 bool logger::check_arch_compatible() 
@@ -617,7 +617,7 @@ unsigned int logger::diff_TimerGet_ms(struct timerStruct *start, struct timerStr
 
 	//program run 10 hours for debug~
 	if (tickReturn >= 36000000) {
-		debug_printf("tickReturn = %u  clockReturn = %u \n", tickReturn, clockReturn);
+		//debug_printf("tickReturn = %u  clockReturn = %u \n", tickReturn, clockReturn);
 		timerMod = MOD_TIME__CLOCK;
 	}
 

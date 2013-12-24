@@ -75,6 +75,10 @@ const char flvHeader[] =			{ 'F', 'L', 'V', 0x01,
 
 bit_stream_httpout::bit_stream_httpout(int stream_id,network *net_ptr, logger *log_ptr,bit_stream_server *bit_stream_server_ptr ,pk_mgr *pk_mgr_ptr, list<int> *fd_list,int acceptfd)
 {
+
+	a = -1;
+	b = -1;
+
 	_reqStreamID = -1;
 	firstRecvReqSreamID = 0;
 
@@ -124,9 +128,17 @@ int bit_stream_httpout::handle_pkt_in(int sock)
 
 	recv_byte = _net_ptr->recv(sock, HTTPrequestBuffer, sizeof(HTTPrequestBuffer), 0);
 
+	// player拿streamID的時候可能會發起多次連線，通常第一個socket的連線會成功，其餘的socket會被player關閉，因此會收到關閉訊息:recv_byte=0, WSAGetLastError()=0
 	if (recv_byte <= 0) {
-		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[ERROR] HTTP Stream in channel WSAGetLastError() =", WSAGetLastError());
+		int socketErr = WSAGetLastError();
+		_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "[ERROR] HTTP Stream in channel WSAGetLastError() =", socketErr, recv_byte);
 
+		struct sockaddr_in addr;
+		int addrLen=sizeof(struct sockaddr_in);
+		int	aa;
+		aa = getpeername(sock, (struct sockaddr *)&addr, &addrLen);
+		_log_ptr->write_log_format("s(u) d s d \n", __FUNCTION__, __LINE__, aa, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+		
 		_pk_mgr_ptr ->del_stream(sock,(stream*)this, STRM_TYPE_MEDIA);
 		data_close(sock," bit_stream_httpout::handle_pkt_in HTTPrequestBuffer ");
 		delete this;
@@ -135,8 +147,8 @@ int bit_stream_httpout::handle_pkt_in(int sock)
 	_log_ptr->write_log_format("s(u) s d s s \n", __FUNCTION__, __LINE__, "recv_byte =", recv_byte, "HTTP request:", HTTPrequestBuffer);
 	
 	struct sockaddr_in addr;
-	int addrLen=sizeof(struct sockaddr_in),
-		aa;
+	int addrLen=sizeof(struct sockaddr_in);
+	int	aa;
 	aa = getpeername(sock, (struct sockaddr *)&addr, &addrLen);
 	_log_ptr->write_log_format("s(u) d s d \n", __FUNCTION__, __LINE__, aa, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 	
@@ -184,6 +196,8 @@ int bit_stream_httpout::handle_pkt_out(int sock)
 {
 	int send_rt_val = 0;
 	
+	
+	
 	/*	Commented on 20131017	*/
 	/*
 	//here is http header and flv header
@@ -222,6 +236,7 @@ int bit_stream_httpout::handle_pkt_out(int sock)
 	}
 	*/
 	//_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "_queue_out_data_ptr->size() =", _queue_out_data_ptr->size());
+	//_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "_send_ctl_info.ctl_state =", _send_ctl_info.ctl_state);
 	
 	if (_send_ctl_info.ctl_state == READY) {
 		size_t send_size;
@@ -238,7 +253,13 @@ int bit_stream_httpout::handle_pkt_out(int sock)
 
 		chunk_ptr = (chunk_t *)_queue_out_data_ptr->front();
 		
+		if (isKeyFrame(chunk_ptr)) {
+			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Is keyframe", chunk_ptr->header.sequence_number);
+		}
+		
+		
 		//_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "3");
+		first_pkt = false;
 		
 		//pop until get the first keyframe
 		if (first_pkt) {
@@ -250,7 +271,7 @@ int bit_stream_httpout::handle_pkt_out(int sock)
 			for (int i = 0; i < 5; i++) {
 				//_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "6");
 				if (!isKeyFrame(chunk_ptr)) {
-					_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "No Key Frame");
+					//_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "No Key Frame");
 					_queue_out_data_ptr->pop();
 					chunk_ptr = _queue_out_data_ptr->front();
 				}
@@ -316,6 +337,10 @@ int bit_stream_httpout::handle_pkt_out(int sock)
 		}
 		*/
 
+		
+		
+		
+		
 
 		//for debug
 		//			fwrite(chunk_ptr->buf,1,chunk_ptr->header.length,file_ptr);
@@ -329,7 +354,42 @@ int bit_stream_httpout::handle_pkt_out(int sock)
 		if (_queue_out_data_ptr->size() == 0) {
 			return RET_OK;
 		}
+		
+	
+		/*
+		// Debug, keyframe time interval:10s, 1000seq/13s, keyframe seq interval:768
+		if (_queue_out_data_ptr->size() < 200) {
+			return RET_OK;
+		}
+		a = chunk_ptr->header.sequence_number;
+		if (b == -1) {
+			b = a;
+		}
+		if (a - b > 1000) {
+			//first_pkt = true;
+			_queue_out_data_ptr->pop();
+			printf("\n\n\n\ a - b > 1000 %d %d %d\n\n\n", a, b, _queue_out_data_ptr->size());
+			_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "a - b > 1000", a, b);
+			if (a - b > 1100) {
+				b = a;
+			}
+			//add_chunk(chunk_ptr);
+			
+			//if (a - b > 1900) {
+			//	b = a;
+			//}
+			
+			return RET_OK;
+			
+		} 
+		*/
+		
+		
+		
 		_queue_out_data_ptr->pop();
+		
+		
+		
 		send_size = chunk_ptr->header.length;
 
 		_send_ctl_info.offset = 0;
@@ -340,7 +400,7 @@ int bit_stream_httpout::handle_pkt_out(int sock)
 		_send_ctl_info.serial_num = chunk_ptr->header.sequence_number;
 
 		send_rt_val = _net_ptr->nonblock_send(sock, &_send_ctl_info);
-
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Send to player ", _send_ctl_info.serial_num);
 		//for debug sequence_number
 		/*
 		static unsigned long test=0;
@@ -450,6 +510,7 @@ void bit_stream_httpout::send_header_to_player(int sock)
 		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__,"send httpHeader sendHeaderBytes =", sendHeaderBytes);
 
 		sendHeaderBytes = _net_ptr->send(sock, (char *)flvHeader, sizeof(flvHeader), 0);
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__,"send flvHeader sendHeaderBytes =", sendHeaderBytes);
 		//debug
 		//fwrite(flvHeader,1,sizeof(flvHeader),file_ptr);
 
@@ -463,7 +524,7 @@ void bit_stream_httpout::send_header_to_player(int sock)
 		else {
 			debug_printf("[ERROR] not found _reqStreamID in map_streamID_header \n");
 			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] not found _reqStreamID in map_streamID_header");
-			*(_net_ptr->_errorRestartFlag)=RESTART;
+			*(_net_ptr->_errorRestartFlag) = RESTART;
 			PAUSE
 		}
 		
@@ -473,9 +534,20 @@ void bit_stream_httpout::send_header_to_player(int sock)
 			sendHeaderBytes = _net_ptr->send(sock, (char *)protocol_header->header, protocol_header->len, 0);	// Ideally send 441 bytes
 			//debug
 			//		fwrite((char *)protocol_header->header,1,protocol_header ->len,file_ptr);
-			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "sendFLVHeaderBytes", sendHeaderBytes);
+			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "send streamHeader sendHeaderBytes", sendHeaderBytes);
 		}
 		first_HTTP_Header = false;
+		
+		printf("\n\n\n\n\n-\n");
+		for (int i = 0; i < protocol_header->len; i++) {
+			printf("%X ", (char *)protocol_header->header[i]);
+			if (((i+1) % 20) == 0) {
+				printf("\n");
+			}
+		}
+		printf("\n-\n\n\n\n\n");
+		//PAUSE
+		
 	}
 }
 

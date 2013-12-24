@@ -174,7 +174,6 @@
     <ClCompile Include="..\logger_client.cpp" />
     <ClCompile Include="..\main.cpp" />
     <ClCompile Include="..\network.cpp" />
-    <ClCompile Include="..\newtest.cpp" />
     <ClCompile Include="..\peer.cpp" />
     <ClCompile Include="..\peer_communication.cpp" />
     <ClCompile Include="..\peer_mgr.cpp" />

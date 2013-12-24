@@ -26,6 +26,7 @@ public:
 	2. set fd handler
 	*/
 	void set_self_pid_channel(unsigned long pid,unsigned long channel_id);
+	void set_self_ip_port(unsigned long ip, unsigned short port);
 	void set_net_obj(network *net_ptr);
 	void set_pk_mgr_obj(pk_mgr *pk_mgr_ptr);
 	void set_prep_obj(configuration *prep);
@@ -167,6 +168,8 @@ public:
 	int buffer_clear_flag;
 	unsigned long self_pid;
 	unsigned long self_channel_id;
+	unsigned long my_public_ip;
+	unsigned short my_private_port;
 	int log_server_sock;
 	Nonblocking_Buff non_log_recv_struct;
 };

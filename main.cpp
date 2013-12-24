@@ -19,7 +19,7 @@
 #include "io_accept.h"
 #include "logger_client.h"
 #include "stunt_mgr.h"
-#include "newtest.h"
+
 
 
 using namespace std;
@@ -101,6 +101,7 @@ void signal_handler(int sig)
 			break;
 		case SIGINT:
 			srv_shutdown = 1;
+			//errorRestartFlag = 1;
 			//logger_client_ptr->log_exit();
 			break;
 #ifndef _WIN32
@@ -132,6 +133,7 @@ void signal_handler(int sig)
 #endif			
 			break;	
 	}
+
 }
 
 #endif
@@ -260,7 +262,14 @@ void firebreathTestAPI::stop(int chid)
 
 int firebreathTestAPI::isReady(int chid)
 {
-    return map_chid_globalVar[chid]->http_srv_ready;
+	map<int, GlobalVars*>::iterator iter;
+	iter = map_chid_globalVar.find(chid);
+	if (iter != map_chid_globalVar.end()) {
+		return map_chid_globalVar[chid]->http_srv_ready;
+	}
+	else {
+		return -1;
+	}
 }
 
 int firebreathTestAPI::isStreamInChannel(int streamID, int chid)
@@ -309,8 +318,8 @@ void firebreathTestAPI::set_config(const std::string& msg)
 		int n = token.find(":");
 		string key(token.begin()+1, token.begin()+n-1);
 		string value(token.begin()+n+2, token.end()-1);
-		
-		map_config.insert(pair<string, string>(key, value));
+		map_config[key] = value;
+		//map_config.insert(pair<string, string>(key, value));
 		ssss += key + ":" + value + "\n";
 		ss.erase(0, pos + delimiter.length());
 	}
@@ -319,8 +328,8 @@ void firebreathTestAPI::set_config(const std::string& msg)
 	int n = token.find(":");
 	string key(token.begin()+1, token.begin()+n-1);
 	string value(token.begin()+n+2, token.end()-1);
-	//map_config[key] = value;
-	map_config.insert(pair<string, string>(key, value));
+	map_config[key] = value;
+	//map_config.insert(pair<string, string>(key, value));
 	ssss += key + ":" + value + "\n";
 	
 	/*
@@ -383,8 +392,10 @@ int mainFunction(int chid){
 int main(int argc, char **argv){
 #endif
 
-//	while((!srv_shutdown)){
-printf("** 000 \n");
+		
+
+	while (!srv_shutdown) {
+
 	
 	
 		int svc_fd_tcp;		// listening-socket for peers 
@@ -621,11 +632,13 @@ printf("** 000 \n");
 		}
 		
 		// Set socket SO_REUSEADDR
+		/*
 		if (setsockopt(svc_fd_tcp, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval , sizeof(optval)) != 0) {
 			log_ptr->write_log_format("s(u) s s d \n", __FUNCTION__, __LINE__,"[ERROR] Set SO_REUSEADDR failed", ". Socket error", WSAGetLastError());
 			debug_printf("[ERROR] Set SO_REUSEADDR failed. socket error %d \n", WSAGetLastError());
 			PAUSE
 		}
+		*/
 		
 		memset(&sin, 0, sizeof(struct sockaddr_in));
 		sin.sin_family = AF_INET;
@@ -731,7 +744,7 @@ printf("** 000 \n");
 		
 		while((!(map_chid_globalVar[chid]->srv_shutdown))  &&  (!(map_chid_globalVar[chid]->errorRestartFlag))) {
 #else
-		while((!srv_shutdown)  &&  (!errorRestartFlag)) {
+		while (!srv_shutdown && !errorRestartFlag) {
 #endif
 
 #ifdef _WIN32
@@ -748,12 +761,23 @@ printf("** 000 \n");
 			net_ptr->epoll_dispatcher();
 
 			pk_mgr_ptr->time_handle();
+			
+			if (*(net_ptr->_errorRestartFlag) == RESTART) {
+				log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
+				log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
+				log_ptr->write_log_format("s(u) s \n\n\n", __FUNCTION__, __LINE__, "Program Restart");
+				//Sleep(2000);
+				break;
+			}
 		}
 
+		debug_printf("Client Restart \n");
+		PAUSE
+		
 #ifdef _FIRE_BREATH_MOD_
-		log_ptr->write_log_format("s =>u s d s d \n", __FUNCTION__,__LINE__,"srv_shutdown",map_chid_globalVar[chid]->srv_shutdown,"errorRestartFlag",map_chid_globalVar[chid]->errorRestartFlag);
+		log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__,"srv_shutdown", map_chid_globalVar[chid]->srv_shutdown, "errorRestartFlag", map_chid_globalVar[chid]->errorRestartFlag);
 #else
-		log_ptr->write_log_format("s =>u s d s d \n", __FUNCTION__,__LINE__,"srv_shutdown",srv_shutdown,"errorRestartFlag",errorRestartFlag);
+		log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "srv_shutdown", srv_shutdown, "errorRestartFlag", errorRestartFlag);
 #endif
 
 		net_ptr->garbage_collection();
@@ -811,7 +835,7 @@ printf("** 000 \n");
 
 		for (int i = 0; i < 10; i++) {
 			printf("Some Thing Error Wait %d Sec To Restart ............\n",10-i );
-		//Sleep(1000);
+			Sleep(1000);
 		}
 
 #ifdef _FIRE_BREATH_MOD_
@@ -820,7 +844,7 @@ printf("** 000 \n");
 		errorRestartFlag =0;
 #endif
 
-//	}
+	}
 
 #ifdef _FIRE_BREATH_MOD_
 	map_chid_globalVar[chid]->streamingPort = 0;

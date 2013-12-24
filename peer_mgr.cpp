@@ -202,6 +202,8 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 		debug_printf("fd not here\n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd not here");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "fd not here", __LINE__);
+		_logger_client_ptr->log_exit();
 		PAUSE
 		return;
 	}
@@ -212,12 +214,16 @@ void peer_mgr::send_test_delay(int sock,unsigned long manifest)
 	if(!(chunk_delay_ptr ) ){
 		debug_printf("peer_mgr::chunk_delay_ptr  new error \n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_delay_ptr new error");
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "chunk_delay_ptr new error", __LINE__);
+		_logger_client_ptr->log_exit();
 		PAUSE
 	}
 	struct chunk_t * html_buf = (struct chunk_t*)new unsigned char [BIG_CHUNK];
 	if(!(html_buf ) ){
 		debug_printf("peer_mgr::html_buf  new error \n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"html_buf new error");
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "html_buf new error", __LINE__);
+		_logger_client_ptr->log_exit();
 		PAUSE
 	}
 	memset(html_buf, 0x0, sizeof(html_buf));
@@ -322,6 +328,8 @@ int peer_mgr::handle_test_delay(unsigned long manifest)
 		if(!(list_array ) ){
 			debug_printf("peer_mgr::list_array  new error \n");
 			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"list_array new error");
+			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "list_array new error", __LINE__);
+			_logger_client_ptr->log_exit();
 			PAUSE
 		}
 
@@ -338,6 +346,8 @@ int peer_mgr::handle_test_delay(unsigned long manifest)
 		if(!(connect_array ) ){
 			debug_printf("peer_mgr::connect_array  new error \n");
 			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"connect_array new error");
+			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "connect_array new error", __LINE__);
+			_logger_client_ptr->log_exit();
 			PAUSE
 		}
 		for(connect_member_iter = connect_member.begin();connect_member_iter != connect_member.end();connect_member_iter++){
@@ -386,6 +396,8 @@ void peer_mgr::send_manifest_to_parent(unsigned long manifestValue,unsigned long
 		parentSock =map_pid_fd_iter ->second;
 	}else{
 		debug_printf("pid not here");
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "pid not here", __LINE__);
+		_logger_client_ptr->log_exit();
 		PAUSE
 		return;
 	}
@@ -397,6 +409,8 @@ void peer_mgr::send_manifest_to_parent(unsigned long manifestValue,unsigned long
 		debug_printf("fd not here\n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd not here");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "fd not here", __LINE__);
+		_logger_client_ptr->log_exit();
 		PAUSE
 		return;
 	}
@@ -406,6 +420,8 @@ void peer_mgr::send_manifest_to_parent(unsigned long manifestValue,unsigned long
 	if(!(chunk_manifestSetPtr ) ){
 		debug_printf("peer_mgr::chunk_manifestSetPtr  new error \n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"chunk_manifestSetPtr new error");
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "chunk_manifestSetPtr new error", __LINE__);
+		_logger_client_ptr->log_exit();
 		PAUSE
 	}
 	memset(chunk_manifestSetPtr, 0x0, sizeof(struct chunk_manifest_set_t));
@@ -470,6 +486,8 @@ void peer_mgr::handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr)
 		debug_printf("handle_manifestSet what happen\n");
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"handle_manifestSet what happen");
 		*(_net_ptr->_errorRestartFlag) =RESTART;
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "handle_manifestSet what happen", __LINE__);
+		_logger_client_ptr->log_exit();
 		PAUSE
 	}
 	
