@@ -359,8 +359,6 @@ int epoll_ctl (int __epfd, int __op, int __fd, struct epoll_event *__events) {
    __THROW.  */
 int epoll_wait (int __epfd, struct epoll_event *__events, int __maxevents, int __timeout, list<int> *fd_list) {
 
-//	printf("trigger\n");
-
     //printf("epoll 108 assert!\n");
 	assert(__maxevents == FD_SETSIZE);
 
@@ -382,8 +380,6 @@ int epoll_wait (int __epfd, struct epoll_event *__events, int __maxevents, int _
 		__events[i].events = 0;
 		__events[i].data.fd = 0;
 	}
-
-	//cout << "bbbbbbbbbbbbbbb" <<endl;
 
 	max_fd = find_max_fd(fd_list);
 	num_ready = select(max_fd + 1, &read_fds, &write_fds, &error_fds, &tv);
@@ -425,6 +421,7 @@ int epoll_wait (int __epfd, struct epoll_event *__events, int __maxevents, int _
 					break;
 		    	case WSAENOTSOCK:
 					printf("The descriptor is not a socket. ");
+					printf(" %d \n", num_ready);
 					PAUSE
 					//system("PAUSE");
 					break;

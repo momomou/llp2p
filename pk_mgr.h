@@ -35,6 +35,7 @@ public:
 	unsigned long pkt_count ;			// 一次 XCOUNT_INTERVAL 時間內收到的chunk數量(有過濾過)
 	unsigned long totalbyte;
 	int synLock;
+	unsigned char exit_code;		// Error code (for program exit)
 
 	unsigned long first_timestamp;		// 第一個收到的封包的timestampd
 	bool firstIn;
@@ -115,6 +116,8 @@ public:
 	void reset_source_delay_detection(unsigned long sub_id);
 	void set_rescue_state(unsigned long sub_id,int state);
 	int check_rescue_state(unsigned long sub_id,int state);
+
+	void set_parent_manifest(struct peer_connect_down_t* parent_info, UINT32 manifest);
 
 	int peer_start_delay_count;		// If received first packet of each substream, peer_start_delay_count++
 	void send_capacity_init();
@@ -223,6 +226,8 @@ private:
 	unsigned long my_pid;
 	unsigned long my_level;
 	unsigned long _manifest;
+	
+	
 	bool pkSendCapacity;
 	unsigned long lastPKtimer;
 	int sentStartDelay;

@@ -23,6 +23,7 @@ logger_client::logger_client(logger *log_ptr)
 	_log_ptr =log_ptr;
 	chunk_buffer = (struct chunk_t *)new unsigned char[(CHUNK_BUFFER_SIZE + sizeof(struct chunk_header_t))];
 	if (!chunk_buffer) {
+		exit_code = MALLOC_ERROR;
 		debug_printf("chunk_buffer loggerClien new error buf_len=%u\n",(CHUNK_BUFFER_SIZE + sizeof(struct chunk_header_t)));
 		PAUSE
 	}
@@ -31,6 +32,7 @@ logger_client::logger_client(logger *log_ptr)
 
 	quality_struct_ptr = (struct quality_struct*)(new struct quality_struct);
 	if (!quality_struct_ptr) {
+		exit_code = MALLOC_ERROR;
 		debug_printf("chunk_buffer loggerClien new error \n");
 		PAUSE
 	}
@@ -113,6 +115,7 @@ void logger_client::log_init()
 	if ((log_server_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
 #ifdef _WIN32
 		int socketErr = WSAGetLastError();
+		exit_code = LOG_SOCKET_ERROR;
 		debug_printf("[ERROR] Create socket failed %d %d \n", log_server_sock, socketErr);
 		::WSACleanup();
 		//*(_net_ptr->_errorRestartFlag) = RESTART;
@@ -134,6 +137,7 @@ void logger_client::log_init()
 		
 		}
 		else {
+			exit_code = LOG_SOCKET_ERROR;
 			debug_printf("[ERROR] Building Log-server connection failed %d %d \n", retVal, socketErr);
 			::closesocket(log_server_sock);
 			::WSACleanup();
@@ -148,6 +152,7 @@ void logger_client::log_init()
 	_net_ptr->epoll_control(log_server_sock, EPOLL_CTL_ADD, EPOLLOUT);
 	_net_ptr->set_fd_bcptr_map(log_server_sock, dynamic_cast<basic_class *> (this));
 	_pk_mgr_ptr->fd_list_ptr->push_back(log_server_sock);
+	_net_ptr->log_fd = log_server_sock;
 }
 
 /*
@@ -197,12 +202,14 @@ void logger_client::source_delay_struct_init(unsigned long sub_stream_num)
 	sub_stream_number = sub_stream_num;
 	max_source_delay = (struct log_source_delay_struct *)new unsigned char[(sub_stream_num*sizeof(struct log_source_delay_struct))]; 
 	if (!max_source_delay) {
+		exit_code = MALLOC_ERROR;
 		debug_printf("max_source_delay loggerClien new error \n");
 		PAUSE
 	}
 	memset(max_source_delay, 0, sub_stream_num * sizeof(struct log_source_delay_struct));
 	delay_list = (double *)new unsigned char[(sub_stream_num*sizeof(double))];
 	if (!delay_list) {
+		exit_code = MALLOC_ERROR;
 		debug_printf("delay_list loggerClien new error \n");
 		PAUSE
 	}
@@ -211,30 +218,11 @@ void logger_client::source_delay_struct_init(unsigned long sub_stream_num)
 	_log_ptr->timerGet(&log_period_source_delay_start);
 }
 
-void logger_client::set_source_delay (unsigned long substream_id, unsigned long source_delay)
+void logger_client::set_source_delay(unsigned long substream_id, unsigned long source_delay)
 {
-	(max_source_delay+substream_id)->count++;
-	
-	(max_source_delay+substream_id)->delay_now = (double)source_delay;
-	//(max_source_delay+substream_id)->average_delay += (double)source_delay;
-	(max_source_delay+substream_id)->accumulated_delay += (double)source_delay;
-	/*	Commented on 20130926	*/
-	/*
-	(max_source_delay+substream_id)->count++;
-	if (source_delay != 0 && (max_source_delay+substream_id)->average_delay != 0) {
-		(max_source_delay+substream_id)->delay_now = (double)source_delay;
-		(max_source_delay+substream_id)->average_delay += (double)source_delay;
-	}
-	else if (source_delay != 0 && (max_source_delay+substream_id)->average_delay == 0) {
-		(max_source_delay+substream_id)->delay_now = (double)source_delay;
-		(max_source_delay+substream_id)->average_delay += (double)source_delay;
-	}
-	else {
-		(max_source_delay+substream_id)->delay_now = 0;
-		(max_source_delay+substream_id)->average_delay += 0;
-		_log_ptr->write_log_format("s(u) s f \n", __FUNCTION__, __LINE__, "[DEBUG](average_delay too large?) set delay_now to 0. average_delay =", (max_source_delay + substream_id)->average_delay);
-	}
-	*/
+	max_source_delay[substream_id].count++;
+	max_source_delay[substream_id].delay_now = (double)source_delay;
+	max_source_delay[substream_id].accumulated_delay += (double)source_delay;
 }
 
 // Send source delay to PK
@@ -243,77 +231,44 @@ void logger_client::send_max_source_delay()
 	double max_delay = 0;
 	
 	for (int i = 0; i < sub_stream_number; i++) {
-		if ((max_source_delay+i)->count > 0) {
-			(max_source_delay+i)->average_delay = (max_source_delay+i)->accumulated_delay / (double)((max_source_delay+i)->count);
-			*(delay_list+i) = (max_source_delay+i)->average_delay;
-			if (max_delay < *(delay_list+i)) {
-				max_delay = *(delay_list+i);
-			}
-			
+		if (max_source_delay[i].count > 0) {
+			max_source_delay[i].average_delay = max_source_delay[i].accumulated_delay / (double)(max_source_delay[i].count);
+			delay_list[i] = max_source_delay[i].average_delay;
+			debug_printf("substream %d accumulated_delay = %d, count = %d average_delay = %d \n", i, static_cast<int>(delay_list[i]), max_source_delay[i].count);
+			cout << "substream " << i 
+					<< " accumulated_delay = " << max_source_delay[i].accumulated_delay 
+					<< " count = " << max_source_delay[i].count 
+					<< " average_delay = " << max_source_delay[i].average_delay 
+					<< " delay_list[] = " << delay_list[i] << endl;
 		}
 		// If not receive any packet for a while, we still need to calculate the source delay
 		else {
-			*(delay_list+i) += LOG_DELAY_SEND_PERIOD;
-			if (max_delay < *(delay_list+i)) {
-				max_delay = *(delay_list+i);
-			}
-		
+			delay_list[i] += LOG_DELAY_SEND_PERIOD;
 			_log_ptr->write_log_format("s(u) s d s d s \n", __FUNCTION__, __LINE__, "substream id", i, "has received nothing for", LOG_DELAY_SEND_PERIOD, "milliseconds");
 		}
+		
+		max_delay = max_delay < delay_list[i] ? delay_list[i] : max_delay;
 	}
 	
+	cout << "max_delay = " << max_delay << endl;
 	for (int i = 0; i < sub_stream_number; i++) {
-		debug_printf("substream %d source delay = %f \n", i, *(delay_list+i));
+		debug_printf("substream %d source delay = %d, count %d \n", i, static_cast<int>(delay_list[i]), max_source_delay[i].count);
 		_log_ptr->write_log_format("s(u) s d s f s f s d \n", __FUNCTION__, __LINE__,
 																"substream", i,
-																"source delay =", *(delay_list+i),
-																"average_delay =", (max_source_delay+i)->average_delay,
-																"count =", (max_source_delay+i)->count);
+																"source delay =", delay_list[i],
+																"average_delay =", max_source_delay[i].average_delay,
+																"count =", max_source_delay[i].count);
 	}
+	debug_printf("Maximum source delay = %f \n", max_delay);
 	
 	log_to_server(LOG_PERIOD_SOURCE_DELAY, 0, max_delay, sub_stream_number, delay_list);
 	_log_ptr->write_log_format("s(u) s f s \n", __FUNCTION__, __LINE__, "send max source delay =", max_delay, "to PK");
 	
 	for (int i = 0; i < sub_stream_number; i++) {
-		(max_source_delay+i)->accumulated_delay = 0;
-		(max_source_delay+i)->count = 0;
+		max_source_delay[i].accumulated_delay = 0;
+		max_source_delay[i].count = 0;
+		max_source_delay[i].average_delay = 0;
 	}
-	
-	/*	Commented on 20130926	*/
-	/*
-	for (int i = 0; i < sub_stream_number; i++) {
-		if ((max_source_delay+i)->average_delay != 0) {
-			if ((max_source_delay+i)->count == 0) {
-				(max_source_delay+i)->count = 1;
-			}
-			*(delay_list+i) = (max_source_delay+i)->average_delay / (double)((max_source_delay+i)->count);
-		}
-		else {
-			*(delay_list+i) = (max_source_delay+i)->delay_now;
-		}
-	}
-
-	for (int i = 0; i < sub_stream_number; i++) {
-		debug_printf("substream %d source delay = %f \n", i, *(delay_list+i));
-		_log_ptr->write_log_format("s(u) s d s f s f s d s f \n", __FUNCTION__, __LINE__,
-														"substream", i,
-														"source delay =", *(delay_list+i),
-														"average_delay =", (max_source_delay+i)->average_delay,
-														"count =", (max_source_delay+i)->count,
-														"delay_now =", (max_source_delay+i)->delay_now);
-		if ( *(delay_list + i) > max_delay) {
-			max_delay = *(delay_list+i);
-		}
-	}
-
-	log_to_server(LOG_PERIOD_SOURCE_DELAY, 0, max_delay, sub_stream_number, delay_list);
-	_log_ptr->write_log_format("s(u) s f s \n", __FUNCTION__, __LINE__, "send max source delay =", max_delay, "to PK");
-	
-	for (int i = 0; i < sub_stream_number; i++) {
-		(max_source_delay+i)->average_delay = 0;
-		(max_source_delay+i)->count = 0;
-	}
-	*/
 }
 
 void logger_client::bw_in_struct_init(unsigned long timestamp,unsigned long pkt_size){
@@ -391,13 +346,13 @@ void logger_client::send_bw()
 		quality_result = 0;
 	}
 	
-	debug_printf("real_in_bw = %.2lf, real_out_bw = %.2lf, quality_result = %.2lf, total_chunk = %u, accumulated_quality = %.2lf, average_quality = %.2lf, lost_pkt = %u \n", real_in_bw,
-																																			real_out_bw,
-																																			quality_result,
-																																			quality_struct_ptr->total_chunk,
-																																			quality_struct_ptr->accumulated_quality,
-																																			quality_struct_ptr->average_quality,
-																																			quality_struct_ptr->lost_pkt);
+	//debug_printf("real_in_bw = %.2lf, real_out_bw = %.2lf, quality_result = %.2lf, total_chunk = %u, accumulated_quality = %.2lf, average_quality = %.2lf, lost_pkt = %u \n", real_in_bw,
+	//																																		real_out_bw,
+	//																																		quality_result,
+	//																																		quality_struct_ptr->total_chunk,
+	//																																		quality_struct_ptr->accumulated_quality,
+	//																																		quality_struct_ptr->average_quality,
+	//																																		quality_struct_ptr->lost_pkt);
 	
 	quality_struct_ptr->lost_pkt = 0;
 	quality_struct_ptr->accumulated_quality = 0.0;
@@ -425,7 +380,8 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		struct log_register_struct *log_register_struct_ptr = NULL;
 		log_register_struct_ptr = new struct log_register_struct;
-		if(!(log_register_struct_ptr)){
+		if (!log_register_struct_ptr) {
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_register_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -457,7 +413,8 @@ void logger_client::log_to_server(int log_mode, ...){
 
 		pkt_size = sizeof(struct log_header_t) + (2 * sizeof(unsigned long)) + (list_num * sizeof(unsigned long)) + (connect_num * sizeof(unsigned long));
 		log_pkt = (struct log_pkt_format_struct *)new unsigned char[pkt_size];
-		if(!(log_pkt)){
+		if (!log_pkt) {
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_pkt loggerClien new error \n");
 			PAUSE
 		}
@@ -501,6 +458,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_list_testing_struct *log_list_testing_struct_ptr = NULL;
 		log_list_testing_struct_ptr = new struct log_list_testing_struct;
 		if(!(log_list_testing_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_list_testing_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -527,6 +485,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_list_detection_testing_struct *log_list_detection_testing_struct_ptr = NULL;
 		log_list_detection_testing_struct_ptr = new struct log_list_detection_testing_struct;
 		if(!(log_list_detection_testing_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_list_detection_testing_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -553,6 +512,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_list_testing_fail_struct *log_list_testing_fail_struct_ptr = NULL;
 		log_list_testing_fail_struct_ptr = new struct log_list_testing_fail_struct;
 		if(!(log_list_testing_fail_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_list_testing_fail_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -576,6 +536,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_cut_pk_struct *log_cut_pk_struct_ptr = NULL;
 		log_cut_pk_struct_ptr = new struct log_cut_pk_struct;
 		if(!(log_cut_pk_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_cut_pk_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -598,6 +559,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_data_come_struct *log_data_come_struct_ptr = NULL;
 		log_data_come_struct_ptr = new struct log_data_come_struct;
 		if(!(log_data_come_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_data_come_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -620,6 +582,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_rescue_trigger_struct *log_rescue_trigger_struct_ptr = NULL;
 		log_rescue_trigger_struct_ptr = new struct log_rescue_trigger_struct;
 		if(!(log_rescue_trigger_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_rescue_trigger_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -642,6 +605,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_rescue_trigger_struct *log_rescue_trigger_struct_ptr = NULL;
 		log_rescue_trigger_struct_ptr = new struct log_rescue_trigger_struct;
 		if(!(log_rescue_trigger_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_rescue_trigger_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -664,6 +628,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_rescue_trigger_struct *log_rescue_trigger_struct_ptr = NULL;
 		log_rescue_trigger_struct_ptr = new struct log_rescue_trigger_struct;
 		if(!(log_rescue_trigger_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_rescue_trigger_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -696,6 +661,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		pkt_size = sizeof(struct log_header_t) + (2 * sizeof(unsigned long)) + (list_num * sizeof(unsigned long)) + (connect_num * sizeof(unsigned long));
 		log_pkt = (struct log_pkt_format_struct *)new unsigned char[pkt_size];
 		if(!(log_pkt)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_pkt loggerClien new error \n");
 			PAUSE
 		}
@@ -739,6 +705,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_list_testing_struct *log_list_testing_struct_ptr = NULL;
 		log_list_testing_struct_ptr = new struct log_list_testing_struct;
 		if(!(log_list_testing_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_list_testing_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -765,6 +732,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_list_detection_testing_struct *log_list_detection_testing_struct_ptr = NULL;
 		log_list_detection_testing_struct_ptr = new struct log_list_detection_testing_struct;
 		if(!(log_list_detection_testing_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_list_detection_testing_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -791,6 +759,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_list_testing_fail_struct *log_list_testing_fail_struct_ptr = NULL;
 		log_list_testing_fail_struct_ptr = new struct log_list_testing_fail_struct;
 		if(!(log_list_testing_fail_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_list_testing_fail_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -814,6 +783,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_cut_pk_struct *log_cut_pk_struct_ptr = NULL;
 		log_cut_pk_struct_ptr = new struct log_cut_pk_struct;
 		if(!(log_cut_pk_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_cut_pk_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -836,6 +806,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_data_come_struct *log_data_come_struct_ptr = NULL;
 		log_data_come_struct_ptr = new struct log_data_come_struct;
 		if(!(log_data_come_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_data_come_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -860,6 +831,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_start_delay_struct *log_start_delay_struct_ptr = NULL;
 		log_start_delay_struct_ptr = new struct log_start_delay_struct;
 		if(!(log_start_delay_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_start_delay_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -893,6 +865,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_period_source_delay_struct *log_period_source_delay_struct_ptr = NULL;
 		log_pkt_format_struct_ptr = (struct log_pkt_format_struct*)new unsigned char[pkt_size];
 		if(!(log_pkt_format_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_pkt_format_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -914,7 +887,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		memcpy((char *)log_pkt_format_struct_ptr + offset,delay_list,(sub_number * sizeof(double)));
 
 		for(int i=0 ;i< sub_number;i++){
-			debug_printf("source delay i=%d delay %lf\n",i,*(delay_list+i));
+			//debug_printf("source delay i=%d delay %lf\n",i,*(delay_list+i));
 		}
 		debug_printf("log_period_source_delay_struct_ptr->max_delay  = %lf\n",log_period_source_delay_struct_ptr->max_delay );
 
@@ -929,6 +902,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_rescue_sub_stream_struct *log_rescue_sub_stream_struct_ptr = NULL;
 		log_rescue_sub_stream_struct_ptr = new struct log_rescue_sub_stream_struct;
 		if(!(log_rescue_sub_stream_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_rescue_sub_stream_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -952,6 +926,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_peer_leave_struct *log_peer_leave_struct_ptr = NULL;
 		log_peer_leave_struct_ptr = new struct log_peer_leave_struct;
 		if(!(log_peer_leave_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_peer_leave_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -973,11 +948,13 @@ void logger_client::log_to_server(int log_mode, ...){
 		int int_array_size = 12;
 		unsigned char *str_buffer = new unsigned char[str_buffer_size];
 		if(!(str_buffer)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("str_buffer loggerClien new error \n");
 			PAUSE
 		}
 		char *inttostr = new char[int_array_size];	//base 4 btes, but it will be increase if not enough (in sprintf)
 		if(!(inttostr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("inttostr loggerClien new error \n");
 			PAUSE
 		}
@@ -1038,6 +1015,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		pkt_size += (sizeof(struct log_header_t) + str_buffer_offset);
 		struct log_write_string_struct *log_write_string_struct_ptr = (struct log_write_string_struct *)new unsigned char[pkt_size];
 		if(!(log_write_string_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_write_string_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -1063,6 +1041,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_begine_struct *log_begine_struct_ptr = NULL;
 		log_begine_struct_ptr = new struct log_begine_struct;
 		if(!(log_begine_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_begine_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -1089,6 +1068,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_rescue_trigger_back_struct *log_rescue_trigger_back_struct_ptr = NULL;
 		log_rescue_trigger_back_struct_ptr = new struct log_rescue_trigger_back_struct;
 		if(!(log_rescue_trigger_back_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_rescue_trigger_back_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -1111,6 +1091,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_list_empty_struct *log_list_empty_struct_ptr = NULL;
 		log_list_empty_struct_ptr = new struct log_list_empty_struct;
 		if(!(log_list_empty_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_list_empty_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -1133,6 +1114,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_test_delay_fail_struct *log_test_delay_fail_struct_ptr = NULL;
 		log_test_delay_fail_struct_ptr = new struct log_test_delay_fail_struct;
 		if(!(log_test_delay_fail_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_test_delay_fail_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -1157,6 +1139,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_test_detection_fail_struct *log_test_detection_fail_struct_ptr = NULL;
 		log_test_detection_fail_struct_ptr = new struct log_test_detection_fail_struct;
 		if(!(log_test_detection_fail_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_test_detection_fail_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -1180,6 +1163,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_data_come_pk_struct *log_data_come_pk_struct_ptr = NULL;
 		log_data_come_pk_struct_ptr = new struct log_data_come_pk_struct;
 		if(!(log_data_come_pk_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_data_come_pk_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -1211,6 +1195,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_client_bw_struct *log_client_bw_struct_ptr = NULL;
 		log_client_bw_struct_ptr = new struct log_client_bw_struct;
 		if(!(log_client_bw_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_client_bw_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -1237,6 +1222,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_time_out_struct *log_time_out_struct_ptr = NULL;
 		log_time_out_struct_ptr = new struct log_time_out_struct;
 		if(!(log_time_out_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_time_out_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -1259,6 +1245,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		struct log_pkt_lose_struct *log_pkt_lose_struct_ptr = NULL;
 		log_pkt_lose_struct_ptr = new struct log_pkt_lose_struct;
 		if(!(log_pkt_lose_struct_ptr)){
+			exit_code = MALLOC_ERROR;
 			debug_printf("log_pkt_lose_struct_ptr loggerClien new error \n");
 			PAUSE
 		}
@@ -1275,7 +1262,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		buffer_size += sizeof(struct log_pkt_lose_struct);
 	}
 	else{
-		
+		exit_code = UNKNOWN;
 		log_to_server(LOG_WRITE_STRING,0,"s \n","unknown state in log\n");
 		log_exit();
 		PAUSE
@@ -1303,6 +1290,7 @@ void logger_client::log_exit()
 			
 		if (_send_byte <= 0) {
 			int socketErr = WSAGetLastError();
+			exit_code = LOG_SOCKET_ERROR;
 			debug_printf("send info to log server error : %d %d \n", _send_byte, socketErr);
 			_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, socketErr);
 			*(_net_ptr->_errorRestartFlag) = RESTART;
@@ -1349,10 +1337,11 @@ void logger_client::log_exit()
 
 		if (_send_byte <= 0) {
 			int socketErr = WSAGetLastError();
+			exit_code = LOG_SOCKET_ERROR;
 			debug_printf("send info to log server error : %d %d \n", _send_byte, socketErr);
 			_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, socketErr);
 			*(_net_ptr->_errorRestartFlag) = RESTART;
-			PAUSE
+			//PAUSE
 		}
 	}
 }
@@ -1369,34 +1358,53 @@ int logger_client::handle_pkt_out(int sock)
 	Nonblocking_Ctl * Nonblocking_Send_Ctrl_ptr = NULL;
 	struct log_pkt_format_struct *log_buffer_element_ptr = NULL;
 	Nonblocking_Send_Ctrl_ptr = &(non_log_recv_struct.nonBlockingSendCtrl);
-	int chunk_buffer_offset = 0;
+	int chunk_buffer_offset = 0;		// offset for accumulate several log messages to be one llp2p packet
 	int log_struct_size = 0;
 	int _send_byte;
 	log_time_differ();
-	//cout << "logger_client::handle_pkt_out " << Nonblocking_Send_Ctrl_ptr->recv_ctl_info.ctl_state << "\n";
 	
+	/* Modify sending log message mechanism on 2014/01/09 */
 	if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY) {
-		if ((log_time_dffer - previous_time_differ) > TIME_PERIOD) {
+		if (log_buffer.size() > MAX_STORED_NUM || (log_time_dffer - previous_time_differ) > TIME_PERIOD) {
 
 			previous_time_differ = log_time_dffer;
-
-			if (buffer_size <= BUFFER_CONTENT_THRESHOLD && buffer_clear_flag == 0) {
-
-				if (buffer_size != 0) {
-					debug_printf("buffer = %d \n", buffer_size);
-					while (buffer_size != 0 && chunk_buffer_offset < TIME_BW) {
+			
+				if (buffer_size > 0) {
+					
+					memset(chunk_buffer, 0, CHUNK_BUFFER_SIZE + sizeof(struct chunk_header_t));
+					do {
 						log_buffer_element_ptr = log_buffer.front();
 
 						log_struct_size = log_buffer_element_ptr->log_header.length + sizeof(struct log_header_t);
+						if (chunk_buffer_offset + log_struct_size > CHUNK_BUFFER_SIZE) {
+							_log_ptr->write_log_format("s(u) s d(d)\n", __FUNCTION__, __LINE__, 
+																		"[WARNING] log_buffer will overflow", 
+																		chunk_buffer_offset + log_struct_size,
+																		CHUNK_BUFFER_SIZE);
+							break;
+						}
+						
+						//debug_printf("%d. buffer_length=%d  length=%d(%d)  cmd=%02x \n", log_buffer.size(),
+						//																buffer_size, 
+						//																log_buffer_element_ptr->log_header.length, 
+						//																sizeof(struct log_header_t),
+						//																log_buffer_element_ptr->log_header.cmd);
+						
 						buffer_size -= log_struct_size;
 
-						if (buffer_size < 0 || (chunk_buffer_offset+log_struct_size) > CHUNK_BUFFER_SIZE) {
+						if (buffer_size < 0) {
+							debug_printf("buffer_size < 0 (%d) \n", buffer_size);
+							_log_ptr->write_log_format("s(u) s (d) \n", __FUNCTION__, __LINE__, "[ERROR] buffer_size < 0", buffer_size);
+							exit_code = LOG_BUFFER_ERROR;
 							PAUSE
 							log_to_server(LOG_WRITE_STRING,0,"s d d \n","error : buffer size : %d and %d (overflow)\n",buffer_size,(chunk_buffer_offset+log_struct_size));
 							log_exit();
 						}
+						if (log_buffer.size() > 100) {
+							_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[WARNING] log_buffer.size() is more than 100. buffer_size =", buffer_size);
+						}
 
-						memcpy((char *)(chunk_buffer->buf) + chunk_buffer_offset,log_buffer_element_ptr,log_struct_size);
+						memcpy((char *)(chunk_buffer->buf)+chunk_buffer_offset, log_buffer_element_ptr, log_struct_size);
 						chunk_buffer_offset += log_struct_size;
 
 						log_buffer.pop();
@@ -1404,7 +1412,8 @@ int logger_client::handle_pkt_out(int sock)
 							delete log_buffer_element_ptr;
 						}
 						log_buffer_element_ptr = NULL;
-					}
+						
+					} while (log_buffer.size() > 0);
 		
 					chunk_buffer->header.cmd = CHNK_CMD_LOG;
 					chunk_buffer->header.rsv_1 = REPLY;
@@ -1418,12 +1427,11 @@ int logger_client::handle_pkt_out(int sock)
 					Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_buffer;
 					Nonblocking_Send_Ctrl_ptr->recv_ctl_info.serial_num =  chunk_buffer->header.sequence_number;
 
-					//printf("cmd= %d total_len = %d\n",chunk_ptr->header.cmd,chunk_ptr->header.length );
-
 					_send_byte = _net_ptr->nonblock_send(sock, &(Nonblocking_Send_Ctrl_ptr->recv_ctl_info));
 
 					if (_send_byte <= 0) {
 						int error_val = WSAGetLastError();
+						exit_code = LOG_SOCKET_ERROR;
 						log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "send info to log server error :", _send_byte, error_val);
 						debug_printf("send info to log server error : %d %d \n", _send_byte, error_val);
 						_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, error_val);
@@ -1431,67 +1439,13 @@ int logger_client::handle_pkt_out(int sock)
 						PAUSE
 					}
 				}
-				
-			}
-			else {
-				buffer_clear_flag = 0;
-
-				if (buffer_size != 0) {
-					debug_printf("buffer = %d \n", buffer_size);
-					
-					while (buffer_size != 0) {
-						log_buffer_element_ptr = log_buffer.front();
-
-						log_struct_size = log_buffer_element_ptr->log_header.length + sizeof(struct log_header_t);
-						buffer_size -= log_struct_size;
-
-						if (buffer_size < 0 || (chunk_buffer_offset+log_struct_size) > CHUNK_BUFFER_SIZE) {
-							log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "[ERROR] buffer size : %d and %d (overflow) in send all \n", buffer_size, (chunk_buffer_offset+log_struct_size));
-							debug_printf("buffer_size = %d, %d > %d \n", buffer_size, chunk_buffer_offset+log_struct_size, CHUNK_BUFFER_SIZE);
-							_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "[ERROR] send info to log server error", buffer_size, chunk_buffer_offset+log_struct_size);
-							PAUSE
-						}
-
-						memcpy((char *)(chunk_buffer->buf) + chunk_buffer_offset, log_buffer_element_ptr, log_struct_size);
-						chunk_buffer_offset += log_struct_size;
-
-						log_buffer.pop();
-						if (log_buffer_element_ptr) {
-							delete log_buffer_element_ptr;
-						}
-						log_buffer_element_ptr = NULL;
-					}
-		
-					chunk_buffer->header.cmd = CHNK_CMD_LOG;
-					chunk_buffer->header.rsv_1 = REPLY;
-					chunk_buffer->header.length = chunk_buffer_offset;
-					chunk_buffer->header.sequence_number = 0;
-
-					Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.offset = 0;
-					Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.total_len = chunk_buffer->header.length + sizeof(chunk_header_t);
-					Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.expect_len = chunk_buffer->header.length + sizeof(chunk_header_t);
-					Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.buffer = (char *)chunk_buffer;
-					Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_buffer;
-					Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.serial_num = chunk_buffer->header.sequence_number;
-
-					_send_byte = _net_ptr->nonblock_send(sock, &(Nonblocking_Send_Ctrl_ptr->recv_ctl_info));
-
-					if (_send_byte <= 0) {
-						int error_val = WSAGetLastError();
-						log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "send info to log server error :", _send_byte, error_val);
-						debug_printf("send info to log server error : %d %d \n", _send_byte, error_val);
-						_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, error_val);
-						log_exit();
-						PAUSE
-					}
-				}
-			}
 		}
 	}
 	else if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.ctl_state == RUNNING) {
 		_send_byte = _net_ptr->nonblock_send(sock, &(Nonblocking_Send_Ctrl_ptr->recv_ctl_info));
 			
 		if (_send_byte <= 0) {
+			exit_code = LOG_SOCKET_ERROR;
 			int error_val = WSAGetLastError();
 			log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "send info to log server error :", _send_byte, error_val);
 			debug_printf("send info to log server error : %d %d \n", _send_byte, error_val);

@@ -1,4 +1,19 @@
 ﻿
+////////////////////////////////////////////////////////
+///
+/// Remove the following comment if FireBreath module, 
+/// and _FIRE_BREATH_MOD_ commented in "common.h"
+///
+///////////////////////////////////////////////////////
+/*
+#include "JSObject.h"
+#include "variant_list.h"
+#include "DOM/Document.h"
+#include "global/config.h"
+#include "firebreathTestAPI.h"
+*/
+
+
 #include "common.h"
 #ifdef _WIN32
 	#include "EpollFake.h"
@@ -24,47 +39,34 @@
 
 using namespace std;
 
-#ifdef _FIRE_BREATH_MOD_
-#include "JSObject.h"
-#include "variant_list.h"
-#include "DOM/Document.h"
-#include "global/config.h"
-//#include "llp2pAPI.h"
-#include "firebreathTestAPI.h"
-#endif
-
-
 
 const char version[] = "1.0.0.0";
 
 
 #ifdef _FIRE_BREATH_MOD_
 
-typedef struct
-{
-    volatile sig_atomic_t handle_sig_alarm;
-
+typedef struct {
+	volatile sig_atomic_t handle_sig_alarm;
 	volatile sig_atomic_t srv_shutdown;
-
 	int errorRestartFlag;
 	//static logger_client *logger_client_ptr = NULL;
 	volatile unsigned short streamingPort;
 	list<int> *fd_list;
-	map<string, string> *map_config2;
+	map<string, string> *map_config;
 	pk_mgr *pk_mgr_ptr_copy;
 	volatile sig_atomic_t is_Pk_mgr_ptr_copy_delete;
 	volatile sig_atomic_t http_srv_ready;
-	volatile sig_atomic_t threadCtl;    // 0 can open thread  ,1 cant open
-	int a;
-	int b;
-	string c;
+	volatile sig_atomic_t thread_num;    // 0 can open thread  ,1 cant open
+	volatile sig_atomic_t is_init;		// 0: This object is not initialized, 1: This object is initialized and can be launched as threads
+	unsigned char exit_code;		// Peer exit error code
+	FB::DOM::WindowPtr window;		// A reference to the DOM Window
 } GlobalVars;
 
-map<string, string> map_config;
-map<int, GlobalVars*> map_chid_globalVar;
+//map<string, string> map_config;
+map<int, GlobalVars*> map_channelID_globalVar;
 void launchThread(void * arg);
 int mainFunction(int chid);
-string ssss;
+//string ssss;
 int set_config_done = 0;
 
 #else
@@ -151,28 +153,9 @@ FB::variant firebreathTestAPI::echo(const FB::variant& msg)
     static int n(0);
     fire_echo("So far, you clicked this many times: ", n++);
 	fire_echo("tess ", 3051);
-    // return "foobar";
-    return "123";
+
+    return "Debug_mode";
 }
-
-FB::variant firebreathTestAPI::echo2(const FB::variant& msg)
-{
-    static int n(0);
-    fire_echo("So far, you clicked this many times: ", n++);
-	fire_echo("tets ", 3051);
-    // return "foobar";
-    return "2";
-} 
-
-FB::variant firebreathTestAPI::echo100(const FB::variant& msg)
-{
-    static int n(0);
-    fire_echo("So far, you clicked this many times: ", n++);
-	fire_echo("test ", 3051);
-    // return "foobar";
-    return "10001";
-}
-
 
 ///////////////////////////////////////////////////////////////////////////////
 /// @fn llp2pPtr llp2pAPI::getPlugin()
@@ -208,16 +191,103 @@ std::string firebreathTestAPI::get_version()
     return FBSTRING_PLUGIN_VERSION;
 }
 
-void firebreathTestAPI::testEvent()
+std::string firebreathTestAPI::get_error_code(int chid)
 {
-    fire_test();
+	if (map_channelID_globalVar.find(chid) == map_channelID_globalVar.end()) {
+		return "Input parameter error";
+	}
+	
+	switch (map_channelID_globalVar[chid]->exit_code) {
+		case PEER_ALIVE :		return "Peer is alive";	break;
+		case CLOSE_CHANNEL :	return "Channel is closed";	break;
+		case CLOSE_STREAM :		return "Stream is closed";	break;
+		case BUFFER_OVERFLOW :	return "Server buffer overflow";	break;
+		case RECV_NODATA :		return "Receive no source from server";	break;
+		case MALLOC_ERROR :		return "Memory allocation error";	break;
+		case MACCESS_ERROR :	return "Memory access error";	break;
+		case PK_SOCKET_ERROR :	return "socket error from server";	break;
+		case LOG_SOCKET_ERROR :	return "socket error from log server";	break;
+		case UNKNOWN :			return "Unknown error";	break;
+		default :				return "(default)Unexpected error";	break;
+	}
 }
 
-int firebreathTestAPI::start(int chid)
+// This function return a unique number for javascript as a key to launch a thread
+int firebreathTestAPI::get_plugin_key()
 {
-	if(map_chid_globalVar.count(chid) > 0)
+	static int plugin_key(0);
+	plugin_key++;
+	return plugin_key;
+}
+
+void firebreathTestAPI::testEvent()
+{
+	// Retrieve a reference to the DOM Window
+    FB::DOM::WindowPtr window = m_host->getDOMWindow();
+ 
+    // Check if the DOM Window has an alert peroperty
+    if (window && window->getJSObject()->HasProperty("window")) {
+        // Create a reference to alert
+        FB::JSObjectPtr obj = window->getProperty<FB::JSObjectPtr>("window");
+ 
+        // Invoke alert with some text
+        //obj->Invoke("alert", FB::variant_list_of("This is a test alert invoked from an NPAPI Plugin"));
+		obj->Invoke("testCallByPlugin", FB::variant_list_of("......"));
+    }
+}
+
+// This function is called by javascript so that an object is created before initialization
+int firebreathTestAPI::create_obj(int channel_id)
+{
+	// Check whether the object of this channel is in the plugin or not
+	if (map_channelID_globalVar.count(channel_id) == 0) {
+		GlobalVars *temp = new GlobalVars;
+		temp->handle_sig_alarm = 0;
+		temp->srv_shutdown = 0;
+		temp->errorRestartFlag = 0;
+		temp->streamingPort = -1;
+		temp->fd_list = new list<int>;
+		temp->map_config = NULL;
+		temp->pk_mgr_ptr_copy = NULL;
+		temp->is_Pk_mgr_ptr_copy_delete = TRUE;
+		temp->http_srv_ready = 0;
+		temp->thread_num = 0;
+		temp->exit_code = PEER_ALIVE;
+		temp->window = m_host->getDOMWindow();
+		
+		map_channelID_globalVar[channel_id] = temp;
+		
+		return 0;
+	}
+	else {
+		FB::DOM::WindowPtr window = m_host->getDOMWindow();
+		if (window && window->getJSObject()->HasProperty("window")) {
+			// Invoke certain function of javascript
+			FB::JSObjectPtr obj = window->getProperty<FB::JSObjectPtr>("window");
+			obj->Invoke("errCode_from_plugin", FB::variant_list_of(-1));
+		}
+		return -11;
+	}
+	
+}
+
+int firebreathTestAPI::start(int channel_id)
+{
+	map<int, GlobalVars*>::iterator iter = map_channelID_globalVar.find(channel_id);
+	if (iter == map_channelID_globalVar.end()) {
+		return -1;
+	}
+	if (iter->second->is_init == 0) {
+		return -2;
+	}
+
+	iter->second->thread_num++;
+	_beginthread(launchThread, 0, (void*)channel_id);	
+
+	/*
+	if(map_channelID_globalVar.count(channel_id) > 0)
 	{
-		map_chid_globalVar[chid]->threadCtl++;
+		map_channelID_globalVar[channel_id]->thread_num++;
 		return 3;
 	}
 	else
@@ -231,54 +301,57 @@ int firebreathTestAPI::start(int chid)
 		temp->pk_mgr_ptr_copy = NULL;
 		temp->is_Pk_mgr_ptr_copy_delete = TRUE;
 		temp->http_srv_ready = 0;
-		temp->threadCtl = 1;
+		temp->thread_num = 1;
+		temp->exit_code = PEER_ALIVE;
 		
-		temp->map_config2 = new map<string, string>;
+		
+		temp->map_config = new map<string, string>;
 		map<string, string>::iterator iter;
 		for (iter = map_config.begin(); iter != map_config.end(); iter++) {
-			temp->map_config2->insert(pair<string, string>(iter->first, iter->second));
+			temp->map_config->insert(pair<string, string>(iter->first, iter->second));
 		}
 		
 		
-		map_chid_globalVar[chid] = temp;
-		_beginthread(launchThread, 0, (void*)chid);	
+		map_channelID_globalVar[channel_id] = temp;
+		_beginthread(launchThread, 0, (void*)channel_id);	
 		return 2;
 	}
 	return TRUE;
+	*/
 }
 
-void firebreathTestAPI::stop(int chid)
+void firebreathTestAPI::stop(int channel_id)
 {
-	if(chid < 1 || map_chid_globalVar.count(chid) <= 0)
+	if(channel_id < 1 || map_channelID_globalVar.count(channel_id) <= 0)
 	{
 		return;
 	}
-	map_chid_globalVar[chid]->threadCtl--;
-	if(map_chid_globalVar[chid]->threadCtl <= 0)
+	map_channelID_globalVar[channel_id]->thread_num--;
+	if(map_channelID_globalVar[channel_id]->thread_num <= 0)
 	{
-		map_chid_globalVar[chid]->srv_shutdown = 1;
+		map_channelID_globalVar[channel_id]->srv_shutdown = 1;
 	}
 }
 
-int firebreathTestAPI::isReady(int chid)
+int firebreathTestAPI::isReady(int channel_id)
 {
 	map<int, GlobalVars*>::iterator iter;
-	iter = map_chid_globalVar.find(chid);
-	if (iter != map_chid_globalVar.end()) {
-		return map_chid_globalVar[chid]->http_srv_ready;
+	iter = map_channelID_globalVar.find(channel_id);
+	if (iter != map_channelID_globalVar.end()) {
+		return map_channelID_globalVar[channel_id]->http_srv_ready;
 	}
 	else {
 		return -1;
 	}
 }
 
-int firebreathTestAPI::isStreamInChannel(int streamID, int chid)
+int firebreathTestAPI::isStreamInChannel(int stream_id, int channel_id)
 {
-	if(map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete ==FALSE){
+	if(map_channelID_globalVar[channel_id]->is_Pk_mgr_ptr_copy_delete ==FALSE){
 		map<int, struct update_stream_header *>::iterator  map_streamID_header_iter;
-		map_streamID_header_iter = map_chid_globalVar[chid]->pk_mgr_ptr_copy ->map_streamID_header.find(streamID);
+		map_streamID_header_iter = map_channelID_globalVar[channel_id]->pk_mgr_ptr_copy ->map_streamID_header.find(stream_id);
 		//		return TRUE;
-		if(map_streamID_header_iter != map_chid_globalVar[chid]->pk_mgr_ptr_copy ->map_streamID_header.end()){
+		if(map_streamID_header_iter != map_channelID_globalVar[channel_id]->pk_mgr_ptr_copy ->map_streamID_header.end()){
 			return TRUE;
 		}else{
 			return FALSE ;
@@ -290,22 +363,32 @@ int firebreathTestAPI::isStreamInChannel(int streamID, int chid)
 	return TRUE;
 }
 
-unsigned short firebreathTestAPI::streamingPortIs(int chid)
+unsigned short firebreathTestAPI::streamingPortIs(int channel_id)
 {
-	return map_chid_globalVar[chid]->streamingPort;
+	return map_channelID_globalVar[channel_id]->streamingPort;
 	/*
-	if (map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete) {
+	if (map_channelID_globalVar[chid]->is_Pk_mgr_ptr_copy_delete) {
 		return 0;
 	}
 	else {
-		return map_chid_globalVar[chid]->streamingPort;
+		return map_channelID_globalVar[chid]->streamingPort;
 	}
 	*/
 }
 
 // Set up configuration and store in map_config
-void firebreathTestAPI::set_config(const std::string& msg)
+int firebreathTestAPI::set_config(int channel_id, const std::string& msg)
 {
+	map<int, GlobalVars*>::iterator iter = map_channelID_globalVar.find(channel_id);
+	if (iter == map_channelID_globalVar.end()) {
+		return -1;
+	}
+	if (iter->second->map_config != NULL) {
+		return -1;
+	}
+
+	iter->second->map_config = new map<string, string>;
+	
 	string ss(msg.begin()+1, msg.end()-1);
 	std::string delimiter = ",";
 
@@ -318,9 +401,9 @@ void firebreathTestAPI::set_config(const std::string& msg)
 		int n = token.find(":");
 		string key(token.begin()+1, token.begin()+n-1);
 		string value(token.begin()+n+2, token.end()-1);
-		map_config[key] = value;
+		iter->second->map_config->insert(pair<string, string>(key, value));
 		//map_config.insert(pair<string, string>(key, value));
-		ssss += key + ":" + value + "\n";
+		//ssss += key + ":" + value + "\n";
 		ss.erase(0, pos + delimiter.length());
 	}
 	token = ss.substr(0, pos);
@@ -328,40 +411,30 @@ void firebreathTestAPI::set_config(const std::string& msg)
 	int n = token.find(":");
 	string key(token.begin()+1, token.begin()+n-1);
 	string value(token.begin()+n+2, token.end()-1);
-	map_config[key] = value;
+	iter->second->map_config->insert(pair<string, string>(key, value));
 	//map_config.insert(pair<string, string>(key, value));
-	ssss += key + ":" + value + "\n";
+	//ssss += key + ":" + value + "\n";
 	
-	/*
-	string str = map_config.find("channel_id")->second;
-	istringstream is(str);
-	int chid;
-	is >> chid;
-	
-	ssss += str + "\n";
-	map<string, string>::iterator iter;
-	
-	
-	for (iter = map_config.begin(); iter != map_config.end(); iter++) {
-		
-		ssss += iter->first + ":" + iter->second + "\n";
-		map_chid_globalVar[chid]->map_config2.insert(pair<string, string>(iter->first, iter->second));
-		//map_chid_globalVar[chid]->map_config2[iter->first] = iter->second;
-	}
-	*/
+	iter->second->is_init = 1;
 
-	set_config_done = 1;
-	return ;
+	//set_config_done = 1;
+	return 0;
 }
 
-std::string firebreathTestAPI::get_config()
+std::string firebreathTestAPI::get_config(int channel_id)
 {
-	map<string, string>::iterator iter;
-	string ret_msg("");
-	for (iter = map_config.begin(); iter != map_config.end(); iter++) {
-		ret_msg += iter->first + ":" + iter->second + "\n";
+	map<int, GlobalVars*>::iterator iter = map_channelID_globalVar.find(channel_id);
+	if (iter == map_channelID_globalVar.end()) {
+		return "The object is not created";
 	}
-	//ssss = ret_msg;
+	if (iter->second->is_init == 0) {
+		return "Initialization of the object is not finished";
+	}
+
+	string ret_msg("");
+	for (map<string, string>::iterator iter_temp = iter->second->map_config->begin(); iter_temp != iter->second->map_config->end(); iter_temp++) {
+		ret_msg += iter_temp->first + ":" + iter_temp->second + "\n";
+	}
     return ret_msg;
 }
 
@@ -369,18 +442,11 @@ int firebreathTestAPI::is_set_config_done()
 {
     return set_config_done;
 }
-/*
-int firebreathTestAPI::valid()
-{
-	return TRUE;
-}
-*/
 
 void launchThread(void * arg)
 {
 	int a = (int)arg;
 	mainFunction(a);
-	//return;
 }
 
 #endif
@@ -392,10 +458,31 @@ int mainFunction(int chid){
 int main(int argc, char **argv){
 #endif
 
-		
+	/*
+	printf("sizeof(int): %d \n", sizeof(int));
+	printf("sizeof(long): %d \n", sizeof(long));
+	printf("sizeof(int *): %d \n", sizeof(int *));
+	printf("sizeof(long *): %d \n", sizeof(long *));
+	printf("sizeof(void *): %d \n", sizeof(void *));
 
+	double aa = 0;
+	double bb = 0;
+	double dd = 0;
+	try {
+		dd = aa / bb;
+	} catch (...) {
+		printf("e: \n");
+	}
+	printf("dd = %f \n", dd);
+	
+	
+	PAUSE
+	*/
+#ifdef _FIRE_BREATH_MOD_
+	while (!map_channelID_globalVar[chid]->srv_shutdown) {
+#else
 	while (!srv_shutdown) {
-
+#endif
 	
 	
 		int svc_fd_tcp;		// listening-socket for peers 
@@ -403,6 +490,8 @@ int main(int argc, char **argv){
 		unsigned long html_size;
 		int optval = 1;
 		struct sockaddr_in sin;
+		unsigned char pk_exit_code = PEER_ALIVE;
+		unsigned char log_exit_code = PEER_ALIVE;
 
 		string svc_tcp_port("");
 		string svc_udp_port("");
@@ -427,12 +516,12 @@ int main(int argc, char **argv){
 		//prep = new configuration(config_file);
 		
 #ifdef _FIRE_BREATH_MOD_
-		prep = new configuration(config_file);
-		for (map<string, string>::iterator iter = map_config.begin(); iter != map_config.end(); iter++) {
+		prep = new configuration(config_file);    
+		for (map<string, string>::iterator iter = map_channelID_globalVar[chid]->map_config->begin(); iter != map_channelID_globalVar[chid]->map_config->end(); iter++) {
 			//prep->map_table.insert(pair<string, string>(iter->first, iter->second));
 			prep->map_table[iter->first] = iter->second;
 		}
-		net_ptr = new network(&(map_chid_globalVar[chid]->errorRestartFlag), map_chid_globalVar[chid]->fd_list);
+		net_ptr = new network(&(map_channelID_globalVar[chid]->errorRestartFlag), map_channelID_globalVar[chid]->fd_list);
 #else
 		prep = new configuration(config_file);
 		if (prep == NULL) {
@@ -457,8 +546,8 @@ int main(int argc, char **argv){
 			PAUSE
 		}
 #ifdef _FIRE_BREATH_MOD_
-		peer_mgr_ptr = new peer_mgr(map_chid_globalVar[chid]->fd_list);
-		stunt_mgr_ptr = new stunt_mgr(map_chid_globalVar[chid]->fd_list);
+		peer_mgr_ptr = new peer_mgr(map_channelID_globalVar[chid]->fd_list);
+		stunt_mgr_ptr = new stunt_mgr(map_channelID_globalVar[chid]->fd_list);
 #else
 		
 		peer_mgr_ptr = new peer_mgr(&fd_list);
@@ -509,7 +598,7 @@ int main(int argc, char **argv){
 		cout << "stream_local_port=" << stream_local_port << endl;
 		
 #ifdef _FIRE_BREATH_MOD_
-		pk_mgr_ptr = new pk_mgr(html_size, map_chid_globalVar[chid]->fd_list, net_ptr , log_ptr , prep , logger_client_ptr, stunt_mgr_ptr);
+		pk_mgr_ptr = new pk_mgr(html_size, map_channelID_globalVar[chid]->fd_list, net_ptr , log_ptr , prep , logger_client_ptr, stunt_mgr_ptr);
 #else
 		pk_mgr_ptr = new pk_mgr(html_size, &fd_list, net_ptr , log_ptr , prep , logger_client_ptr, stunt_mgr_ptr);
 #endif
@@ -593,7 +682,7 @@ int main(int argc, char **argv){
 			debug_printf("MODE_BitStream \n");
 
 #ifdef _FIRE_BREATH_MOD_
-			bit_stream_server_ptr = new bit_stream_server(net_ptr,log_ptr, logger_client_ptr, pk_mgr_ptr, map_chid_globalVar[chid]->fd_list);
+			bit_stream_server_ptr = new bit_stream_server(net_ptr,log_ptr, logger_client_ptr, pk_mgr_ptr, map_channelID_globalVar[chid]->fd_list);
 #else
 			bit_stream_server_ptr = new bit_stream_server(net_ptr,log_ptr, logger_client_ptr, pk_mgr_ptr, &fd_list);
 #endif
@@ -606,9 +695,9 @@ int main(int argc, char **argv){
 			ss_tmp << stream_local_port;
 			ss_tmp >> port_tcp;
 #ifdef _FIRE_BREATH_MOD_
-			map_chid_globalVar[chid]->streamingPort = bit_stream_server_ptr->init(0, port_tcp);
-			log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "Create bit_stream_server success. port =", map_chid_globalVar[chid]->streamingPort);
-			debug_printf("Create bit_stream_server success. port = %u", map_chid_globalVar[chid]->streamingPort);
+			map_channelID_globalVar[chid]->streamingPort = bit_stream_server_ptr->init(0, port_tcp);
+			log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "Create bit_stream_server success. port =", map_channelID_globalVar[chid]->streamingPort);
+			debug_printf("Create bit_stream_server success. port = %u", map_channelID_globalVar[chid]->streamingPort);
 #else
 			streamingPort = bit_stream_server_ptr->init(0, port_tcp);
 			log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Create bit_stream_server success. port =", streamingPort);
@@ -645,7 +734,7 @@ int main(int argc, char **argv){
 		sin.sin_addr.s_addr = INADDR_ANY;
 		unsigned short ptop_port = (unsigned short)atoi(svc_tcp_port.c_str());		// listen-port for peer connection
 
-		// Find an available port
+		// Find an available port for p2p connection
 		for ( ; ; ptop_port++) {
 			sin.sin_port = htons(ptop_port);
 			if (::bind(svc_fd_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) < 0) {
@@ -699,7 +788,7 @@ int main(int argc, char **argv){
 		net_ptr->set_fd_bcptr_map(svc_fd_tcp, dynamic_cast<basic_class *>(peer_communication_ptr->get_io_accept_handler()));
 
 #ifdef _FIRE_BREATH_MOD_
-		(map_chid_globalVar[chid]->fd_list)->push_back(svc_fd_tcp);
+		(map_channelID_globalVar[chid]->fd_list)->push_back(svc_fd_tcp);
 #else
 		fd_list.push_back(svc_fd_tcp);
 #endif
@@ -729,20 +818,30 @@ int main(int argc, char **argv){
 		}*/
 
 #ifdef _FIRE_BREATH_MOD_
-		map_chid_globalVar[chid]->pk_mgr_ptr_copy = pk_mgr_ptr ;
-		map_chid_globalVar[chid]->http_srv_ready = 1;
-		map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete = FALSE;
+
+		// Invoke jwplayer in javascript
+		FB::JSObjectPtr obj = map_channelID_globalVar[chid]->window->getProperty<FB::JSObjectPtr>("window");
+		obj->Invoke("start_jwplayer", FB::variant_list_of(map_channelID_globalVar[chid]->streamingPort));
+
+		
+
+
+		map_channelID_globalVar[chid]->pk_mgr_ptr_copy = pk_mgr_ptr ;
+		map_channelID_globalVar[chid]->http_srv_ready = 1;
+		map_channelID_globalVar[chid]->is_Pk_mgr_ptr_copy_delete = FALSE;
 		
 		map<string, string>::iterator iter;
-		for (iter = map_config.begin(); iter != map_config.end(); iter++) {
+		for (iter = map_channelID_globalVar[chid]->map_config->begin(); iter != map_channelID_globalVar[chid]->map_config->end(); iter++) {
 			log_ptr->write_log_format("s(u) s s \n", __FUNCTION__, __LINE__, (iter->first).c_str(), (iter->second).c_str());
 		}
 		for (iter = prep->map_table.begin(); iter != prep->map_table.end(); iter++) {
 			log_ptr->write_log_format("s(u) -- s s \n", __FUNCTION__, __LINE__, (iter->first).c_str(), (iter->second).c_str());
 		}
-	
+		log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "Before PAUSE");
+		//PAUSE
+		log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "After PAUSE");
 		
-		while((!(map_chid_globalVar[chid]->srv_shutdown))  &&  (!(map_chid_globalVar[chid]->errorRestartFlag))) {
+		while((!(map_channelID_globalVar[chid]->srv_shutdown))  &&  (!(map_channelID_globalVar[chid]->errorRestartFlag))) {
 #else
 		while (!srv_shutdown && !errorRestartFlag) {
 #endif
@@ -750,7 +849,7 @@ int main(int argc, char **argv){
 #ifdef _WIN32
 
 	#ifdef _FIRE_BREATH_MOD_
-			net_ptr->epoll_waiter(1000, map_chid_globalVar[chid]->fd_list);
+			net_ptr->epoll_waiter(1000, map_channelID_globalVar[chid]->fd_list);
 	#else
 			net_ptr->epoll_waiter(1000, &fd_list);
 	#endif
@@ -770,13 +869,22 @@ int main(int argc, char **argv){
 				break;
 			}
 		}
-
+		
+		pk_exit_code = pk_mgr_ptr->exit_code;
+		log_exit_code = logger_client_ptr->exit_code;
+		
+		
+		debug_printf("pk_exit_code = %d, log_exit_code = %d \n", pk_exit_code, log_exit_code);
+		
+		
 		debug_printf("Client Restart \n");
 		PAUSE
 		
 #ifdef _FIRE_BREATH_MOD_
-		log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__,"srv_shutdown", map_chid_globalVar[chid]->srv_shutdown, "errorRestartFlag", map_chid_globalVar[chid]->errorRestartFlag);
+		log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "exit_code =", map_channelID_globalVar[chid]->exit_code);
+		log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__,"srv_shutdown", map_channelID_globalVar[chid]->srv_shutdown, "errorRestartFlag", map_channelID_globalVar[chid]->errorRestartFlag);
 #else
+		log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "pk_exit_code =", pk_exit_code, "log_exit_code =", log_exit_code);
 		log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "srv_shutdown", srv_shutdown, "errorRestartFlag", errorRestartFlag);
 #endif
 
@@ -805,9 +913,9 @@ int main(int argc, char **argv){
 		net_ptr = NULL;	
 
 #ifdef _FIRE_BREATH_MOD_
-		map_chid_globalVar[chid]->is_Pk_mgr_ptr_copy_delete = TRUE;
-		map_chid_globalVar[chid]->pk_mgr_ptr_copy =NULL;
-		map_chid_globalVar[chid]->http_srv_ready = 0;
+		map_channelID_globalVar[chid]->is_Pk_mgr_ptr_copy_delete = TRUE;
+		map_channelID_globalVar[chid]->pk_mgr_ptr_copy =NULL;
+		map_channelID_globalVar[chid]->http_srv_ready = 0;
 #endif
 		if (pk_mgr_ptr) {
 			delete pk_mgr_ptr;
@@ -839,7 +947,7 @@ int main(int argc, char **argv){
 		}
 
 #ifdef _FIRE_BREATH_MOD_
-		map_chid_globalVar[chid]->errorRestartFlag =0;
+		map_channelID_globalVar[chid]->errorRestartFlag =0;
 #else
 		errorRestartFlag =0;
 #endif
@@ -847,13 +955,13 @@ int main(int argc, char **argv){
 	}
 
 #ifdef _FIRE_BREATH_MOD_
-	map_chid_globalVar[chid]->streamingPort = 0;
-	map_chid_globalVar[chid]->handle_sig_alarm = 0;
-	map_chid_globalVar[chid]->srv_shutdown = 0;
-	map_chid_globalVar[chid]->errorRestartFlag = 0;
-	delete map_chid_globalVar[chid]->fd_list;
-	free(map_chid_globalVar[chid]);
-	map_chid_globalVar.erase(chid);
+	map_channelID_globalVar[chid]->streamingPort = 0;
+	map_channelID_globalVar[chid]->handle_sig_alarm = 0;
+	map_channelID_globalVar[chid]->srv_shutdown = 0;
+	map_channelID_globalVar[chid]->errorRestartFlag = 0;
+	delete map_channelID_globalVar[chid]->fd_list;
+	free(map_channelID_globalVar[chid]);
+	map_channelID_globalVar.erase(chid);
 #else
 	streamingPort = 0;
 	handle_sig_alarm = 0;

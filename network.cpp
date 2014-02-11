@@ -157,6 +157,16 @@ void network::epoll_waiter(int timeout, list<int> *fd_list)
 				_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
 			}
 		}
+		
+		struct sockaddr_in addr;
+		int addrLen = sizeof(struct sockaddr_in);
+		int	aa;
+		aa = getsockname(pk_fd, (struct sockaddr *)&addr, &addrLen);
+		debug_printf("  aa:%2d  cfd: %2d , SrcAddr: %s:%d \n", aa, pk_fd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+		aa = getpeername(pk_fd, (struct sockaddr *)&addr, &addrLen);
+		debug_printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d \n", aa, pk_fd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+
+		PAUSE
 	}
 }
 #else
@@ -176,7 +186,7 @@ void network::epoll_dispatcher(void)
 		_map_fd_bc_tbl_iter = _map_fd_bc_tbl.find(cfd);
 		
 		if (_map_fd_bc_tbl_iter != _map_fd_bc_tbl.end()) {
-			//DBG_PRINTF("here\n");
+			
 			bc_ptr = _map_fd_bc_tbl_iter->second;
 			
 			//printf("nfds: %d, i: %d ", nfds, i);
@@ -189,39 +199,73 @@ void network::epoll_dispatcher(void)
 			//printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d  ", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 			
 			if (events[i].events & (EPOLLRDHUP | EPOLLERR)) {
-				//printf("%d sock error\n",cfd);
-				// EPOLLRDHUP => This socket is closed by client (client has sent a FIN), we have to close it.
-				cout << "something wrong: fd = " << cfd << " error:"<<WSAGetLastError()<< endl;
-				//PAUSE
-				_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
-				continue;
+				if (cfd == pk_fd) {
+					// TODO: handle pk socket
+					debug_printf("pk socket error");
+					PAUSE
+				}
+				else if (cfd == log_fd) {
+					// TODO: handle log-server socket
+					debug_printf("log-server socket error");
+					PAUSE
+				}
+				else {
+					// EPOLLRDHUP => This socket is closed by client (client has sent a FIN), we have to close it.
+					cout << "something wrong: fd = " << cfd << " error:"<<WSAGetLastError()<< endl;
+				
+					_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
+					PAUSE
+					continue;
+				}
 			}
 			
 			if(events[i].events & EPOLLIN) {
-				//printf("%d sock in  ",cfd);
-				//printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d  \n", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
-				if (bc_ptr->handle_pkt_in(cfd) == RET_SOCK_ERROR) {		// readable
-                    printf("%s,handle in sock error\n",__FUNCTION__);
-					if(_map_fd_bc_tbl.find(cfd) != _map_fd_bc_tbl.end()){
-						_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
+				if (bc_ptr->handle_pkt_in(cfd) == RET_SOCK_ERROR) {
+					if (cfd == pk_fd) {
+						// TODO: handle pk socket
+						debug_printf("pk socket error");
+						*_errorRestartFlag = RESTART;
+						return ;	// Once pk socket error, immediately restart
 					}
-					close(cfd);
+					else if (cfd == log_fd) {
+						// TODO: handle log-server socket
+						debug_printf("log-server socket error");
+						PAUSE
+					}
+					else {
+						debug_printf("%s %d, handle in sock error\n", __FUNCTION__, cfd);
+						if(_map_fd_bc_tbl.find(cfd) != _map_fd_bc_tbl.end()){
+							_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
+						}
+						close(cfd);
+					}
                 }
 			}
 			if(events[i].events & EPOLLOUT) {
-				//printf("%d sock out  ",cfd);
-				//printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d  \n", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
-				if (bc_ptr->handle_pkt_out(cfd) == RET_SOCK_ERROR) {		// writable
-					printf("%s,handle out sock error\n",__FUNCTION__);
-					if(_map_fd_bc_tbl.find(cfd) != _map_fd_bc_tbl.end()){
-						_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
+				if (bc_ptr->handle_pkt_out(cfd) == RET_SOCK_ERROR) {
+					if (cfd == pk_fd) {
+						// TODO: handle pk socket 
+						debug_printf("pk socket error");
+						PAUSE
 					}
-					close(cfd);
+					else if (cfd == log_fd) {
+						// TODO: handle log-server socket
+						debug_printf("log-server socket error");
+						PAUSE
+					}
+					else {
+						debug_printf("%s %d, handle out sock error\n", __FUNCTION__, cfd);
+						if(_map_fd_bc_tbl.find(cfd) != _map_fd_bc_tbl.end()){
+							_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
+						}
+						close(cfd);
+					}
 				}
 			}
 			if(events[i].events & ~(EPOLLIN | EPOLLOUT)) {
 				//printf("%d error\n",cfd);
 				bc_ptr->handle_pkt_error(cfd);		// error
+				PAUSE
 			}
 		} else {
 			// can't fd in map table?
@@ -375,8 +419,16 @@ int network::close(int sock)
 	}
 	
 	debug_printf("close socket %d, now _map_fd_bc_tbl.size() = %d \n", sock, _map_fd_bc_tbl.size());
+	for (std::map<int, basic_class *>::iterator iter = _map_fd_bc_tbl.begin(); iter != _map_fd_bc_tbl.end(); iter++) {
+		struct sockaddr_in addr;
+		int addrLen = sizeof(struct sockaddr_in);
+		int	aa;
+		aa = getsockname(pk_fd, (struct sockaddr *)&addr, &addrLen);
+		debug_printf("  aa:%2d  cfd: %2d , SrcAddr: %s:%d \n", aa, pk_fd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+		aa = getpeername(pk_fd, (struct sockaddr *)&addr, &addrLen);
+		debug_printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d \n", aa, pk_fd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+	}
 	epoll_control(sock, EPOLL_CTL_DEL, 0);
-//	cout << "sock close fd_size = " << _map_fd_bc_tbl.size() << endl;
 	
 	::shutdown(sock, SHUT_RDWR);
 #ifdef _WIN32
@@ -400,6 +452,7 @@ int network::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 	recv_rt_val = recv(sock, send_info->recv_ctl_info.buffer + send_info->recv_ctl_info.offset, send_info->recv_ctl_info.expect_len, 0);
 
 	if (recv_rt_val < 0) {
+		
 		#ifdef _WIN32 
 		int socket_error = WSAGetLastError();
 		if (socket_error == WSAEWOULDBLOCK) {
@@ -429,14 +482,17 @@ int network::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 			//send_info->recv_ctl_info.ctl_state = RUNNING;
 			return RET_OK;
 		} else {
+			debug_printf("recv %d byte from sock: %d, expected len = %d \n", recv_rt_val, sock, send_info->recv_ctl_info.expect_len);
 			#ifdef _WIN32 
 			debug_printf("WSAGetLastError() = %d \n", socket_error);
 			#else
 			#endif
 			return RET_SOCK_ERROR;
 		}
-	} else if (recv_rt_val == 0) {
-		cout << "recv 0 byte from sock: " << sock << ", expect len = " << send_info->recv_ctl_info.expect_len << endl;
+	} 
+	// The connection has been gracefully closed
+	else if (recv_rt_val == 0) {
+		debug_printf("recv 0 byte from sock: %d, expected len = %d \n", sock, send_info->recv_ctl_info.expect_len);
 		#ifdef _WIN32 
 		int socket_error = WSAGetLastError();
 		debug_printf("WSAGetLastError() = %d \n", socket_error);
@@ -466,7 +522,7 @@ int network::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 			}
 
 			//send_info->recv_ctl_info.ctl_state = READY;
-			return RET_OK;
+			return RET_SOCK_CLOSED_GRACEFUL;
 		} else {
 
 			if(send_info ->recv_packet_state == READ_HEADER_READY){
@@ -491,10 +547,10 @@ int network::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 
 			//send_info->recv_ctl_info.ctl_state = RUNNING;
 			//here maybe a sock error
-			return RET_SOCK_ERROR;
+			return RET_SOCK_CLOSED_GRACEFUL;
 			//return RET_OK;
 		}
-	}else if (recv_rt_val == send_info->recv_ctl_info.expect_len) {
+	} else if (recv_rt_val == send_info->recv_ctl_info.expect_len) {
 
 		//QueryPerformanceCounter(&teststart);
 

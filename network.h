@@ -21,6 +21,8 @@ public:
 	unsigned long long int recv_byte;
 	int *_errorRestartFlag;
 	list<int>  * fd_list_ptr;
+	int pk_fd;		// PK socket fd
+	int log_fd;		// Log-server socket fd
 
 	void timer();		// timer
 	void setall_fd_epollout();

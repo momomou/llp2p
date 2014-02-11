@@ -171,6 +171,8 @@ public:
 	unsigned long my_public_ip;
 	unsigned short my_private_port;
 	int log_server_sock;
+	unsigned char exit_code;		// Error code (for program exit)
+
 	Nonblocking_Buff non_log_recv_struct;
 };
 
