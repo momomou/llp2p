@@ -405,29 +405,28 @@ void network::peer_set(peer *peer_ptr)
 //shutdown socket and close socket
 int network::close(int sock) 
 {
-//	DBG_PRINTF("here\n");
+	debug_printf("before close socket %d, _map_fd_bc_tbl.size() = %d \n", sock, _map_fd_bc_tbl.size());
+	for (std::map<int, basic_class *>::iterator iter = _map_fd_bc_tbl.begin(); iter != _map_fd_bc_tbl.end(); iter++) {
+		struct sockaddr_in src_addr;
+		struct sockaddr_in dst_addr;
+		int addrLen = sizeof(struct sockaddr_in);
+		int	a, b;
+		a = getsockname(iter->first, (struct sockaddr *)&src_addr, &addrLen);
+		b = getpeername(iter->first, (struct sockaddr *)&dst_addr, &addrLen);
+		debug_printf(" | (%d) fd:%3d, SA: %s:%d | (%d) fd:%3d, DA: %s:%d | \n", a, iter->first, inet_ntoa(src_addr.sin_addr), ntohs(src_addr.sin_port),
+																				b, iter->first, inet_ntoa(dst_addr.sin_addr), ntohs(dst_addr.sin_port));
+	}
 	
 	_map_fd_bc_tbl_iter = _map_fd_bc_tbl.find(sock);
 	
 	if (_map_fd_bc_tbl_iter == _map_fd_bc_tbl.end()) {
 		return -1;
-	} else {
-//		delete _map_fd_bc_tbl_iter->second;
+	} 
+	else {
+		//delete _map_fd_bc_tbl_iter->second;
 		_map_fd_bc_tbl.erase(_map_fd_bc_tbl_iter);
-		//cout << "erase fd" << endl;
-		//PAUSE
 	}
 	
-	debug_printf("close socket %d, now _map_fd_bc_tbl.size() = %d \n", sock, _map_fd_bc_tbl.size());
-	for (std::map<int, basic_class *>::iterator iter = _map_fd_bc_tbl.begin(); iter != _map_fd_bc_tbl.end(); iter++) {
-		struct sockaddr_in addr;
-		int addrLen = sizeof(struct sockaddr_in);
-		int	aa;
-		aa = getsockname(pk_fd, (struct sockaddr *)&addr, &addrLen);
-		debug_printf("  aa:%2d  cfd: %2d , SrcAddr: %s:%d \n", aa, pk_fd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
-		aa = getpeername(pk_fd, (struct sockaddr *)&addr, &addrLen);
-		debug_printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d \n", aa, pk_fd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
-	}
 	epoll_control(sock, EPOLL_CTL_DEL, 0);
 	
 	::shutdown(sock, SHUT_RDWR);
@@ -437,7 +436,6 @@ int network::close(int sock)
 #else
 	return ::close(sock);
 #endif
-
 
 }
 

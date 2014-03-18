@@ -116,6 +116,12 @@
     <ClInclude Include="..\io_accept_nat.h" />
     <ClInclude Include="..\io_connect.h" />
     <ClInclude Include="..\io_nonblocking.h" />
+    <ClInclude Include="..\irc\irc_client.h" />
+    <ClInclude Include="..\irc\libircclient.h" />
+    <ClInclude Include="..\irc\libirc_errors.h" />
+    <ClInclude Include="..\irc\libirc_events.h" />
+    <ClInclude Include="..\irc\libirc_options.h" />
+    <ClInclude Include="..\irc\libirc_rfcnumeric.h" />
     <ClInclude Include="..\libBitStreamHTTP\bit_stream_httpout.h" />
     <ClInclude Include="..\libBitStream\bit_stream_out.h" />
     <ClInclude Include="..\librtmp\amf.h" />
@@ -159,6 +165,7 @@
     <ClCompile Include="..\io_accept_nat.cpp" />
     <ClCompile Include="..\io_connect.cpp" />
     <ClCompile Include="..\io_nonblocking.cpp" />
+    <ClCompile Include="..\irc\irc_client.cpp" />
     <ClCompile Include="..\libBitStreamHTTP\bit_stream_httpout.cpp" />
     <ClCompile Include="..\libBitStream\bit_stream_out.cpp" />
     <ClCompile Include="..\librtmp\amf.cpp" />
@@ -184,6 +191,9 @@
     <ClCompile Include="..\stream_udp.cpp" />
     <ClCompile Include="..\stunt\tcp_punch.cpp" />
     <ClCompile Include="..\stunt_mgr.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\irc\libircclient.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

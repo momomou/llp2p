@@ -13,7 +13,7 @@ class bit_stream_server;
 
 class bit_stream_httpout:public stream {
 public:
-
+	FILE *fp;
 	list<int> *fd_list_ptr;
 	map<int, struct update_stream_header *>::iterator  map_streamID_header_iter;
 

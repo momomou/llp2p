@@ -80,14 +80,14 @@ unsigned short bit_stream_server::init(int stream_id, unsigned short bitStreamSe
 	for ( ; ; bitStreamServerPort++) {
 		sin.sin_port = htons(bitStreamServerPort);
 		int n = bind(_sock_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in));
-		printf("bind n: %d \n", n);
+		//debug_printf("bind n: %d \n", n);
 		if (n != 0) {
 			_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "Socket bind failed at port", bitStreamServerPort, ". Socket error", WSAGetLastError());
-			debug_printf("Socket bind failed at port %d. Socket error %d \n", bitStreamServerPort, WSAGetLastError());
+			//debug_printf("Socket bind failed at port %d. Socket error %d \n", bitStreamServerPort, WSAGetLastError());
 			continue;
 		}
 		n = listen(_sock_tcp, MAX_POLL_EVENT);
-		printf("listen n: %d \n", n);
+		//debug_printf("listen n: %d \n", n);
 		if (n != 0) {
 			_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "Socket listen failed at port", bitStreamServerPort, ". Socket error", WSAGetLastError());
 			debug_printf("Socket listen failed at port %d. Socket error %d \n", bitStreamServerPort, WSAGetLastError());

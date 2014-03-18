@@ -22,22 +22,25 @@ class pk_mgr:public basic_class {
 
 
 public:
-	FILE *fp;
+	FILE *record_file_fp;		// For save the file
+	bool first_pkt;				// Flag for check keyframe
 	list<int> *fd_list_ptr;
 //	list<int> outside_rescue_list;
 	list <int> streamID_list;
 	struct peer_connect_down_t *pkDownInfoPtr;
-	struct timerStruct start,end;
-	volatile unsigned long Xcount;						// Number of average received packets per unit time
+	struct timerStruct start;
+	struct timerStruct end;
+	struct timerStruct reconnect_timer;	// Test for reconnect
+	volatile unsigned long Xcount;		// Number of average received packets per unit time. Xcount*PARAMETER_X:一秒鐘收到的packet數量
 	unsigned long totalMod ;
 	unsigned long reSynTime;
 	struct timerStruct lastSynStartclock;
 	unsigned long pkt_count ;			// 一次 XCOUNT_INTERVAL 時間內收到的chunk數量(有過濾過)
 	unsigned long totalbyte;
-	int synLock;
+	int syncLock;					// set 1 if send sync token to pk and not yet receive the response
 	unsigned char exit_code;		// Error code (for program exit)
 
-	unsigned long first_timestamp;		// 第一個收到的封包的timestampd
+	UINT32 first_timestamp;		// 第一個收到的封包的timestampd
 	bool firstIn;
 	struct timerStruct LastTimer;
 	struct timerStruct sleepTimer;
@@ -85,8 +88,6 @@ public:
 	unsigned long bit_rate;
 	unsigned long sub_stream_num;
 
-	unsigned long public_ip;
-	unsigned short my_private_port;
 	unsigned long inside_lane_rescue_num;
 	unsigned long outside_lane_rescue_num;
 
@@ -97,7 +98,7 @@ public:
 
 	// Variables of synchronization
 	struct timerStruct syn_round_start;
-	unsigned long syn_round_time;
+	int syn_round_time;
 	struct syn_struct syn_table;
 
 
@@ -106,13 +107,9 @@ public:
 	void send_syn_token_to_pk(int pk_sock);
 	void syn_recv_handler(struct syn_token_receive* syn_struct_back_token);
 
-
-	// For debug
-	void PrintSubstreamInfo();
-
 	void delay_table_init();
 	void source_delay_detection(int sock, unsigned long sub_id, unsigned int seq_now);
-	void quality_source_delay_count(int sock, unsigned long substream_id, unsigned int seq_now);
+	void quality_source_delay_count(int sock, unsigned long substream_id, unsigned int seq_now);	// Calculation of quality and source-delay
 	void reset_source_delay_detection(unsigned long sub_id);
 	void set_rescue_state(unsigned long sub_id,int state);
 	int check_rescue_state(unsigned long sub_id,int state);
@@ -122,10 +119,10 @@ public:
 	int peer_start_delay_count;		// If received first packet of each substream, peer_start_delay_count++
 	void send_capacity_init();
 	void send_capacity_to_pk(int sock);
-
+	void send_source_delay(int sock);		// Send source-delay info to pk
 	
-	volatile unsigned int _least_sequence_number;			//收到目前為止最新的seq
-	volatile unsigned int _current_send_sequence_number;	//最後送給player的seq(還沒送)
+	volatile UINT32 _least_sequence_number;			//收到目前為止最新的seq
+	volatile UINT32 _current_send_sequence_number;	//最後送給player的seq(還沒送)
 
 	unsigned long stream_number;	//channel 下stream的個數
 	
@@ -161,7 +158,7 @@ public:
 
 
 	void handle_stream(struct chunk_t *chunk_ptr, int sockfd);
-
+	void handle_kickout(struct chunk_t *chunk_ptr, int sockfd);
 
 ///new rescue function
 	//	void handleAppenSelfdPid(struct chunk_t *chunk_ptr );
@@ -176,6 +173,10 @@ public:
 	void send_rescueManifestToPKUpdate(unsigned long manifestValue);
 	void send_parentToPK(unsigned long manifestValue ,unsigned long oldPID);
 	void reSet_detectionInfo();
+
+	// Record file
+	void record_file(chunk_t *chunk_ptr);
+	void record_file_init(int stream_id);
 
 	//可獨立的unitl
 	unsigned long manifestToSubstreamID(unsigned long  manifest );
@@ -226,10 +227,13 @@ private:
 	unsigned long my_pid;
 	unsigned long my_level;
 	unsigned long _manifest;
-	
+	unsigned long my_public_ip;
+	unsigned short my_public_port;
+	unsigned long my_private_ip;
+	unsigned short my_private_port;
 	
 	bool pkSendCapacity;
-	unsigned long lastPKtimer;
+	unsigned long lastPKtimer;		// Record the time that pk receives peer's sync token
 	int sentStartDelay;
 
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
@@ -237,27 +241,3 @@ private:
 };
 
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

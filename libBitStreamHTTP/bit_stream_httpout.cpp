@@ -92,7 +92,9 @@ bit_stream_httpout::bit_stream_httpout(int stream_id,network *net_ptr, logger *l
 	fd_list_ptr = fd_list;
 	_bit_stream_server_ptr = bit_stream_server_ptr;
 	_queue_out_data_ptr = NULL;
-
+	//fp = fopen("video", "wb");
+	//fwrite((char *)flvHeader, 1, sizeof(flvHeader), fp);
+	
 	_queue_out_data_ptr = new std::queue<struct chunk_t *>;	
 	if (!_queue_out_data_ptr) {
 		printf("new _queue_out_data_ptr in bit_stream_httpout\n");
@@ -259,7 +261,7 @@ int bit_stream_httpout::handle_pkt_out(int sock)
 		
 		
 		//_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "3");
-		first_pkt = false;
+		//first_pkt = false;
 		
 		//pop until get the first keyframe
 		if (first_pkt) {
@@ -400,7 +402,11 @@ int bit_stream_httpout::handle_pkt_out(int sock)
 		_send_ctl_info.serial_num = chunk_ptr->header.sequence_number;
 
 		send_rt_val = _net_ptr->nonblock_send(sock, &_send_ctl_info);
-		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Send to player ", _send_ctl_info.serial_num);
+		_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "Send to player", _send_ctl_info.serial_num, send_size);
+		
+		//int nn = fwrite((char *)chunk_ptr->buf, 1, send_size, fp);
+		//_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Write file", nn);
+		
 		//for debug sequence_number
 		/*
 		static unsigned long test=0;
@@ -532,8 +538,7 @@ void bit_stream_httpout::send_header_to_player(int sock)
 		
 		if (protocol_header->len > 0) {
 			sendHeaderBytes = _net_ptr->send(sock, (char *)protocol_header->header, protocol_header->len, 0);	// Ideally send 441 bytes
-			//debug
-			//		fwrite((char *)protocol_header->header,1,protocol_header ->len,file_ptr);
+			//fwrite((char *)protocol_header->header, 1, protocol_header->len, fp);
 			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "send streamHeader sendHeaderBytes", sendHeaderBytes);
 		}
 		first_HTTP_Header = false;

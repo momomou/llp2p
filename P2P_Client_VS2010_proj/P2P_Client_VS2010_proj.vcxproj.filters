@@ -31,6 +31,9 @@
     <Filter Include="原始程式檔\stunt">
       <UniqueIdentifier>{fbfac7de-6459-4a12-8e85-f90beb7cdaad}</UniqueIdentifier>
     </Filter>
+    <Filter Include="原始程式檔\irc">
+      <UniqueIdentifier>{179abad7-e837-48f4-859c-b45c0826c5e2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\peer_mgr.h">
@@ -147,6 +150,24 @@
     <ClInclude Include="..\newtest.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
+    <ClInclude Include="..\irc\irc_client.h">
+      <Filter>原始程式檔\irc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\irc\libirc_errors.h">
+      <Filter>原始程式檔\irc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\irc\libirc_events.h">
+      <Filter>原始程式檔\irc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\irc\libirc_options.h">
+      <Filter>原始程式檔\irc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\irc\libirc_rfcnumeric.h">
+      <Filter>原始程式檔\irc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\irc\libircclient.h">
+      <Filter>原始程式檔\irc</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Makefile">
@@ -256,5 +277,13 @@
     <ClCompile Include="..\io_accept_nat.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
+    <ClCompile Include="..\irc\irc_client.cpp">
+      <Filter>原始程式檔\irc</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\irc\libircclient.lib">
+      <Filter>原始程式檔\irc</Filter>
+    </Library>
   </ItemGroup>
 </Project>

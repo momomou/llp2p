@@ -1,7 +1,8 @@
-//#ifndef _FIRE_BREATH_MOD_
-//#define _FIRE_BREATH_MOD_ 
-//#endif
-
+/*
+#ifndef _FIRE_BREATH_MOD_
+#define _FIRE_BREATH_MOD_ 
+#endif
+*/
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
@@ -15,15 +16,28 @@
 #define DEBUG2
 #endif
 */
-
+/*
 #ifndef WRITE_LOG
 #define WRITE_LOG		// write log.txt
 #endif
+*/
+#ifndef SEND_LOG_DEBUG
+#define SEND_LOG_DEBUG	// Allow to send CHNK_CMD_LOG_DEBUG to log-server
+#endif
 
+/*
+#ifndef IRC_CLIENT
+#define IRC_CLIENT	// Allow to open IRC functions
+#endif
+*/
+/*
+#ifndef RECORD_FILE
+#define RECORD_FILE	// Allow to record received message
+#endif
+*/
 // Role of function caller
 #define RESCUE_PEER		0	// the function caller is child
 #define CANDIDATE_PEER	1	// the function caller is parent
-
 
 
 #define FD_SETSIZE		2048
@@ -73,7 +87,7 @@
 #define TEST_TIME
 #define LISTEN_TIMEOUT	1000	//MUST less than  CONNECT_TIME_OUT
 
-//log part
+/* LOG part: Defined parameters */
 #define BUFFER_CONTENT_THRESHOLD 2000
 #define CHUNK_BUFFER_SIZE 5000	//15000		// Maximum bytes which stores log messages
 #define TIME_BW	500
@@ -81,44 +95,26 @@
 #define LOG_TIMES 2
 #define TIME_PERIOD 2500		//500
 #define MAX_STORED_NUM	20					// If log_buffer.size() more than this value, send log messages to log server
-//log state part
-/*
-1. LOG_REGISTER: send register info to get register back
-2. LOG_REG_LIST: from recive reg list to timeout(start testing) 
-3. LOG_REG_LIST_TESTING: from timeout(start testing) to setmanifest
-4. LOG_REG_LIST_DETECTION_TESTING_SUCCESS: from setmanifest to cut pk stream.
-5. LOG_REG_LIST_TESTING_FAIL: from timeout(start testing) to send topology to pk.
-6. LOG_REG_CUT_PK: send pk cut.
-7. LOG_REG_DATA_COME: data come.
-*/
-#define LOG_REGISTER	0x01
-#define LOG_REG_LIST	0x02
-#define LOG_REG_LIST_TESTING	0x03
-#define LOG_REG_LIST_DETECTION_TESTING_SUCCESS	0x04
-#define LOG_REG_LIST_TESTING_FAIL	0x05
-#define LOG_REG_CUT_PK	0x06
-#define LOG_REG_DATA_COME	0x07
+#define LOG_DELAY_SEND_PERIOD 5000
+#define LOG_BW_SEND_PERIOD 6000
 
-/*
-1. LOG_RESCUE_TRIGGER: from sending rescue request to get rescue list
-2. LOG_RESCUE_LIST: from reciving rescue list to timeout(start testing)
-3. LOG_RESCUE_TESTING: from start testing to setmanifest
-4. LOG_RESCUE_DETECTION_TESTING_SUCCESS: from setmanifest to cut pk stream.
-5. LOG_RESCUE_LIST_TESTING_FAIL: from timeout(start testing) to send topology to pk.
-6. LOG_RESCUE_CUT_PK: send pk cut.
-7. LOG_RESCUE_DATA_COME: data come.
-*/
-#define LOG_RESCUE_TRIGGER	0x08	
-#define LOG_RESCUE_LIST	0x09
-#define LOG_RESCUE_TESTING	0x0a
-#define LOG_RESCUE_DETECTION_TESTING_SUCCESS	0x0b
-#define LOG_RESCUE_LIST_TESTING_FAIL	0x0c
-#define LOG_RESCUE_CUT_PK	0x0d
-#define LOG_RESCUE_DATA_COME	0x0e
+/* LOG part: peer state (for debug CHNK_CMD_LOG_DEBUG) */
+#define LOG_REGISTER							0x01	// send register info to get register back
+#define LOG_REG_LIST							0x02	// from recive reg list to timeout(start testing) 
+#define LOG_REG_LIST_TESTING					0x03	// from timeout(start testing) to setmanifest
+#define LOG_REG_LIST_DETECTION_TESTING_SUCCESS	0x04	// from setmanifest to cut pk stream.
+#define LOG_REG_LIST_TESTING_FAIL				0x05	// from timeout(start testing) to send topology to pk.
+#define LOG_REG_CUT_PK							0x06	// send pk cut.
+#define LOG_REG_DATA_COME						0x07	// data come.
+#define LOG_RESCUE_TRIGGER						0x08	// from sending rescue request to get rescue list
+#define LOG_RESCUE_LIST							0x09	// from reciving rescue list to timeout(start testing)
+#define LOG_RESCUE_TESTING						0x0a	// from start testing to setmanifest
+#define LOG_RESCUE_DETECTION_TESTING_SUCCESS	0x0b	// from setmanifest to cut pk stream.
+#define LOG_RESCUE_LIST_TESTING_FAIL			0x0c	// from timeout(start testing) to send topology to pk.
+#define LOG_RESCUE_CUT_PK						0x0d	// send pk cut.
+#define LOG_RESCUE_DATA_COME					0x0e	// data come.
 
-/*
-the peer's condition
-*/
+/* LOG part: peer's condition (for debug CHNK_CMD_LOG_DEBUG) */
 #define LOG_START_DELAY	0x0f
 #define LOG_PERIOD_SOURCE_DELAY	0x10
 #define LOG_RESCUE_SUB_STREAM	0x11
@@ -126,9 +122,7 @@ the peer's condition
 #define LOG_WRITE_STRING	0x13
 #define LOG_BEGINE 0x14
 
-/*
-UPDTAE
-*/
+/* LOG part: update (for debug CHNK_CMD_LOG_DEBUG) */
 #define LOG_RESCUE_TRIGGER_BACK 0x15
 #define LOG_LIST_EMPTY 0x16
 #define LOG_TEST_DELAY_FAIL 0x17		// All connections building of list-peers fail  
@@ -140,11 +134,19 @@ UPDTAE
 #define LOG_TIME_OUT 0x1d
 #define LOG_PKT_LOSE 0x1e
 
-/*
-log parameter
-*/
-#define LOG_DELAY_SEND_PERIOD 5000
-#define LOG_BW_SEND_PERIOD 6000
+/* LOG part: peer's data (CHNK_CMD_LOG) */
+#define LOG_DATA_PEER_INFO 			0x30
+#define LOG_DATA_START_DELAY 		0x31
+#define LOG_DATA_BANDWIDTH 			0x32
+#define LOG_DATA_SOURCE_DELAY 		0x33
+
+/* LOG part: topology (CHNK_CMD_LOG) */
+#define LOG_TOPO_PEER_JOIN			0x40
+#define LOG_TOPO_TEST_SUCCESS		0x41
+#define LOG_TOPO_RESCUE_TRIGGER		0x42
+#define LOG_TOPO_PEER_LEAVE			0x43
+
+
 
 #include "configuration.h"
 
@@ -303,10 +305,12 @@ using std::bitset;
 //#define CHNK_CMD_PEER_PARENT_CHILDREN	0xF0	//¼È®É¤£¥Î
 #define CHNK_CMD_TOPO_INFO				0x1E
 #define CHNK_CMD_ROLE					0x1F
-#define CHNK_CMD_KICK_PEER				0x20
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
-#define CHNK_CMD_LOG	0x20
+#define CHNK_CMD_LOG					0x20	// Send to log-server for data
+#define CHNK_CMD_LOG_DEBUG 				0X21	// Send to log-server for debug
+#define CHNK_CMD_SRC_DELAY 				0X22	// Send source-delay to pk
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+#define CHNK_CMD_KICK_PEER				0x23
 
 #define CHNK_CMD_PEER_UNKNOWN			0xFF	// 1 B cmd => 0xFF is reserved for unknown cmd
 
@@ -364,6 +368,10 @@ struct timerStruct{
 #define REQUEST				0
 #define REPLY				1
 
+#define SYNC_UNINIT			0			// Not initialize sync data yet
+#define SYNC_ONGOING		1			// sent sync token to pk and not yet receive the response
+#define SYNC_FINISH			2			// sync finish
+	
 #define FREE				0
 #define LOCK				1
 #define MAIN_LOCKER			2
@@ -604,6 +612,13 @@ struct chunk_delay_test_t{
 	UINT8 buf[0];								//unsigned char buf[0];
 };
 
+struct chunk_period_source_delay_struct{
+	struct chunk_header_t header;
+	UINT32 pid;
+	double max_delay;
+	UINT32 sub_num;
+	double av_delay[0];
+};
 
 struct chunk_manifest_set_t{
 	struct chunk_header_t header;
@@ -794,9 +809,11 @@ struct peer_latency_measure {
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 struct syn_struct{
+	INT8 first_sync_done;				// A flag check whether the first synchronization is done. 0: no, 1: yes (Detection starts when first sync is done)
+	INT8 state;							// Synchronization state
 	INT32 init_flag; 							//int init_flag;	// 0:not init, 1:send, 2:init complete
 	UINT32 client_abs_start_time;		// Synchronized time relative to PK
-	UINT32 start_seq;							//unsigned long start_seq;
+	UINT32 start_seq;					//unsigned long start_seq;	// The sequence number received when first sync is done
 
 	//timer
 	struct timerStruct start_clock;			// The last synchronization time
@@ -1143,6 +1160,39 @@ struct quality_struct{
 	UINT32 total_chunk;							//unsigned long total_chunk;	// Number of chunks in one calculation
 };
 
+// Structure of log peer's data
+struct log_data_peer_info {
+	struct log_header_t log_header;
+	UINT32 public_ip;	
+	UINT16 public_port;	
+	UINT32 private_ip;	
+	UINT16 private_port;	
+};
+struct log_data_start_delay {
+	struct log_header_t log_header;
+	double start_delay;
+};
+struct log_data_bw {
+	struct log_header_t log_header;
+	double should_in_bw;
+	double real_in_bw;
+	double real_out_bw;
+	double quality;
+};
+struct log_data_source_delay {
+	struct log_header_t log_header;
+	double max_delay;
+	UINT32 sub_num;	
+	double av_delay[0];
+};
+
+// Structure of log topology
+struct log_topology {
+	struct log_header_t log_header;
+	UINT32 my_pid;
+	UINT32 selected_pid;
+	UINT32 manifest;
+};
 
 #define INIT 0
 #define IO_FINISH 1
@@ -1170,14 +1220,19 @@ typedef struct {
 #define CLOSE_CHANNEL		0x01	// PK will close the channel
 #define CLOSE_STREAM		0x02	// PK will close the stream
 #define	BUFFER_OVERFLOW		0x03	// The buffer in PK is full
+#define	CHANGE_PK			0x04	// PK is merged, need to restart the client
 // The followings are Sensed by peer
-#define RECV_NODATA			0x04	// Receive nothing from PK
-#define MALLOC_ERROR		0x05	// Memory allocation error
-#define MACCESS_ERROR		0x06	// Memory access error
-#define PK_SOCKET_ERROR		0x07	// connection with PK socket error
-#define PK_SOCKET_CLOSED	0x08	// connection with PK socket has been gracefully closed by PK
-#define LOG_SOCKET_ERROR	0x09	// connection with log-server socket error
-#define LOG_BUFFER_ERROR	0x0A	// The buffer stores messages sent to log-server is error
+#define RECV_NODATA			0x34	// Receive nothing from PK
+#define MALLOC_ERROR		0x35	// Memory allocation error
+#define MACCESS_ERROR		0x36	// Memory access error
+#define PK_BUILD_ERROR		0x37	// Fail to build connection with PK
+#define PK_SOCKET_ERROR		0x38	// connection with PK socket error
+#define PK_SOCKET_CLOSED	0x39	// connection with PK socket has been closed
+#define LOG_BUILD_ERROR		0x3A	// Fail to build connection with log-server
+#define LOG_SOCKET_ERROR	0x3B	// connection with log-server socket error
+#define LOG_SOCKET_CLOSED	0x3C	// connection with log-server socket has been closed
+#define LOG_BUFFER_ERROR	0x3D	// The buffer stores messages sent to log-server is error
+#define PK_TIMEOUT			0x3E	// no streams received from pk, it may happen when peer's network doesn't work 
 #define	UNKNOWN				0xFF	// Others not defined
 
 
