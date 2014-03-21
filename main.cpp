@@ -37,6 +37,7 @@
 #include "io_accept.h"
 #include "logger_client.h"
 #include "stunt_mgr.h"
+#include "register_mgr.h"
 
 #include "irc/irc_client.h"
 
@@ -608,13 +609,12 @@ int main(int argc, char **argv){
 #endif
 	
 
-
-	
+		/*
+		// DEMO test
 		int demo_flag = 0;
 		string demo_pk_ip("");
 		string demo_pk_port("");
-		/*
-		// DEMO test
+		
 		{
 			WSADATA wsaData;										// Winsock initial data
 			if(WSAStartup(MAKEWORD(2, 2),&wsaData)) {
@@ -706,6 +706,7 @@ int main(int argc, char **argv){
 		peer_mgr *peer_mgr_ptr = NULL;
 		stunt_mgr *stunt_mgr_ptr = NULL;
 		pk_mgr *pk_mgr_ptr = NULL;
+		register_mgr *register_mgr_ptr = NULL;
 		//rtmp_server *rtmp_svr = NULL;
 		//rtmp *rtmp_ptr = NULL;
 		//amf *amf_ptr = NULL; 
@@ -735,13 +736,14 @@ int main(int argc, char **argv){
 			PAUSE
 		}
 #endif
-		
-		if (demo_flag) {
-			prep->map_table["pk_ip"] = demo_pk_ip;
-			prep->map_table["pk_port"] = demo_pk_port;
-			debug_printf("PK  ip:%s port:%s \n", demo_pk_ip.c_str(), demo_pk_port.c_str());
-		}
 
+		register_mgr_ptr = new register_mgr();
+		if (register_mgr_ptr == NULL) {
+			printf("[ERROR] register_mgr_ptr new error \n");
+			PAUSE
+		}
+		
+		
 		log_ptr = new logger();
 		if (log_ptr == NULL) {
 			printf("[ERROR] log_ptr new error \n");
@@ -776,6 +778,21 @@ int main(int argc, char **argv){
 		char s[64];
 		sprintf(s,"%d",thread_key);
 #endif
+		
+		// Connect to register server
+#ifdef _FIRE_BREATH_MOD_
+		string channel_id_tmp = map_channelID_globalVar.find(thread_key)->second->map_config->find("channel_id")->second;
+		register_mgr_ptr->build_connect(atoi(channel_id_tmp.c_str()));
+#else
+		register_mgr_ptr->build_connect(10);
+#endif		
+
+
+		if (register_mgr_ptr->got_pk) {
+			prep->map_table["pk_ip"] = register_mgr_ptr->pk_ip;
+			prep->map_table["pk_port"] = register_mgr_ptr->pk_port;
+			debug_printf("PK  ip:%s port:%s \n", register_mgr_ptr->pk_ip.c_str(), register_mgr_ptr->pk_ip.c_str());
+		}
 		
 		
 		log_ptr->start_log_record(SYS_FREQ);

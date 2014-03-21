@@ -143,6 +143,7 @@
     <ClInclude Include="..\peer_communication.h" />
     <ClInclude Include="..\peer_mgr.h" />
     <ClInclude Include="..\pk_mgr.h" />
+    <ClInclude Include="..\register_mgr.h" />
     <ClInclude Include="..\stream.h" />
     <ClInclude Include="..\stream_handler.h" />
     <ClInclude Include="..\stream_handler_udp.h" />
@@ -185,6 +186,7 @@
     <ClCompile Include="..\peer_communication.cpp" />
     <ClCompile Include="..\peer_mgr.cpp" />
     <ClCompile Include="..\pk_mgr.cpp" />
+    <ClCompile Include="..\register_mgr.cpp" />
     <ClCompile Include="..\stream.cpp" />
     <ClCompile Include="..\stream_handler.cpp" />
     <ClCompile Include="..\stream_handler_udp.cpp" />

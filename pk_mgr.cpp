@@ -2306,6 +2306,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 			testingManifest &= ~manifest;
 			_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__,__LINE__,"after cut the testing substream",testingManifest,"sent to PK manifest=",pkDownInfoPtr->peerInfo.manifest | testingManifest);
 
+			_logger_client_ptr->log_to_server(LOG_TOPO_TEST_SUCCESS, parent_info->peerInfo.manifest, parent_info->peerInfo.pid);
 			_logger_client_ptr->log_to_server(LOG_RESCUE_DETECTION_TESTING_SUCCESS, manifest, 1, parent_info->peerInfo.pid);
 			send_rescueManifestToPKUpdate(pkDownInfoPtr->peerInfo.manifest | testingManifest);	// [QUESTION] send_rescueManifestToPKUpdate(0)??
 			_logger_client_ptr->log_to_server(LOG_RESCUE_CUT_PK, manifest);
@@ -2568,6 +2569,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 								_logger_client_ptr->log_to_server(LOG_RESCUE_TRIGGER, lost_Manifest);
 								_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, lost_Manifest, PK_PID);
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s \n", __FUNCTION__, __LINE__, "[RESCUE_TYPE] 0 2-second-ago-packet is lost");
 								send_rescueManifestToPK(pkDownInfoPtr ->peerInfo.manifest | testingManifest);
 
 								while (lost_Manifest) {
@@ -3482,6 +3484,7 @@ void pk_mgr::measure()
 					//這邊可能因為有些stream 正在testing 而沒有flag 因此傳出去的需要再跟testing 的合起來
 					_logger_client_ptr->log_to_server(LOG_RESCUE_TRIGGER,(connectPeerInfo->peerInfo.manifest &(~afterManifest)));
 					_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, (connectPeerInfo->peerInfo.manifest &(~afterManifest)), PK_PID);
+					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s d d \n", __FUNCTION__, __LINE__, "[RESCUE_TYPE] 1", count_N, continuous_P);
 					//_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__," old PK manifest ",pkDownInfoPtr ->peerInfo.manifest);
 					send_rescueManifestToPK(pkDownInfoPtr->peerInfo.manifest | testingManifest);
 					_log_ptr->write_log_format("s(u) s (u)(u) \n", __FUNCTION__, __LINE__, "PK's manifest + testing manifest sent to PK", pkDownInfoPtr->peerInfo.manifest, testingManifest);
@@ -4391,6 +4394,7 @@ void pk_mgr::time_handle()
 
 						_logger_client_ptr->log_to_server(LOG_RESCUE_TRIGGER, needrescueManifest);
 						_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, needrescueManifest, PK_PID);
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s \n", __FUNCTION__, __LINE__, "[RESCUE_TYPE] 2 timeout");
 						// The rescue-manifest sent to PK = original substream from PK + testingManifest
 						send_rescueManifestToPK(pkDownInfoPtr->peerInfo.manifest | testingManifest);
 
