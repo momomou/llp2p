@@ -472,6 +472,12 @@ void pk_mgr::source_delay_detection(int sock, unsigned long sub_id, unsigned int
 		if (delay_table_iter->second->delay_beyond_count > source_delay_max_times) {
 			if (pid_peerDown_info_iter->second->lastTriggerCount == 0) {
 				
+				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s d s d d \n", __FUNCTION__, __LINE__,
+																					"[RESCUE_TYPE] 3 ",
+																					delay_table_iter->second->delay_beyond_count,
+																					">",
+																					source_delay_max_times,
+																					MAX_DELAY);
 				_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__,
 																"Rescue triggered. delay_beyond_count", delay_table_iter->second->delay_beyond_count,
 																">", source_delay_max_times);
@@ -493,7 +499,7 @@ void pk_mgr::source_delay_detection(int sock, unsigned long sub_id, unsigned int
 																 "pid ",pid_peerDown_info_iter->second->peerInfo.pid,
 																 "need cut substream id", sub_id);
 
-
+				
 				// If this substream is from PK, we have no idea to rescue it. Else, find this substream's
 				// parent, and cut the testing substream from it(if have testing substream from it). If cannot find 
 				// testing substream, cut other normal substream
@@ -1664,7 +1670,7 @@ int pk_mgr::handle_pkt_in(int sock)
 				ssDetect_ptr[substream_id].isTesting = FALSE;
 			}
 		}
-		
+		_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, pkDownInfoPtr->peerInfo.manifest | chunk_seed_notify->manifest, PK_PID);
 		set_parent_manifest(pkDownInfoPtr, pkDownInfoPtr->peerInfo.manifest | chunk_seed_notify->manifest);
 		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "Change PK's manifest to =", pkDownInfoPtr->peerInfo.manifest);
 	}
@@ -2266,7 +2272,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 		parent_pid != PK_PID &&  
 		check_rescue_state(substream_id, 2)) {
 
-		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "case 3");
+		_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "case 3", ssDetect_ptr[substream_id].testing_count++, PARAMETER_M*Xcount);
 		debug_printf("Test-delay state ... \n");
 		
 		ssDetect_ptr[substream_id].testing_count++;
@@ -2308,7 +2314,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 
 			_logger_client_ptr->log_to_server(LOG_TOPO_TEST_SUCCESS, parent_info->peerInfo.manifest, parent_info->peerInfo.pid);
 			_logger_client_ptr->log_to_server(LOG_RESCUE_DETECTION_TESTING_SUCCESS, manifest, 1, parent_info->peerInfo.pid);
-			send_rescueManifestToPKUpdate(pkDownInfoPtr->peerInfo.manifest | testingManifest);	// [QUESTION] send_rescueManifestToPKUpdate(0)??
+			send_rescueManifestToPKUpdate(pkDownInfoPtr->peerInfo.manifest | testingManifest);
 			_logger_client_ptr->log_to_server(LOG_RESCUE_CUT_PK, manifest);
 			_logger_client_ptr->log_to_server(LOG_RESCUE_DATA_COME, manifest);
 
@@ -2452,11 +2458,12 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	// leastCurrDiff = latest received sequence number so far - latest sequence number sent to player
 	// Check whether packet is lost or not in buf_chunk_t[]
 	leastCurrDiff = _least_sequence_number - _current_send_sequence_number;
+	//debug_printf("-------------- %d %d %d \n", leastCurrDiff, _least_sequence_number, _current_send_sequence_number);
 	_log_ptr->write_log_format("s(u) d u u \n", __FUNCTION__, __LINE__, leastCurrDiff, _least_sequence_number, _current_send_sequence_number);
 	if (leastCurrDiff < 0) {
 		exit_code = UNKNOWN;
 		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s d u u \n", "[ERROR] leastCurrDiff < 0.", leastCurrDiff, _least_sequence_number, _current_send_sequence_number);
-		debug_printf("[ERROR] leastCurrDiff < 0. %d %u %u \n", leastCurrDiff, _least_sequence_number, _current_send_sequence_number);
+		debug_printf("[ERROR] leastCurrDiff < 0. %d %u %u %d %d \n", leastCurrDiff, _least_sequence_number, _current_send_sequence_number, Xcount, pkt_count);
 		_log_ptr->write_log_format("s(u) s d u u \n", __FUNCTION__, __LINE__, "[ERROR] leastCurrDiff < 0.", leastCurrDiff, _least_sequence_number, _current_send_sequence_number);
 		*(_net_ptr->_errorRestartFlag) = RESTART;
 		_logger_client_ptr->log_exit();
@@ -2475,8 +2482,10 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	}
 	
 	/// 封包太晚到，超過兩秒(與目前為止收到最新的sequence相比)
-	// Skip the 2-second-ago-packet and suppose it is lost. Forward "_current_send_sequence_number" until point to the existing packet
+	// Skip the 2-second-ago-packet and suppose it is lost.
 	for ( ; leastCurrDiff > (int)(Xcount * PARAMETER_X * BUFF_SIZE); _current_send_sequence_number++) {
+		
+		leastCurrDiff = _least_sequence_number - _current_send_sequence_number;
 		
 		// If 2-second-ago-packet is lost 
 		if ((**(buf_chunk_t + (_current_send_sequence_number % _bucket_size))).header.sequence_number != _current_send_sequence_number) {
@@ -2607,7 +2616,7 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[WARNING] Piles up too much chunk in the buffer", Xcount*PARAMETER_X*BUFF_SIZE);
 		}
 		//_current_send_sequence_number++;
-		leastCurrDiff = _least_sequence_number - _current_send_sequence_number;
+		//leastCurrDiff = _least_sequence_number - _current_send_sequence_number;
 	}
 	
 	// Evaluate the quality
@@ -2617,7 +2626,8 @@ void pk_mgr::handle_stream(struct chunk_t *chunk_ptr, int sockfd)
 	} 
 
 	//正常傳輸丟給player 在這個for 底下給的seq下的一定是有方向性的
-	for ( ; _current_send_sequence_number < _least_sequence_number; ) {
+	// Reserve 5 packets in client-program
+	for ( ; _current_send_sequence_number < (_least_sequence_number-5); ) {
 
 		//_current_send_sequence_number 指向的地方還沒到 ,不做處理等待並return
 		if ((**(buf_chunk_t + (_current_send_sequence_number % _bucket_size))).header.sequence_number != _current_send_sequence_number) {
