@@ -137,12 +137,7 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 	map_fd_nonblocking_ctl[sock] = Nonblocking_Buff_ptr ;
 
 	if (!Nonblocking_Buff_ptr || !queue_out_ctrl_ptr || !queue_out_data_ptr) {
-		_pk_mgr_ptr->exit_code = MALLOC_ERROR;
-		debug_printf("peer::handle_connect  new error \n");
-		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "peer::handle_connect   new error");
-		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s \n", __FUNCTION__, __LINE__, "peer::handle_connect new error \n");
-		_logger_client_ptr->log_exit();
-		PAUSE
+		_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::handle_connect  new error", __FUNCTION__, __LINE__);
 	}
 
 	memset(Nonblocking_Buff_ptr, 0, sizeof(Nonblocking_Buff));
@@ -152,12 +147,7 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 
 		rescue_peer = new struct peer_info_t;
 		if (!rescue_peer) {
-			_pk_mgr_ptr->exit_code = MALLOC_ERROR;
-			debug_printf("peer::handle_connect  new error \n");
-			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__,__LINE__," peer::handle_connect   new error");
-			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s \n", __FUNCTION__, __LINE__, "peer::handle_connect new error \n");
-			_logger_client_ptr->log_exit();
-			PAUSE
+			_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::handle_connect  new error", __FUNCTION__, __LINE__);
 		}
 		memset(rescue_peer, 0, sizeof(struct peer_info_t));
 		
@@ -171,15 +161,9 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "rescue_peer->pid =", rescue_peer->pid);
 	}
 	else {
-		_pk_mgr_ptr->exit_code = UNKNOWN;
-		debug_printf("fd error why dup\n");
-		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] fd error why dup");
 		debug_printf("rescue_peer->pid = %d  socket = %d\n",chunk_request_ptr->info.pid,sock);
-		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[ERROR] rescue_peer->pid =", chunk_request_ptr->info.pid);
 		data_close(sock,"close_by peer com", CLOSE_CHILD);
-		*(_net_ptr->_errorRestartFlag) = RESTART;
-		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "[ERROR] fd error why dup", __LINE__);
-		_logger_client_ptr->log_exit();
+		_pk_mgr_ptr->handle_error(UNKNOWN, "[ERROR] fd error why dup", __FUNCTION__, __LINE__);
 		
 		map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
 		map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
@@ -194,7 +178,7 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 
 		}
 
-		PAUSE
+		//PAUSE
 	}
 }
 
@@ -217,12 +201,7 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 		queue_out_data_ptr = new std::queue<struct chunk_t *>;
 		Nonblocking_Buff * Nonblocking_Buff_ptr = new Nonblocking_Buff;
 		if (!Nonblocking_Buff_ptr || !queue_out_ctrl_ptr || !queue_out_data_ptr) {
-			_pk_mgr_ptr->exit_code = MALLOC_ERROR;
-			debug_printf("peer::handle_connect  new error \n");
-			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] peer::handle_connect   new error");
-			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "peer::handle_connect  new error", __LINE__);
-			_logger_client_ptr->log_exit();
-			PAUSE
+			_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::handle_connect  new error", __FUNCTION__, __LINE__);
 		}
 		memset(Nonblocking_Buff_ptr, 0, sizeof(Nonblocking_Buff));
 		map_fd_nonblocking_ctl[sock] = Nonblocking_Buff_ptr ;
@@ -244,12 +223,7 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 
 		chunk_request_ptr = (struct chunk_request_msg_t *)new unsigned char[sizeof(struct chunk_request_msg_t)];
 		if (!chunk_request_ptr) {
-			_pk_mgr_ptr->exit_code = MALLOC_ERROR;
-			debug_printf("peer::chunk_request_ptr  new error \n");
-			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] peer::chunk_request_ptr   new error");
-			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "[ERROR] peer::chunk_request_ptr   new error", __LINE__);
-			_logger_client_ptr->log_exit();
-			PAUSE
+			_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::chunk_request_ptr  new error", __FUNCTION__, __LINE__);
 		}
 		memset(chunk_request_ptr, 0, sizeof(struct chunk_request_msg_t));
 
@@ -358,12 +332,7 @@ int peer::handle_pkt_in(int sock)
 		}
 	}
 	else {
-		_pk_mgr_ptr->exit_code = MACCESS_ERROR;
-		debug_printf("Nonblocking_Buff_ptr NOT FIND \n");
-		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "Nonblocking_Buff_ptr NOT FIND");
-		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "Nonblocking_Buff_ptr NOT FIND", __LINE__);
-		_logger_client_ptr->log_exit();
-		PAUSE
+		_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] Nonblocking_Buff_ptr NOT FIND", __FUNCTION__, __LINE__);
 		return RET_SOCK_ERROR;
 	}
 
@@ -371,12 +340,7 @@ int peer::handle_pkt_in(int sock)
 		if (Nonblocking_Recv_ptr->recv_packet_state == READ_HEADER_READY) {
 			chunk_header_ptr = (struct chunk_header_t *)new unsigned char[sizeof(chunk_header_t)];
 			if (!chunk_header_ptr) {
-				_pk_mgr_ptr->exit_code = MALLOC_ERROR;
-				debug_printf("peer::chunk_header_ptr  new error \n");
-				_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, " peer::chunk_header_ptr   new error");
-				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "peer::chunk_header_ptr  new error", __LINE__);
-				_logger_client_ptr->log_exit();
-				PAUSE
+				_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::chunk_header_ptr  new error", __FUNCTION__, __LINE__);
 			}
 			memset(chunk_header_ptr, 0, sizeof(struct chunk_header_t));
 
@@ -394,12 +358,7 @@ int peer::handle_pkt_in(int sock)
 			
 			chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
 			if (!chunk_ptr) {
-				_pk_mgr_ptr->exit_code = MALLOC_ERROR;
-				debug_printf("peer::chunk_ptr  new error \n");
-				_log_ptr->write_log_format("s(u) s \n", __FUNCTION__,__LINE__," peer::chunk_ptr   new error");
-				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "peer::chunk_ptr  new error", __LINE__);
-				_logger_client_ptr->log_exit();
-				PAUSE
+				_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::chunk_ptr  new error", __FUNCTION__, __LINE__);
 			}
 
 			memset(chunk_ptr, 0, buf_len);
@@ -478,13 +437,7 @@ int peer::handle_pkt_in(int sock)
 				queue_out_ctrl_ptr = fd_queue_iter ->second;
 			}
 			else {
-				_pk_mgr_ptr->exit_code = MACCESS_ERROR;
-				debug_printf("fd not here\n");
-				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__, __LINE__, "fd not here");
-				*(_net_ptr->_errorRestartFlag) = RESTART;
-				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "fd not here", __LINE__);
-				_logger_client_ptr->log_exit();
-				PAUSE
+				_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] fd not here", __FUNCTION__, __LINE__);
 				return RET_OK;
 			}
 
@@ -545,12 +498,7 @@ int peer::handle_pkt_in(int sock)
 
 									peerDownInfoPtr = new struct peer_connect_down_t ;
 									if (!peerDownInfoPtr) {
-										_pk_mgr_ptr->exit_code = MALLOC_ERROR;
-										debug_printf("peer::peerDownInfoPtr  new error \n");
-										_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__," peer::peerDownInfoPtr new error");
-										_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] peer::peerDownInfoPtr new error");
-										_logger_client_ptr->log_exit();
-										PAUSE
+										_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::peerDownInfoPtr  new error", __FUNCTION__, __LINE__);
 									}
 
 									memset(peerDownInfoPtr, 0, sizeof(struct peer_connect_down_t));
@@ -697,12 +645,7 @@ int peer::handle_pkt_in(int sock)
 						_pk_mgr_ptr ->clear_map_pid_peer_info(replyManifest);
 					}
 					else {
-						_pk_mgr_ptr->exit_code = MACCESS_ERROR;
-						debug_printf("pid_peer_info_iter not found \n");
-						_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "pid_peer_info_iter not found");
-						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "pid_peer_info_iter not found", __LINE__);
-						_logger_client_ptr->log_exit();
-						PAUSE
+						_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] pid_peer_info_iter not found", __FUNCTION__, __LINE__);
 					}
 				}
 
@@ -724,13 +667,7 @@ int peer::handle_pkt_in(int sock)
 		_pk_mgr_ptr->send_capacity_to_pk(_pk_mgr_ptr->_sock);
 	} 
 	else {
-		_pk_mgr_ptr->exit_code = UNKNOWN;
-		debug_printf("Unknown header.cmd %d \n", chunk_ptr->header.cmd);
-		_log_ptr->write_log_format("s =>u s d \n", __FUNCTION__, __LINE__, "Unknown header.cmd %d", chunk_ptr->header.cmd);
-		*(_net_ptr->_errorRestartFlag) =RESTART;
-		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s d u \n", "Unknown header.cmd", chunk_ptr->header.cmd, __LINE__);
-		_logger_client_ptr->log_exit();
-		PAUSE
+		_pk_mgr_ptr->handle_error(UNKNOWN, "[ERROR] Unknown header.cmd", __FUNCTION__, __LINE__);
 	}
 
 	if (chunk_ptr) {
@@ -819,13 +756,7 @@ int peer::handle_pkt_out(int sock)
 			peerInfoPtr = map_pid_rescue_peer_info_iter ->second ;
 		}
 	}else{
-		_pk_mgr_ptr->exit_code = MACCESS_ERROR;
-		debug_printf("map_fd_pid NOT FIND \n");
-		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"map_fd_pid NOT FIND");
-		*(_net_ptr->_errorRestartFlag) =RESTART;
-		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "map_fd_pid NOT FIND", __LINE__);
-		_logger_client_ptr->log_exit();
-		PAUSE
+		_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] map_fd_pid NOT FIND", __FUNCTION__, __LINE__);
 		return RET_SOCK_ERROR;
 	}
 	//////////////////////////////////////////////////////////////
@@ -894,21 +825,11 @@ int peer::handle_pkt_out(int sock)
 							map<int , unsigned long>::iterator detect_map_fd_pid_iter;
 							detect_map_fd_pid_iter = map_fd_pid.find(sock);
 							if(detect_map_fd_pid_iter == map_fd_pid.end()){
-								_pk_mgr_ptr->exit_code = MACCESS_ERROR;
-								debug_printf("[ERROR] can not find fd pid in source_delay_detection\n");
-								_log_ptr->write_log_format("s =>u s \n", __FUNCTION__, __LINE__, "[ERROR] can not find fd pid in source_delay_detection");
-								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "[ERROR] can not find fd pid in source_delay_detection", __LINE__);
-								_logger_client_ptr->log_exit();
-								PAUSE
+								_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] Cannot find fd pid in source_delay_detection", __FUNCTION__, __LINE__);
 							}
 							pid_peerDown_info_iter = _pk_mgr_ptr->map_pid_peerDown_info.find(detect_map_fd_pid_iter->second);
 							if(pid_peerDown_info_iter == _pk_mgr_ptr->map_pid_peerDown_info.end()){
-								_pk_mgr_ptr->exit_code = MACCESS_ERROR;
-								debug_printf("[ERROR] can not find pid peerinfo in source_delay_detection\n");
-								_log_ptr->write_log_format("s =>u s \n", __FUNCTION__, __LINE__, "[ERROR] can not find pid peerinfo in source_delay_detection");
-								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "[ERROR] can not find pid peerinfo in source_delay_detection", __LINE__);
-								_logger_client_ptr->log_exit();
-								PAUSE
+								_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] Cannot find pid peerinfo in source_delay_detection", __FUNCTION__, __LINE__);
 							}
 							if (pid_peerDown_info_iter->second->peerInfo.manifest == 0) {
 								map<unsigned long, int>::iterator iter = map_in_pid_fd.find(pid_peerDown_info_iter ->first) ;
@@ -916,11 +837,7 @@ int peer::handle_pkt_out(int sock)
 									data_close(map_in_pid_fd[pid_peerDown_info_iter ->first], "manifest=0", CLOSE_PARENT) ;
 								}
 								else{
-									_pk_mgr_ptr->exit_code = MACCESS_ERROR;
-									_log_ptr->write_log_format("s =>u s \n", __FUNCTION__, __LINE__, "[DEBUG] set parent manifest=0 but cannot find this parent's pid in map_in_pid_fd");
-									_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "[DEBUG] set parent manifest=0 but cannot find this parent's pid in map_in_pid_fd", __LINE__);
-									_logger_client_ptr->log_exit();
-									PAUSE
+									_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] Set parent manifest=0 but cannot find this parent's pid in map_in_pid_fd", __FUNCTION__, __LINE__);
 								}
 							}
 						}
@@ -1374,24 +1291,14 @@ void peer::data_close(int cfd, const char *reason ,int type)
 			debug_printf("test1 \n");
 		}
 		else {
-			_pk_mgr_ptr->exit_code = MACCESS_ERROR;
-			debug_printf("peer:: not parent and not children\n");
-			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"peer:: not parent and not children");
-			*(_net_ptr->_errorRestartFlag) =RESTART;
-			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "peer:: not parent and not children", __LINE__);
-			_logger_client_ptr->log_exit();
-			PAUSE
+			_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] peer:: not parent and not children", __FUNCTION__, __LINE__);
 		}
 		debug_printf("test2 \n");
 		map_fd_pid.erase(map_fd_pid_iter);		// 這行(這附近)曾發生segmentation fault
 		debug_printf("test3 \n");
 	}
 	else {
-		_pk_mgr_ptr->exit_code = MACCESS_ERROR;
-		debug_printf("peer:: CLOSE map_fd_pid not find why \n");
-		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "peer:: CLOSE map_fd_pid not find why", __LINE__);
-		_logger_client_ptr->log_exit();
-		PAUSE
+		_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] peer:: CLOSE map_fd_pid not find why", __FUNCTION__, __LINE__);
 	}
 }
 

@@ -23,9 +23,8 @@ void network::setall_fd_epollout()
 
 void network::garbage_collection() 
 {
-	
 	if (_map_fd_bc_tbl.size()) {
-		for(_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin() ; _map_fd_bc_tbl_iter != _map_fd_bc_tbl.end() ; _map_fd_bc_tbl_iter++) {
+		for(_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin() ; _map_fd_bc_tbl_iter != _map_fd_bc_tbl.end() ;) {
 			if(close(_map_fd_bc_tbl_iter->first) == -1){
 				printf("_map_fd_bc_tbl_iter error");
 				//PAUSE
@@ -46,7 +45,6 @@ void network::garbage_collection()
 #else
 	::close(epfd);
 #endif
-
 }
 
 
@@ -73,7 +71,8 @@ unsigned long network::getLocalIpv4()
 				ip = ((struct sockaddr_in *)AI->ai_addr)->sin_addr.s_addr;
 				struct in_addr localIP;
 				memcpy(&localIP, &ip, sizeof(struct in_addr));
-				cout << "network::getLocalIpv4 ip:" << inet_ntoa(localIP) << "\n";
+				//cout << "network::getLocalIpv4 ip:" << inet_ntoa(localIP) << "\n";
+				debug_printf("network::getLocalIpv4 ip: %s \n", inet_ntoa(localIP));
 				return ip; // 找到，提早返回 
 		}
 	}
@@ -429,7 +428,7 @@ int network::close(int sock)
 	
 	epoll_control(sock, EPOLL_CTL_DEL, 0);
 	
-	::shutdown(sock, SHUT_RDWR);
+	debug_printf("shutdown: %d \n", ::shutdown(sock, SHUT_RDWR));
 #ifdef _WIN32
 	::closesocket(sock);
 	return 0;

@@ -15,7 +15,6 @@ configuration::configuration() : filename(""), tmp_only(true)
 
 configuration::configuration(string file) : filename(file), tmp_only(false) 
 {
-	printf("-111 \n");
 #ifdef _FIRE_BREATH_MOD_
 	map_table["bucket_size"] = "8192";
 	map_table["channel_id"] = "0";
@@ -32,11 +31,8 @@ configuration::configuration(string file) : filename(file), tmp_only(false)
 	map_table["svc_tcp_port"] = "5566";
 	map_table["svc_udp_port"] = "7788";
 #else
-	printf("-222 \n");
 	fstream fh(filename.c_str(), fstream::in);
-	printf("-333 \n");
 	if (fh.is_open()) {
-		printf("-444 \n");
 		string linebuf;
 		while(getline(fh, linebuf)) {
 			size_t pos;                                     // we don't need initial this value

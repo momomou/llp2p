@@ -16,11 +16,11 @@
 #define DEBUG2
 #endif
 */
-/*
+
 #ifndef WRITE_LOG
 #define WRITE_LOG		// write log.txt
 #endif
-*/
+
 #ifndef SEND_LOG_DEBUG
 #define SEND_LOG_DEBUG	// Allow to send CHNK_CMD_LOG_DEBUG to log-server
 #endif

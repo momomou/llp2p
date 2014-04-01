@@ -113,6 +113,7 @@ void signal_handler(int sig)
 			break;
 		case SIGINT:
 			srv_shutdown = 1;
+			system("PAUSE");
 			//errorRestartFlag = 1;
 			//logger_client_ptr->log_exit();
 			break;
@@ -582,7 +583,11 @@ int mainFunction(int thread_key){
 #else
 int main(int argc, char **argv){
 #endif
-	
+
+	cout << "tst_speed_svr " << version << " (Compiled Time: "__DATE__ << " "__TIME__")" << endl << endl;
+
+	FILE *record_file_fp2 = NULL;
+	record_file_fp2 = fopen("file", "wb");
 	/*
 	printf("sizeof(int): %d \n", sizeof(int));
 	printf("sizeof(long): %d \n", sizeof(long));
@@ -802,11 +807,11 @@ int main(int argc, char **argv){
 		prep->read_key("svc_udp_port", svc_udp_port);
 		prep->read_key("stream_local_port", stream_local_port);
 
-		cout << "html_size=" << html_size << endl;
-		cout << "svc_tcp_port=" << svc_tcp_port << endl;
-		cout << "svc_udp_port=" << svc_udp_port << endl;
-		cout << "stream_local_port=" << stream_local_port << endl;
-		
+		debug_printf("html_size = %d \n", html_size);
+		debug_printf("svc_tcp_port = %s \n", svc_tcp_port.c_str());
+		debug_printf("svc_udp_port = %s \n", svc_udp_port.c_str());
+		debug_printf("stream_local_port = %s \n", stream_local_port.c_str());
+
 #ifdef _FIRE_BREATH_MOD_
 		pk_mgr_ptr = new pk_mgr(html_size, map_channelID_globalVar[thread_key]->fd_list, net_ptr , log_ptr , prep , logger_client_ptr, stunt_mgr_ptr);
 #else
@@ -815,7 +820,9 @@ int main(int argc, char **argv){
 		if (!pk_mgr_ptr) {
 			printf("pk_mgr_ptr error !!!!!!!!!!!!!!!\n");
 		}
-
+		
+		pk_mgr_ptr->record_file_fp = record_file_fp2;
+		
 		net_ptr->epoll_creater();
 		//log_ptr->start_log_record(SYS_FREQ);
 
@@ -964,7 +971,7 @@ int main(int argc, char **argv){
 		
 		net_ptr->set_nonblocking(svc_fd_tcp);
 
-		cout << "tst_speed_svr " << version << " (Compiled Time: "__DATE__ << " "__TIME__")" << endl;
+		
 		log_ptr->write_log_format("s(u) s (s)\n", __FUNCTION__, __LINE__, "PF", "ready now");
 
 		if (!log_ptr->check_arch_compatible()) {
@@ -1148,6 +1155,8 @@ int main(int argc, char **argv){
 #else
 		errorRestartFlag =0;
 #endif
+
+		PAUSE
 
 	}
 

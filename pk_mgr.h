@@ -159,6 +159,7 @@ public:
 
 	void handle_stream(struct chunk_t *chunk_ptr, int sockfd);
 	void handle_kickout(struct chunk_t *chunk_ptr, int sockfd);
+	void handle_error(int exit_code, char *msg, char *func, unsigned int line);
 
 ///new rescue function
 	//	void handleAppenSelfdPid(struct chunk_t *chunk_ptr );
