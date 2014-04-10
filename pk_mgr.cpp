@@ -3136,7 +3136,7 @@ void pk_mgr::measure()
 		//找出統計最多的值
 		for (int i = 1; i < sub_stream_num+1; i++) {
 			if (tempMax < statsArryCount_ptr[i]) {
-				tempMax = statsArryCount_ptr[i];	// tempMax = statsArryCount_ptr[k];
+				tempMax = statsArryCount_ptr[i];
 				rescueSS = i;
 			}
 		}
