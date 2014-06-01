@@ -35,9 +35,20 @@
 #define RECORD_FILE	// Allow to record received message
 #endif
 */
+/*
+#ifndef STUNT_FUNC
+#define STUNT_FUNC	// Allow to record received message
+#endif
+*/
 // Role of function caller
 #define RESCUE_PEER		0	// the function caller is child
 #define CANDIDATE_PEER	1	// the function caller is parent
+
+// Substream states
+#define SS_INIT			0	// The substream is in join state when not receive the first data
+#define SS_STABLE		1	// The substream is in normal state
+#define SS_RESCUE		2	// The substream is in rescue state
+#define SS_TEST			3	// The substream is in test state
 
 
 #define FD_SETSIZE		2048
@@ -48,28 +59,28 @@
 
 ////resuce PARAMETER////
 #define PARAMETER_X		4				// chunk packets per (1000/PARAMETER_X) ms
-#define MAX_DELAY 		20000			// source delay PARAMETER ms
+#define MAX_DELAY 		2000			// source delay PARAMETER ms
 #define SOURCE_DELAY_CONTINUOUS 0.5		// The maximal permissive times that souce-delay is bigger than MAX_DELAY. SOURCE_DELAY_CONTINUOUS * x(packets/s) / substream
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue(頻寬檢查)
-#define PARAMETER_M		8
-#define PARAMETER_N		5
-#define PARAMETER_P		3
+#define PARAMETER_M		16		// 8
+#define PARAMETER_N		10		// 5
+#define PARAMETER_P		6		// 3
 
 // LOG SERVER
 #define LOGPORT		8754
 #define LOGIP		"140.114.90.154"
 //ms
-#define CONNECT_TIME_OUT	4000
+#define CONNECT_TIME_OUT	2000
 #define NETWORK_TIMEOUT		5000		// Period of check peer's unnormal disconnection
 #define BASE_RESYN_TIME		20000
 
-
+#define NEEDSOURCE_THRESHOLD	0.96	// substream在stable或有duplicate source狀態的數目 / 全部substream數目, 超過這個threshold可以不必向pk要source
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
 // BUFF_SIZE sec
 #define BUFF_SIZE		2
 //CHUNK_LOSE sec, mean lose about CHUNK_LOSE sec packet
-#define CHUNK_LOSE		2	//
+#define CHUNK_LOSE		0.5	//
 
 
 
@@ -234,9 +245,9 @@ using std::bitset;
 // Defined Macro
 #define PAUSE for (;;) { cout << "PAUSE , Press any key to continue..." << __FUNCTION__ << ":" << __LINE__; fgetc(stdin); }
 #ifdef DEBUG
-    #define debug_printf(str, ...) do { printf("(%d)\t", __LINE__); printf(str, __VA_ARGS__); } while (0)
+    #define debug_printf(...) do { printf("(%d)\t", __LINE__); printf(__VA_ARGS__); } while (0)
 #else
-    #define debug_printf(str, ...)
+    #define debug_printf(str...)
 #endif
 #ifdef DEBUG2
     #define debug_printf2(str, ...) do { printf("(%d)\t", __LINE__); printf(str, __VA_ARGS__); } while (0)
@@ -257,6 +268,11 @@ using std::bitset;
 	typedef uint16_t    UINT16;
 	typedef uint32_t    UINT32;
 	typedef uint64_t    UINT64;
+	typedef char 		CHAR;
+	typedef int			SOCKET;
+	#define	FALSE		0
+	#define TRUE		1
+	#define MAX_PATH	260
 #endif
 
 
@@ -354,7 +370,9 @@ using std::bitset;
 
 struct timerStruct{
 	volatile UINT32 clockTime;			//volatile unsigned long clockTime;
+#ifdef _WIN32	
 	LARGE_INTEGER tickTime;
+#endif
 	volatile UINT32 initTickFlag;		//volatile unsigned initTickFlag;
 	volatile UINT32 initClockFlag;		//volatile unsigned initClockFlag;
 };
@@ -639,6 +657,7 @@ struct rescue_pkt_from_server{
 	UINT32 pid;									//unsigned long pid;
 	UINT32 manifest;							//unsigned long manifest;
 	UINT32 rescue_seq_start;					//unsigned int rescue_seq_start;
+	UINT32 need_source;	
 };
 
 
@@ -655,7 +674,9 @@ struct chunk_register_reply_t {
 	UINT32 sub_stream_num;						//unsigned long sub_stream_num;
 	UINT32 public_ip;							//unsigned long public_ip;
 	UINT32 inside_lane_rescue_num;				//unsigned long inside_lane_rescue_num;
-	struct level_info_t *level_info[0];	
+	UINT32 is_seed;
+	UINT32 pkt_rate;
+	struct level_info_t *level_info[0];
 };
 
 /*
@@ -809,7 +830,7 @@ struct peer_latency_measure {
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
 struct syn_struct{
-	INT8 first_sync_done;				// A flag check whether the first synchronization is done. 0: no, 1: yes (Detection starts when first sync is done)
+	bool first_sync_done;				// A flag check whether the first synchronization is done (Detection starts when first sync is done)
 	INT8 state;							// Synchronization state
 	INT32 init_flag; 							//int init_flag;	// 0:not init, 1:send, 2:init complete
 	UINT32 client_abs_start_time;		// Synchronized time relative to PK
@@ -819,8 +840,14 @@ struct syn_struct{
 	struct timerStruct start_clock;			// The last synchronization time
 };
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
+
+
+
+/************************************************************/
+/*		Structures of Substream Information	(2014/4/25)		*/
+/************************************************************/
 struct source_delay {
-	UINT32 source_delay_time;					//unsigned int source_delay_time;
+	INT32 source_delay_time;					//unsigned int source_delay_time;	// Current source delay
 	//timer
 	struct timerStruct client_end_time;
 	UINT32 end_seq_num;							//unsigned long end_seq_num;	// The first received packet sequence of a substream
@@ -829,8 +856,49 @@ struct source_delay {
 	INT32 rescue_state;						//int rescue_state;		//0 normal 1 rescue trigger 2 testing
 	INT32 delay_beyond_count;					//int delay_beyond_count;	// Counter++ if delay more than MAX_DELAY
 };
+
+struct substream_data {
+	struct timerStruct lastAlarm;		// 每一次處理rescue_detecion()結束的時刻
+	struct timerStruct firstAlarm;		// count_X = 1 的時刻 
+	struct timerStruct previousAlarm;	// count_X = Xcount-1 的時刻 
+
+	UINT32 last_timestamp;				//unsigned int	last_timestamp;	// 每一次處理rescue_detecion()結束的timestamp
+	UINT32 first_timestamp;				//unsigned int	first_timestamp;	// count_X = 1 時刻的 timestamp
+	UINT32 last_seq;					//unsigned long	last_seq;	// 每一次處理rescue_detecion()結束的seq
+
+	UINT32 measure_N;					//unsigned int	measure_N;		//第N次測量
+	UINT32 count_X;						//unsigned int	count_X;		//X個封包量一次
+
+	UINT32 total_buffer_delay;			//unsigned int	total_buffer_delay;		// 兩個連續封包之間的最大 source-delay
+	double total_source_bitrate;			// 從 count_X = 1 累積到 count_X = Xcount 的 sourceBitrate
+	double total_local_bitrate;			// 從 count_X = 1 累積到 count_X = Xcount 的 localBitrate
+	UINT32 total_byte;					//unsigned int	total_byte;
+	INT32 isTesting;					//int				isTesting;
+	UINT32 testing_count;				//unsigned int	testing_count;	//用來測試rescue 的計數器
+	UINT32 previousParentPID;			//unsigned		previousParentPID;
+};
+
+struct substream_state {
+	UINT32 state;						// The substream state
+	bool is_testing;					// Set true when receive the packet from a parent in SS_RESCUE, and set false when test-delay success
+	bool dup_src;						// A flag whether the peer needs source from pk when in SS_RESCUE and SS_TEST state
+};
+
+struct substream_info {
+	bool first_pkt_received;
+	bool timeout_flag;					
+	UINT32 first_pkt_seq;						// Record the first packet
+	UINT32 latest_pkt_seq;						// The latest packet received so far
+	struct timerStruct latest_pkt_client_time;	// The time when the latest packet received in local time
+	UINT32 latest_pkt_timestamp;				// The timestamp of the latest packet
+	struct substream_state state;
+	struct source_delay source_delay_table;
+	struct substream_data data;
+	UINT32 current_parent_pid;					// The current parent pid
+	UINT32 previous_parent_pid;					
+};
 /****************************************************/
-/*		Structures of synchronization				*/
+/*		Structures of Synchronization				*/
 /****************************************************/
 struct syn_token_send {
 	struct chunk_header_t header;
@@ -945,15 +1013,24 @@ struct fd_information {
 };
 
 typedef struct _XconnInfo {
+#ifdef _WIN32
 	SOCKET sServer;
 	SOCKET sPeer;
+#else
+	INT32 sServer;
+	INT32 sPeer;
+#endif
 	INT8 myId[MAX_ID_LEN + 1];					//char myId[MAX_ID_LEN + 1];
 	INT8 peerId[MAX_ID_LEN + 1];				//char peerId[MAX_ID_LEN + 1];
 	INT32 flag;									//int flag;
 } XconnInfo;
 
 struct nat_con_thread_struct {
+#ifdef _WIN32
 	HANDLE hThread;
+#else
+	void *hThread;
+#endif
 	UINT32 threadID;							//unsigned threadID;
 	UINT32 manifest;							//unsigned long manifest;
 	UINT32 pid;									//unsigned long pid;
@@ -1221,6 +1298,7 @@ typedef struct {
 #define CLOSE_STREAM		0x02	// PK will close the stream
 #define	BUFFER_OVERFLOW		0x03	// The buffer in PK is full
 #define	CHANGE_PK			0x04	// PK is merged, need to restart the client
+#define	FAILED_SERVICE		0x05	// Current PK cannot service, need to reconnect to Register Server for another PK
 // The followings are Sensed by peer
 #define RECV_NODATA			0x34	// Receive nothing from PK
 #define MALLOC_ERROR		0x35	// Memory allocation error
@@ -1233,6 +1311,7 @@ typedef struct {
 #define LOG_SOCKET_CLOSED	0x3C	// connection with log-server socket has been closed
 #define LOG_BUFFER_ERROR	0x3D	// The buffer stores messages sent to log-server is error
 #define PK_TIMEOUT			0x3E	// no streams received from pk, it may happen when peer's network doesn't work 
+#define SOCKET_ERROR		0x3F
 #define	UNKNOWN				0xFF	// Others not defined
 
 

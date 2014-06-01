@@ -137,10 +137,10 @@ INT32 tcp_punch::XInit(const char* pchIP1, const char* pchIP2, SOCKET* psServerL
 	//receive the server version from server
 	log_on_read_error(*psServerLog, (char*)&nServerVersion, sizeof(nServerVersion), "Receiving server version", LAB_ERR_RECEIVE);
 	g_nServerVersion = ntohl(nServerVersion);
-	if (ntohl(nServerVersion) != g_Fingerprint.nServerVer) {
+	if ((INT32)ntohl(nServerVersion) != g_Fingerprint.nServerVer) {
 		g_Fingerprint.nDone = false;
 	}
-	printf("[XInit] nServerVersion: %d  %d \n", ntohl(nServerVersion));
+	printf("[XInit] nServerVersion: %d \n", ntohl(nServerVersion));
 	
 	//receive the client IP from server
 	log_on_read_error(*psServerLog, (char*)&g_nClientIP, sizeof(g_nClientIP), "Receiving client IP", LAB_ERR_RECEIVE);
@@ -1012,6 +1012,7 @@ LAB_ERR:
  ***********************************************************************/
 INT32 tcp_punch::XTryConnect(SOCKET sServerLog, SOCKET sAuxServer, struct sockaddr *pAddrPeer, INT32 nAddrPeerLen, INT32 nMiliSec) 
 {
+#ifdef _WIN32
 	int time1 = GetTickCount();
 	struct sockaddr_in AnyAddr;
     INT32 nRetVal = 0;
@@ -1058,7 +1059,7 @@ INT32 tcp_punch::XTryConnect(SOCKET sServerLog, SOCKET sAuxServer, struct sockad
 LAB_ERR:
     return ERR_FAIL;
 
-
+#endif
 }
 
 /***********************************************************************
@@ -1183,7 +1184,7 @@ INT32 tcp_punch::XProbeNAT(SOCKET sServerLog)
  ***********************************************************************/
 INT32 tcp_punch::XCheckConeTCP(SOCKET sServerLog) 
 {
-    SOCKET sEcho;
+    SOCKET sEcho = 0;
     struct sockaddr_in AddrLocal;
     INT32 nOne = 1;
     INT32 i = 0;
@@ -1353,7 +1354,7 @@ void tcp_punch::XAnalyzeNature(UINT32 *punAddrGlobal, UINT16 *puwPortGlobal, UIN
 		if (g_Fingerprint.nGAddr == 0) 
 			g_Fingerprint.nGAddr = punAddrGlobal[i];
 		// an abnormal result
-		if (punAddrGlobal[i] != g_Fingerprint.nGAddr) 
+		if ((INT32)punAddrGlobal[i] != g_Fingerprint.nGAddr) 
 		{
 			g_Fingerprint.nGAddr = 0xFFFFFFFF;
             break;
@@ -1508,6 +1509,7 @@ LAB_ERR:
  ***********************************************************************/
 INT32 tcp_punch::XReadFingerprint(void) 
 {
+#ifdef _WIN32
     INT32 nFD = 0;
 	INT32 nErr = ERR_NONE;
 	g_Fingerprint.chID[0] = '\0';
@@ -1557,6 +1559,7 @@ INT32 tcp_punch::XReadFingerprint(void)
 	}
 
 	return nErr;
+#endif
 }
 
 /////////////////////////////////////////////////////////////////////////

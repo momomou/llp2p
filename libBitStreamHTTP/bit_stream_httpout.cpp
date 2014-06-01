@@ -132,13 +132,17 @@ int bit_stream_httpout::handle_pkt_in(int sock)
 
 	// player拿streamID的時候可能會發起多次連線，通常第一個socket的連線會成功，其餘的socket會被player關閉，因此會收到關閉訊息:recv_byte=0, WSAGetLastError()=0
 	if (recv_byte <= 0) {
+#ifdef _WIN32
 		int socketErr = WSAGetLastError();
+#else
+		int socketErr = errno;
+#endif
 		_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "[ERROR] HTTP Stream in channel WSAGetLastError() =", socketErr, recv_byte);
 
 		struct sockaddr_in addr;
 		int addrLen=sizeof(struct sockaddr_in);
 		int	aa;
-		aa = getpeername(sock, (struct sockaddr *)&addr, &addrLen);
+		aa = getpeername(sock, (struct sockaddr *)&addr, (socklen_t *)&addrLen);
 		_log_ptr->write_log_format("s(u) d s d \n", __FUNCTION__, __LINE__, aa, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 		
 		_pk_mgr_ptr ->del_stream(sock,(stream*)this, STRM_TYPE_MEDIA);
@@ -151,7 +155,7 @@ int bit_stream_httpout::handle_pkt_in(int sock)
 	struct sockaddr_in addr;
 	int addrLen=sizeof(struct sockaddr_in);
 	int	aa;
-	aa = getpeername(sock, (struct sockaddr *)&addr, &addrLen);
+	aa = getpeername(sock, (struct sockaddr *)&addr, (socklen_t *)&addrLen);
 	_log_ptr->write_log_format("s(u) d s d \n", __FUNCTION__, __LINE__, aa, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 	
 	
@@ -428,9 +432,13 @@ int bit_stream_httpout::handle_pkt_out(int sock)
 
 
 		if (send_rt_val < 0) {
+#ifdef _WIN32
 			int socketErr = WSAGetLastError();
+#else
+			int socketErr = errno;
+#endif
 			_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "socket error number =", socketErr, send_rt_val);
-
+#ifdef _WIN32
 			// Buffer is full
 			if (socketErr == WSAEWOULDBLOCK) {		
 				//it not a error
@@ -449,6 +457,8 @@ int bit_stream_httpout::handle_pkt_out(int sock)
 				delete this;
 				return RET_SOCK_ERROR;
 			}
+#else
+#endif
 		}
 
 		/*
@@ -469,8 +479,13 @@ int bit_stream_httpout::handle_pkt_out(int sock)
 		_log_ptr->write_log_format("s(u) s d (d) (d)\n", __FUNCTION__, __LINE__, "[DEBUG] _send_ctl_info.ctl_state =", _send_ctl_info.ctl_state, send_rt_val, _stream_id);
 		
 		if (send_rt_val < 0) {
+#ifdef _WIN32
 			int socketErr = WSAGetLastError();
+#else
+			int socketErr = errno;
+#endif
 			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "socket error number =", socketErr);
+#ifdef _WIN32
 			if (socketErr == WSAEWOULDBLOCK) {		//buff full
 				//it not a error
 				//				_send_ctl_info.ctl_state = RUNNING;
@@ -488,6 +503,7 @@ int bit_stream_httpout::handle_pkt_out(int sock)
 				delete this;
 				return RET_SOCK_ERROR;
 			}
+#endif
 		}
 		
 		/*
@@ -545,7 +561,7 @@ void bit_stream_httpout::send_header_to_player(int sock)
 		
 		printf("\n\n\n\n\n-\n");
 		for (int i = 0; i < protocol_header->len; i++) {
-			printf("%X ", (char *)protocol_header->header[i]);
+			printf("%x ", protocol_header->header[i]);
 			if (((i+1) % 20) == 0) {
 				printf("\n");
 			}
@@ -637,8 +653,11 @@ int  bit_stream_httpout::getStreamID_FromHTTP_Request(int sock, char *httpBuffer
 		int crossdomainHeaderSize = (sizeof(crossdomain)-1) ;
 
 		char conten_length[20] ;
+#ifdef _WIN32
 		itoa((sizeof(crossdomain)-1),conten_length,10);
-
+#else
+		sprintf(conten_length, "%d", sizeof(crossdomain)-1);
+#endif
 		int len =0 ;	
 		while(crossdomainHeaderSize){
 
@@ -672,7 +691,7 @@ int  bit_stream_httpout::getStreamID_FromHTTP_Request(int sock, char *httpBuffer
 	}
 	else {
 		ptr += 5;
-		char temp[5] = {'0x0','0x0','0x0','0x0','\0'};
+		char temp[5] = {0};
 		memcpy(temp, ptr, 4);
 		_log_ptr->write_log_format("s(u) s s \n", __FUNCTION__, __LINE__,"temp =", temp);
 		streamID = atoi(temp);

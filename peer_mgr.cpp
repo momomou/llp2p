@@ -275,8 +275,16 @@ int peer_mgr::handle_test_delay(unsigned long manifest)
 	list<unsigned long>::iterator connect_member_iter;
 	unsigned char log_protocol = LOG_RESCUE_LIST;
 
-	for(pid_peer_info_iter = (_pk_mgr_ptr ->map_pid_peer_info).begin(); pid_peer_info_iter != (_pk_mgr_ptr ->map_pid_peer_info).end(); pid_peer_info_iter++) {
+	_log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
+	
+	for(pid_peer_info_iter = _pk_mgr_ptr->map_pid_peer_info.begin(); pid_peer_info_iter != _pk_mgr_ptr->map_pid_peer_info.end(); pid_peer_info_iter++) {
+		
+		debug_printf("map_pid_peer_info.size() = %d,  pid = %d \n", _pk_mgr_ptr->map_pid_peer_info.size(), pid_peer_info_iter->first);
+		_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__,
+													"map_pid_peer_info.size() =", _pk_mgr_ptr->map_pid_peer_info.size(),
+													"pid =", pid_peer_info_iter->first);
 
+		
 		if(pid_peer_info_iter ->second->manifest == manifest){
 			pid = (pid_peer_info_iter ->first) ;
 
@@ -284,8 +292,8 @@ int peer_mgr::handle_test_delay(unsigned long manifest)
 			list_member.push_back(pid);
 
 			//testing in PC room avoid connect to self
-			if(pid_peer_info_iter->second->public_ip == self_public_ip && pid_peer_info_iter->second->private_ip == _net_ptr->getLocalIpv4()){
-				continue;
+			if(pid_peer_info_iter->second->public_ip == self_public_ip && pid_peer_info_iter->second->private_ip == _pk_mgr_ptr->my_private_ip){
+				//continue;
 			}
 
 			map_pid_fd_iter = peer_ptr ->map_in_pid_fd.find(pid);
@@ -348,7 +356,7 @@ int peer_mgr::handle_test_delay(unsigned long manifest)
 		while(tempManifest){
 				sendSubStreamID = _pk_mgr_ptr->manifestToSubstreamID (tempManifest);
 				_pk_mgr_ptr ->set_rescue_state(sendSubStreamID,0);
-				_pk_mgr_ptr->send_parentToPK( _pk_mgr_ptr->SubstreamIDToManifest(sendSubStreamID) ,PK_PID +1);
+				//_pk_mgr_ptr->send_parentToPK( _pk_mgr_ptr->SubstreamIDToManifest(sendSubStreamID) ,PK_PID +1);
 				tempManifest &=  (~ _pk_mgr_ptr->SubstreamIDToManifest(sendSubStreamID)) ;
 		}
 	}

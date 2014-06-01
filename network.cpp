@@ -47,17 +47,15 @@ void network::garbage_collection()
 #endif
 }
 
-
 unsigned long network::getLocalIpv4() 
 {
-	
 	unsigned long ip = 0UL;
 	
 #ifdef _WIN32	// WIN32 我們使用 domain 反查方式來處理 ip, 不使用 WIN32 API 
-	char hostname[512];
+	char hostname[512] = {0};
 
-	memset(hostname, 0x0, 512);
 	gethostname(hostname, sizeof(hostname));
+	debug_printf("hostname(%d): %s \n", strlen(hostname), hostname);
 	
 	struct addrinfo *AddrInfo, *AI;
 	
@@ -65,17 +63,20 @@ unsigned long network::getLocalIpv4()
 		return ip;	// error return 0UL
     }	
 
+	debug_printf("hostname(%d): %s \n", strlen(hostname), hostname);
+	
+	// Search all network adapters
 	for(AI = AddrInfo; AI != NULL; AI = AI->ai_next) {
 		switch(AI->ai_family) {
-			case AF_INET:
+			case AF_INET:	// ipv4
 				ip = ((struct sockaddr_in *)AI->ai_addr)->sin_addr.s_addr;
 				struct in_addr localIP;
 				memcpy(&localIP, &ip, sizeof(struct in_addr));
-				//cout << "network::getLocalIpv4 ip:" << inet_ntoa(localIP) << "\n";
 				debug_printf("network::getLocalIpv4 ip: %s \n", inet_ntoa(localIP));
-				return ip; // 找到，提早返回 
+				return ip; // 找到，提早返回
 		}
 	}
+	
 #else				// LINUX 我們使用 ioctl 來詢問 , 注意此 ioctl 的方式不支援 v6 取得
 	int fd;			// socket fd
 	struct ifreq ifr;
@@ -194,7 +195,7 @@ void network::epoll_dispatcher(void)
 				aa;
 			//aa=getsockname(cfd, (struct sockaddr *)&addr, &addrLen);
 			//printf("  aa:%2d  cfd: %2d , SrcAddr: %s:%d \n", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
-			aa=getpeername(cfd, (struct sockaddr *)&addr, &addrLen);
+			aa=getpeername(cfd, (struct sockaddr *)&addr, (socklen_t *)&addrLen);
 			//printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d  ", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 			
 			if (events[i].events & (EPOLLRDHUP | EPOLLERR)) {
@@ -210,10 +211,23 @@ void network::epoll_dispatcher(void)
 				}
 				else {
 					// EPOLLRDHUP => This socket is closed by client (client has sent a FIN), we have to close it.
-					cout << "something wrong: fd = " << cfd << " error:"<<WSAGetLastError()<< endl;
-				
-					_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
-					PAUSE
+#ifdef _WIN32
+					int socketErr = WSAGetLastError();
+#else
+					int socketErr = errno;
+#endif
+					if (events[i].events & EPOLLRDHUP) {
+						debug_printf("Socket %d is closed by remote host, err = %d \n", cfd, socketErr);
+						close(cfd);
+					}
+					else if (events[i].events & EPOLLERR) {
+						debug_printf("something wrong: fd = %d  error: %d \n", cfd, socketErr);
+						_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
+						PAUSE
+					}
+					//debug_printf("something wrong: fd = %d  error: %d \n", cfd, socketErr);
+					//_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
+					//PAUSE
 					continue;
 				}
 			}
@@ -275,7 +289,8 @@ void network::epoll_dispatcher(void)
 void network::epoll_control(int sock, int op, unsigned int event) 
 {
 	struct epoll_event ev;
-	int ret;
+	int ret = 0;
+	int ret2 = 0;
 	memset(&ev, 0x0, sizeof(struct epoll_event));	
 	set_nonblocking(sock);
 	ev.data.fd = sock;
@@ -285,13 +300,14 @@ void network::epoll_control(int sock, int op, unsigned int event)
 	epoll_ctl(epfd, op, sock, &ev, &epollVar);
 	ret = epoll_ctl(epfd, op, sock, &ev, &epollVar);
 #else
-	epoll_ctl(epfd, op, sock, &ev);
 	ret = epoll_ctl(epfd, op, sock, &ev);
+	//ret2 = epoll_ctl(epfd, op, sock, &ev);
 #endif
 
+	//debug_printf("sock: %d,  ret = %d, ret2 = %d \n", sock, ret, ret2);
 	
-	if(ret == -1) {
-		printf("!!!epoll_ctl failed with sock:%d, errno:%d\n",sock, errno);
+	if(ret2 == -1) {
+		debug_printf("!!!epoll_ctl failed with sock:%d, errno:%d\n",sock, errno);
 		//perror("failed with error");
 	} else {
 		//printf("!!!epoll_ctl success with sock:%d\n",sock);
@@ -409,11 +425,16 @@ int network::close(int sock)
 		struct sockaddr_in src_addr;
 		struct sockaddr_in dst_addr;
 		int addrLen = sizeof(struct sockaddr_in);
-		int	a, b;
-		a = getsockname(iter->first, (struct sockaddr *)&src_addr, &addrLen);
-		b = getpeername(iter->first, (struct sockaddr *)&dst_addr, &addrLen);
-		debug_printf(" | (%d) fd:%3d, SA: %s:%d | (%d) fd:%3d, DA: %s:%d | \n", a, iter->first, inet_ntoa(src_addr.sin_addr), ntohs(src_addr.sin_port),
-																				b, iter->first, inet_ntoa(dst_addr.sin_addr), ntohs(dst_addr.sin_port));
+		int	a;
+		int b;
+		char src_IP[16] = {0};
+		char dst_IP[16] = {0};
+		a = getsockname(iter->first, (struct sockaddr *)&src_addr, (socklen_t *)&addrLen);
+		b = getpeername(iter->first, (struct sockaddr *)&dst_addr, (socklen_t *)&addrLen);
+		memcpy(src_IP, inet_ntoa(src_addr.sin_addr), strlen(inet_ntoa(src_addr.sin_addr)));
+		memcpy(dst_IP, inet_ntoa(dst_addr.sin_addr), strlen(inet_ntoa(dst_addr.sin_addr)));
+		debug_printf(" | (%d) fd:%3d, SA: %s:%d | (%d) fd:%3d, DA: %s:%d | \n", a, iter->first, src_IP, ntohs(src_addr.sin_port),
+																				b, iter->first, dst_IP, ntohs(dst_addr.sin_port));
 	}
 	
 	_map_fd_bc_tbl_iter = _map_fd_bc_tbl.find(sock);
@@ -433,7 +454,9 @@ int network::close(int sock)
 	::closesocket(sock);
 	return 0;
 #else
-	return ::close(sock);
+	int ret = ::close(sock);
+	debug_printf("ret = %d \n", ret);
+	return 0;
 #endif
 
 }
@@ -547,7 +570,7 @@ int network::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 			return RET_SOCK_CLOSED_GRACEFUL;
 			//return RET_OK;
 		}
-	} else if (recv_rt_val == send_info->recv_ctl_info.expect_len) {
+	} else if ((UINT32)recv_rt_val == send_info->recv_ctl_info.expect_len) {
 
 		//QueryPerformanceCounter(&teststart);
 
@@ -632,7 +655,7 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 				return RET_SOCK_ERROR;
 			}
 		}
-		else if (send_rt_val == send_info->expect_len) {
+		else if ((UINT32)send_rt_val == send_info->expect_len) {
 			send_info->ctl_state = READY;
 			return send_rt_val;
 
@@ -672,7 +695,7 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 				return RET_SOCK_ERROR;
 			}
 		}
-		else if (send_rt_val == send_info->expect_len) {
+		else if ((UINT32)send_rt_val == send_info->expect_len) {
 			send_info->ctl_state = READY;
 			return send_rt_val;
 		} else {	

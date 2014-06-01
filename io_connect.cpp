@@ -51,10 +51,14 @@ int io_connect::handle_pkt_out(int sock)
 
 	error_len = sizeof(error_num);
 	error_num = -1;
-	error_return = getsockopt(sock,SOL_SOCKET, SO_ERROR, (char*)&error_num, &error_len);
+	error_return = getsockopt(sock,SOL_SOCKET, SO_ERROR, (char*)&error_num, (socklen_t *)&error_len);
 	
 	if (error_return != 0) {
+#ifdef _WIN32
 		int socketErr = WSAGetLastError();
+#else
+		int socketErr = errno;
+#endif
 		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s d (d) (d) \n", "[ERROR] call getsockopt error num :", error_return, socketErr, error_num);
 		debug_printf("[ERROR] call getsockopt error num : %d (%d) (%d) \n", error_return, socketErr, error_num);
 		_log_ptr->write_log_format("s(u) s d (d) (d) \n", __FUNCTION__, __LINE__, "[ERROR] call getsockopt error num :", error_return, socketErr, error_num);
@@ -206,7 +210,12 @@ int io_connect::handle_pkt_out(int sock)
 
 void io_connect::handle_pkt_error(int sock)
 {
-	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in io_connect handle_pkt_error error number : ",WSAGetLastError());
+#ifdef _WIN32
+	int socketErr = WSAGetLastError();
+#else
+	int socketErr = errno;
+#endif
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in io_connect handle_pkt_error error number : ",socketErr);
 	_logger_client_ptr->log_exit();
 }
 
@@ -222,8 +231,13 @@ void io_connect::handle_job_timer()
 
 void io_connect::handle_sock_error(int sock, basic_class *bcptr)
 {
+#ifdef _WIN32
+	int socketErr = WSAGetLastError();
+#else
+	int socketErr = errno;
+#endif
 	_peer_communication_ptr->fd_close(sock);
-	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in io_connect handle_sock_error error number : ",WSAGetLastError());
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in io_connect handle_sock_error error number : ",socketErr);
 	_logger_client_ptr->log_exit();
 }
 

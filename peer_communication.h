@@ -40,7 +40,7 @@ public:
 	virtual void handle_job_realtime();
 	virtual void handle_job_timer();
 
-	unsigned long total_manifest;
+	unsigned long total_manifest;			// The manifest which is in progress
 	unsigned long session_id_count;
 	struct level_info_t *self_info;
 	map<unsigned long, struct peer_com_info *> session_id_candidates_set;

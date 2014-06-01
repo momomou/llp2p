@@ -100,7 +100,13 @@ int io_accept::handle_pkt_out(int sock)
 
 void io_accept::handle_pkt_error(int sock)
 {
-	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in io_accept handle_pkt_error error number : ",WSAGetLastError());
+#ifdef _WIN32
+	int socketErr = WSAGetLastError();
+#else
+	int socketErr = errno;
+#endif
+	
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in io_accept handle_pkt_error error number : ",socketErr);
 	_logger_client_ptr->log_exit();
 }
 
@@ -116,8 +122,12 @@ void io_accept::handle_job_timer()
 }
 
 void io_accept::handle_sock_error(int sock, basic_class *bcptr){
-	
+#ifdef _WIN32
+	int socketErr = WSAGetLastError();
+#else
+	int socketErr = errno;
+#endif
 	_peer_communication_ptr->fd_close(sock);
-	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in io_accept handle_sock_error error number : ",WSAGetLastError());
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in io_accept handle_sock_error error number : ",socketErr);
 	_logger_client_ptr->log_exit();
 }

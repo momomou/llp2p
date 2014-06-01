@@ -34,7 +34,7 @@ int io_nonblocking::handle_pkt_in(int sock)
 
 	struct chunk_header_t* chunk_header_ptr = NULL;
 	struct chunk_t* chunk_ptr = NULL;
-	unsigned long buf_len=0;
+	int buf_len=0;
 
 	map<int ,  struct ioNonBlocking*>::iterator map_fd_NonBlockIO_iter;
 	map_fd_NonBlockIO_iter = _peer_communication_ptr->map_fd_NonBlockIO.find(sock);
@@ -82,7 +82,7 @@ int io_nonblocking::handle_pkt_in(int sock)
 			buf_len = sizeof(chunk_header_t)+ ((chunk_t *)(Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer)) ->header.length ;
 			chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
 			if(!chunk_ptr){
-				printf("chunk_ptr iononblocking new error buf_len=%u\n",buf_len);
+				printf("chunk_ptr iononblocking new error buf_len=%d\n",buf_len);
 				_log_ptr->write_log_format("s =>u s s u \n", __FUNCTION__,__LINE__," chunk_ptr  iononblocking new error","buf_len",buf_len);
 				PAUSE
 			}

@@ -104,7 +104,7 @@ public:
 	*/
 	void log_exit();
 
-	void handle_error(int exit_code, char *msg, char *func, unsigned int line);
+	void handle_error(int exit_code, const char *msg, const char *func, unsigned int line);
 
 	/*
 	this part just implement handle pkt out

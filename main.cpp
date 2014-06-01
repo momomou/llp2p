@@ -36,7 +36,9 @@
 #include "io_connect.h"
 #include "io_accept.h"
 #include "logger_client.h"
+#ifdef STUNT_FUNC
 #include "stunt_mgr.h"
+#endif
 #include "register_mgr.h"
 
 #include "irc/irc_client.h"
@@ -113,7 +115,12 @@ void signal_handler(int sig)
 			break;
 		case SIGINT:
 			srv_shutdown = 1;
-			system("PAUSE");
+#ifdef _WIN32
+			//system("PAUSE");
+			exit(1);
+#else
+			exit(1);
+#endif
 			//errorRestartFlag = 1;
 			//logger_client_ptr->log_exit();
 			break;
@@ -298,9 +305,9 @@ int firebreathTestAPI::create_obj(int thread_key)
 		temp->exit_code = PEER_ALIVE;
 		temp->window = m_host->getDOMWindow();
 		memset(temp->irc_arg.channel, 0, sizeof(temp->irc_arg.channel));
-		memcpy(temp->irc_arg.channel,"#llp2p_test", 11);
+		memcpy(temp->irc_arg.channel,"#p2ptv_game", 11);
 		memset(temp->irc_arg.ip, 0, sizeof(temp->irc_arg.ip));
-		memcpy(temp->irc_arg.ip, "210.61.27.38", 12);
+		memcpy(temp->irc_arg.ip, "140.114.71.174", 14);
 		memset(temp->irc_arg.nick, 0, sizeof(temp->irc_arg.nick));
 		memcpy(temp->irc_arg.nick, "USER1", 5);
 		
@@ -584,6 +591,7 @@ int mainFunction(int thread_key){
 int main(int argc, char **argv){
 #endif
 
+	
 	cout << "tst_speed_svr " << version << " (Compiled Time: "__DATE__ << " "__TIME__")" << endl << endl;
 
 	FILE *record_file_fp2 = NULL;
@@ -704,6 +712,7 @@ int main(int argc, char **argv){
 		string stream_local_port("");
 		string config_file("config.ini");
 
+		
 		configuration *prep = NULL;
 		network *net_ptr = NULL;
 		logger *log_ptr = NULL;					// record log on local file
@@ -718,10 +727,10 @@ int main(int argc, char **argv){
 		//rtmp_supplement *rtmp_supplement_ptr = NULL;
 		bit_stream_server *bit_stream_server_ptr =NULL;
 		peer_communication *peer_communication_ptr = NULL;
-
+		
 		// Create constructors
 		//prep = new configuration(config_file);
-		
+	
 #ifdef _FIRE_BREATH_MOD_
 		prep = new configuration(config_file);    
 		for (map<string, string>::iterator iter = map_channelID_globalVar[thread_key]->map_config->begin(); iter != map_channelID_globalVar[thread_key]->map_config->end(); iter++) {
@@ -730,16 +739,19 @@ int main(int argc, char **argv){
 		}
 		net_ptr = new network(&(map_channelID_globalVar[thread_key]->errorRestartFlag), map_channelID_globalVar[thread_key]->fd_list);
 #else
+	
 		prep = new configuration(config_file);
 		if (prep == NULL) {
 			printf("[ERROR] prep new error \n");
 			PAUSE
 		}
+	
 		net_ptr = new network(&errorRestartFlag, &fd_list);
 		if (net_ptr == NULL) {
 			printf("[ERROR] net_ptr new error \n");
 			PAUSE
 		}
+	
 #endif
 
 		register_mgr_ptr = new register_mgr();
@@ -747,6 +759,7 @@ int main(int argc, char **argv){
 			printf("[ERROR] register_mgr_ptr new error \n");
 			PAUSE
 		}
+		
 		
 		
 		log_ptr = new logger();
@@ -776,6 +789,16 @@ int main(int argc, char **argv){
 		//	PAUSE
 		//}
 		
+		
+		#ifdef _WIN32
+		WSADATA wsaData;										// Winsock initial data
+		if(WSAStartup(MAKEWORD(2, 2),&wsaData)) {
+			printf("WSAStartup ERROR\n");
+			WSACleanup();
+			exit(0);
+		}
+#endif
+		
 #endif
 
 		
@@ -789,7 +812,7 @@ int main(int argc, char **argv){
 		string channel_id_tmp = map_channelID_globalVar.find(thread_key)->second->map_config->find("channel_id")->second;
 		register_mgr_ptr->build_connect(atoi(channel_id_tmp.c_str()));
 #else
-		register_mgr_ptr->build_connect(10);
+		register_mgr_ptr->build_connect(1);
 #endif		
 
 
@@ -846,14 +869,7 @@ int main(int argc, char **argv){
 		signal(SIGUSR1, SIG_IGN);	
 #endif
 
-#ifdef _WIN32
-		WSADATA wsaData;										// Winsock initial data
-		if(WSAStartup(MAKEWORD(2, 2),&wsaData)) {
-			printf("WSAStartup ERROR\n");
-			WSACleanup();
-			exit(0);
-		}
-#endif
+
 
 #ifdef _FIRE_BREATH_MOD_
 #else
@@ -927,13 +943,23 @@ int main(int argc, char **argv){
 
 		// Create TCP socket and UDP socket
 		if ((svc_fd_tcp = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-			log_ptr->write_log_format("s(u) s s d d \n", __FUNCTION__, __LINE__,"[ERROR] Create TCP socket failed", ". Socket error", WSAGetLastError(), svc_fd_tcp);
-			debug_printf("[ERROR] Create TCP socket failed. socket error %d %d \n", WSAGetLastError(), svc_fd_tcp);
+#ifdef _WIN32
+			int socketErr = WSAGetLastError();
+#else
+			int socketErr = errno;
+#endif
+			log_ptr->write_log_format("s(u) s s d d \n", __FUNCTION__, __LINE__,"[ERROR] Create TCP socket failed", ". Socket error", socketErr, svc_fd_tcp);
+			debug_printf("[ERROR] Create TCP socket failed. socket error %d %d \n", socketErr, svc_fd_tcp);
 			PAUSE
 		}
 		if ((svc_fd_udp = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-			log_ptr->write_log_format("s(u) s s d d \n", __FUNCTION__, __LINE__,"[ERROR] Create UDP socket failed", ". Socket error", WSAGetLastError(), svc_fd_udp);
-			debug_printf("[ERROR] Create UDP socket failed. socket error %d %d \n", WSAGetLastError(), svc_fd_udp);
+#ifdef _WIN32
+			int socketErr = WSAGetLastError();
+#else
+			int socketErr = errno;
+#endif
+			log_ptr->write_log_format("s(u) s s d d \n", __FUNCTION__, __LINE__,"[ERROR] Create UDP socket failed", ". Socket error", socketErr, svc_fd_udp);
+			debug_printf("[ERROR] Create UDP socket failed. socket error %d %d \n", socketErr, svc_fd_udp);
 			PAUSE
 		}
 		
@@ -955,13 +981,23 @@ int main(int argc, char **argv){
 		for ( ; ; ptop_port++) {
 			sin.sin_port = htons(ptop_port);
 			if (::bind(svc_fd_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) < 0) {
-				log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "Socket bind failed at port", ptop_port, ". Socket error", WSAGetLastError());
+#ifdef _WIN32
+				int socketErr = WSAGetLastError();
+#else
+				int socketErr = errno;
+#endif
+				log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "Socket bind failed at port", ptop_port, ". Socket error", socketErr);
 				//debug_printf("Socket bind failed at port %d. Socket error %d \n", ptop_port, WSAGetLastError());
 				continue;
 			}
 			if (listen(svc_fd_tcp, MAX_POLL_EVENT) < 0) {
-				log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "Socket listen failed at port", ptop_port, ". Socket error", WSAGetLastError());
-				debug_printf("Socket listen failed at port %d. Socket error %d \n", ptop_port, WSAGetLastError());
+#ifdef _WIN32
+				int socketErr = WSAGetLastError();
+#else
+				int socketErr = errno;
+#endif
+				log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "Socket listen failed at port", ptop_port, ". Socket error", socketErr);
+				debug_printf("Socket listen failed at port %d. Socket error %d \n", ptop_port, socketErr);
 				continue;
 			}
 			break;
@@ -1156,7 +1192,7 @@ int main(int argc, char **argv){
 		errorRestartFlag =0;
 #endif
 
-		PAUSE
+		//PAUSE
 
 	}
 

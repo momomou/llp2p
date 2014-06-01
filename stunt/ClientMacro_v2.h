@@ -54,14 +54,7 @@
 		a;                                                                                  \
 	} 
 #else
-#define act_on_error(x, s, a)																\
-	if ((x) == -1) {                                                                        \
-        if (g_pDbgFile_v2 != NULL) fprintf(g_pDbgFile_v2, "%s:%d: %s ... ERROR(%d)\n", "client.c", __LINE__, (s), errno);	            \
-        if (errno != 0) {                                                             \
-            if (g_pDbgFile_v2 != NULL) fprintf(g_pDbgFile_v2, "%s:%d: ERROR(%d)\n", "client.c", __LINE__, errno);		\
-        }                                                                                   \
-        a;                                                                                  \
-    } 
+#define act_on_error(x, s, a)
 #endif
 
 #ifdef _WIN32
@@ -74,14 +67,7 @@
 		write2((sock_logr), __log_buf, (INT32) strlen(__log_buf));			                                    \
 	} while(false)
 #else
-#define log1(sock_logr, s, a1)                                                              \
-	do {                                                                                    \
-		struct timeb __log_buft;                                                            \
-		char __log_buf[2048];                                                               \
-		ftime(&__log_buft);                                                                 \
-		snprintf(__log_buf, 2048, "%d.%03d:%s:%d:" s "\n", __log_buft.time, __log_buft.millitm, "client.c", __LINE__, (a1));	            \
-		write2((sock_logr), __log_buf, (INT32) strlen(__log_buf));			                                    \
-	} while(false)
+#define log1(sock_logr, s, a1)
 #endif
 
 #define readtimeout(s, socks, t, g)     \
@@ -98,7 +84,7 @@
 #ifdef _WIN32
 #define log_on_error(x, s, g)   act_on_error((x), (s), log1(sock_logr, "%s ... ERROR", s); if (__act_errno != 0) {log1(sock_logr, "ERROR(%d)", __act_errno);} goto g)
 #else
-#define log_on_error(x, s, g)   act_on_error((x), (s), log1(sock_logr, "%s ... ERROR", s); if (errno != 0) {log1(sock_logr, "ERROR(%d)", errno);} goto g)
+#define log_on_error(x, s, g)
 #endif
 #define return_on_error(x, s)   act_on_error((x), (s), return)
 #define die_on_error(x, s)      act_on_error((x), (s), exit(1))
@@ -108,21 +94,21 @@
 #define read2(s,b,l)            recv((s),((char *)b),l,0)
 #define close2(s)               closesocket((s)); (s) = (SOCKET) -1; do { } while(0)
 #else
-#define write2(s,b,l)           write((s),((char *)b),l)
-#define read2(s,b,l)            read((s),((char *)b),l)
-#define close2(s)               close((s)); (s) = (SOCKET) -1; do { } while(0)
+#define write2(s,b,l)
+#define read2(s,b,l)
+#define close2(s)
 #endif
 #define cont_on_write_error(sock, buf, size, s)     act_on_error((size) == write2((sock), (buf), (size)) ? 0 : -1, (s), close2((sock)); continue)
 #define cont_on_read_error(sock, buf, size, s)      act_on_error((size) == read2((sock), (buf), (size)) ? 0 : -1, (s), close2((sock)); continue)
 #ifdef _WIN32
 #define log_on_read_error(sock, buf, size, s, g)    act_on_error((size) == read2((sock), (buf), (size)) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "%s ... ERROR", s); if (__act_errno != 0) {log1(sock_logr, "ERROR(%d)", __act_errno);} goto g)
 #else
-#define log_on_read_error(sock, buf, size, s, g)    act_on_error((size) == read2((sock), (buf), (size)) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "%s ... ERROR", s); if (errno != 0) {log1(sock_logr, "ERROR(%d)", errno);} goto g)
+#define log_on_read_error(sock, buf, size, s, g)
 #endif
 #ifdef _WIN32
 #define log_on_write_error(sock, buf, size, s, g)   act_on_error((size) == write2((sock), (buf), (size)) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "%s ... ERROR", s); if (__act_errno != 0) {log1(sock_logr, "ERROR(%d)", __act_errno);} goto g)
 #else
-#define log_on_write_error(sock, buf, size, s, g)   act_on_error((size) == write2((sock), (buf), (size)) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "%s ... ERROR", s); if (errno != 0) {log1(sock_logr, "ERROR(%d)", errno);} goto g)
+#define log_on_write_error(sock, buf, size, s, g)
 #endif
 #define log_on_sendto_error(sock, buf, size, addr, addrlen, s, g)    act_on_error((size) == sendto((sock), (buf), (INT32)(size), 0, (addr), (addrlen)) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "%s ... ERROR", s); goto g)
 
@@ -155,37 +141,9 @@
 		act_on_error((size) == dbg ? 0 : -1, (s), close2((sock)); log1(sock_logr, "%s ... ERROR", s); log1(sock_logr, "Read %d bytes", dbg); log1(sock_logr, "Expecting %d bytes.", size); goto g);                         \
 	} while(false)
 #else
-#define log_on_Xread_error(sock, buf, size, s, g)                       \
-    do {                                                                \
-        UCHAR __tag[2];                                                 \
-        char __buf[256];                                                \
-        INT32 dbg;                                                        \
-        act_on_error((2 == read2((sock), __tag, 2)) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "Xact Read: %s ... ERROR", s); goto g);    \
-        if (__tag[0] != TAG_OK) {                                       \
-            act_on_error((__tag[1] == read2((sock), __buf, __tag[1])) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "Xact eat ok: %s ... ERROR", s); goto g);  \
-			snprintf(errbuf, 128, " REMOTE-%s", __buf);                \
-			__tag[0] = TAG_ACKABORT;                                    \
-            __tag[1] = 0;                                               \
-            act_on_error((2 == write2((sock), __tag, 2)) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "Xact write abortack: %s ... ERROR", s); NULL);  \
-            log1(sock_logr, "Xact: aborted %s", __buf);                 \
-            goto g;                                                     \
-        } else if ((size) != __tag[1]) {                                \
-            log_on_error(-1, "Protocol error", g);                      \
-        }                                                               \
-        act_on_error(((size) == (dbg = read2((sock), (buf), (size)))) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "%s ... ERROR", s); log1(sock_logr, "Read %d bytes", dbg); log1(sock_logr, "Expecting %d bytes.", size); goto g);                         \
-    } while(false)
+#define log_on_Xread_error(sock, buf, size, s, g)
 #endif
-#define log_on_Xwrite_error(sock, buf, size, s, g)      \
-    do {                                                \
-        UCHAR __tag[2] = {TAG_OK, (size)};              \
-        printf("11\n");		\
-		act_on_error(2 == write2((sock), __tag, 2) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "Xact write: %s ... ERROR", s); goto g);    \
-        printf("22\n");		\
-		int nn = write2((sock), (buf), (size));			\
-		printf("size: %d , nn: %d \n", (size), nn);		\
-		act_on_error((size) == nn ? 0 : -1, (s), close2((sock)); log1(sock_logr, "%s ... ERROR", s); goto g);                        \
-		printf("33\n");		\
-	} while(false)
+#define log_on_Xwrite_error(sock, buf, size, s, g)
 
 #ifdef _WIN32
 #define log_on_Xabort_error(sock, s, g)                 \
@@ -221,38 +179,7 @@
         }                               \
     } while(false)
 #else
-#define log_on_Xabort_error(sock, s, g)                 \
-    do {                                                \
-        unsigned char __slen = 1 + (unsigned char)strlen(errbuf); \
-        UCHAR __tag[2] = {TAG_ABORT, __slen};           \
-        char __buf[256];                                \
-        INT32 wait = true;                                \
-        act_on_error(2 == write2((sock), __tag, 2) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "Xact write abort: %s ... ERROR", s); wait = false);  \
-        act_on_error(__slen == write2((sock), errbuf, __slen) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "Xact write abort: %s ... ERROR", (errbuf)); wait = false);  \
-        while(wait) {                                   \
-            {                                           \
-                fd_set __socks;                         \
-                struct timeval Timeout;                 \
-                readtimeout((sock), __socks, 45, g);    \
-            }                                           \
-            act_on_error(2 == read2((sock), __tag, 2) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "Xact read ack: %s ... ERROR", s); break); \
-            switch(__tag[0]) {          \
-                case TAG_OK:            \
-                    act_on_error(__tag[1] == read2((sock), __buf, __tag[1]) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "Xact eat ok: %s ... ERROR", s); wait = false; break);  \
-                    break;              \
-                case TAG_ABORT:         \
-                    act_on_error(__tag[1] == read2((sock), __buf, __tag[1]) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "Xact eat ok: %s ... ERROR", s); wait = false; break);  \
-					snprintf(errbuf + __slen - 1, 128 - __slen + 1, " REMOTE-%s", __buf);   \
-					__tag[0] = TAG_ACKABORT;       \
-                    __tag[1] = 0;       \
-                    act_on_error(2 == write2((sock), __tag, 2) ? 0 : -1, (s), close2((sock)); log1(sock_logr, "Xact write abortack: %s ... ERROR", s); wait = false; break);  \
-                    break;              \
-                case TAG_ACKABORT:      \
-                    wait = false;       \
-                    break;              \
-            }                           \
-        }                               \
-    } while(false)
+#define log_on_Xabort_error(sock, s, g)
 #endif
 #define log_on_Xcommit_error(sock, s, g1, g2)                                       \
     {                                                                               \

@@ -14,14 +14,16 @@
 #include "stunt/ClientMacro_v2.h"
 #include "stunt/tcp_punch.h"
 
-  
+#ifdef _WIN32
 //#include "ws2tcpip.h"  // for setsockopt(..., IPPROTO_IP, IP_TTL, ...)
 #include "mstcpip.h"
+#endif
 
 using namespace std;
 
 stunt_mgr::stunt_mgr(list<int> *fd_list)
 {
+#ifdef _WIN32	
 	printf("11 \n");
 	_tcp_punch_ptr = NULL;
 	printf("12 \n");
@@ -33,16 +35,20 @@ stunt_mgr::stunt_mgr(list<int> *fd_list)
 	printf("15 \n");
 	comm_timeout = COMM_TIMEOUT;
 	printf("16 \n");
+#endif
 }
 
 stunt_mgr::~stunt_mgr(){
+#ifdef _WIN32	
 	printf("==============Delete stunt_mgr Success==========\n");
 	
 	//g_pDbgFile_v2 = stdout;
+#endif
 }
 
 int stunt_mgr::init(unsigned long myPID)
 {
+#ifdef _WIN32	
 	int nRet, s, e, nErr;
 	_pid = myPID;
 	itoa(_pid, _pidChar, 10);
@@ -78,11 +84,13 @@ int stunt_mgr::init(unsigned long myPID)
 
 	Sleep(500);
 	return 0;
+#endif
 }
 
 // Must guarantee that before receive STUNT's messages(handle_pkt_in is triggered), I have the corresponding peer in the list
 int stunt_mgr::handle_pkt_in(int sock)
 {	
+#ifdef _WIN32	
 	cout << "---------------stunt_mgr::handle_pkt_in-----";
 	
 	// using for record handle_pkt_in time
@@ -555,20 +563,22 @@ int stunt_mgr::handle_pkt_in(int sock)
 	cout << "---------------stunt_mgr::handle_pkt_in end \n";
 
 	return RET_OK;
-
+#endif
 }
 
 int stunt_mgr::handle_pkt_out(int sock)
 {
-	
+#ifdef _WIN32	
 	return RET_OK;
+#endif
 }
 
 void stunt_mgr::handle_pkt_error(int sock)
 {
-	
+#ifdef _WIN32	
 	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in io_connect handle_pkt_error error number : ",WSAGetLastError());
 	_logger_client_ptr->log_exit();
+#endif
 }
 
 void stunt_mgr::handle_job_realtime()
@@ -583,15 +593,17 @@ void stunt_mgr::handle_job_timer()
 }
 
 void stunt_mgr::handle_sock_error(int sock, basic_class *bcptr){
+#ifdef _WIN32		
 	_peer_communication_ptr->fd_close(sock);
 	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in io_connect handle_sock_error error number : ",WSAGetLastError());
 	_logger_client_ptr->log_exit();
+#endif
 }
 
 
 void stunt_mgr::data_close(int cfd, const char *reason) 
 {
-
+#ifdef _WIN32	
 //	list<int>::iterator fd_iter;
 //
 //	_log_ptr->write_log_format("s => s (s)\n", (char*)__PRETTY_FUNCTION__, "pk", reason);
@@ -606,12 +618,13 @@ void stunt_mgr::data_close(int cfd, const char *reason)
 //	}
 ////	PAUSE
 	_peer_communication_ptr->fd_close(cfd);
-
+#endif
 }
 
 
 int stunt_mgr::tcpPunch_connection(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long peerID, int flag, unsigned long session_id)
 {
+#ifdef _WIN32	
 	printf("------------- tcpPunch_connection \n");
 	printf("manifest: %u \n", manifest);
 	// using for record handle_pkt_out time
@@ -742,10 +755,12 @@ int stunt_mgr::tcpPunch_connection(struct level_info_t *level_info_ptr,int fd_ro
 	printf("Communicate to STUNT-COMM time: %d ms \n", timeEnd-timeStart);
 	
 	return 0;
+#endif
 }
 
 void stunt_mgr::accept_check_nat(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, unsigned long session_id)
 {
+#ifdef _WIN32	
 	printf("====accept_check_nat==== \n");
 	list<unsigned long>::iterator list_itr;
 	map<unsigned long, struct peer_info_t_nat>::iterator _map_pid_peerInfo_itr;
@@ -811,11 +826,13 @@ void stunt_mgr::accept_check_nat(struct level_info_t *level_info_ptr,int fd_role
 	}
 	
 	return;
+#endif	
 }
 
 // Initialize the socket to STUNT-CTRL, and connect to it
 void stunt_mgr::ConnectToCTRL(struct peer_info_t_nat peer_info_nat)
 {
+#ifdef _WIN32	
 	printf("=========stunt_mgr::ConnectToCTRL========= \n");
 	// using for record handle_pkt_in time
 	int timeStart, timeEnd;
@@ -929,4 +946,5 @@ void stunt_mgr::ConnectToCTRL(struct peer_info_t_nat peer_info_nat)
 	_map_ctrlfd_pid[sCtrl] = peer_info_nat.pid;
 	_map_pid_speer[peer_info_nat.pid] = sPeerTemp;
 	_map_ctrlfd_state[sCtrl] = ctrlState;
+#endif
 }

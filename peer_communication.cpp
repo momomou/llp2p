@@ -84,7 +84,8 @@ peer_communication::~peer_communication(){
 
 void peer_communication::set_self_info(unsigned long public_ip){
 	self_info->public_ip = public_ip;
-	self_info->private_ip = _net_ptr->getLocalIpv4();
+	//self_info->private_ip = _net_ptr->getLocalIpv4();
+	self_info->private_ip = _pk_mgr_ptr->my_private_ip;
 }
 
 //flag 0 rescue peer(caller is child), flag 1 candidate's peer(caller is parent)
@@ -99,112 +100,121 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest, st
 															"manifest =", rescue_manifest,
 															"caller =", caller, 
 															"candidates_num =", candidates_num);
-	for (int i = 0; i < candidates_num; i++) {
+	for (unsigned int i = 0; i < candidates_num; i++) {
 		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "list pid", testing_info->level_info[i]->pid);
 	}
 	
 	// caller is the child of the candidate-peer, 0
 	if (caller == RESCUE_PEER) {
-		if ((total_manifest & rescue_manifest) == 1) {
-			_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d d \n","error : re-rescue for some sub stream : %d %d in set_candidates_test\n",total_manifest,rescue_manifest);
+		if ((total_manifest & rescue_manifest) > 0) {
+			debug_printf("[DEBUG] Received manifest which is in progress. manifest = %d total_manifest = %d \n", rescue_manifest, total_manifest);
+			_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__,
+															"[DEBUG] Received manifest which is in progress. manifest =", rescue_manifest,
+															"total_manifest =", total_manifest);
+			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u \n", "[DEBUG] Received manifest which is in progress. manifest =", total_manifest,
+																					"total_manifest =", total_manifest);
+			debug_printf("111 \n");
+			//_logger_client_ptr->log_exit();
+		}
+		debug_printf("112 \n");
+		//else {
+		//debug_printf2("rescue manifest: %d already rescue manifest: %d \n", rescue_manifest, total_manifest);
+		//_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "rescue-peer calls peer_communication");
+		_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "rescue manifest =", rescue_manifest, "already rescue manifest =", total_manifest);
+		debug_printf("113 \n");
+		total_manifest = total_manifest | rescue_manifest;	//total_manifest has to be erased in stop_attempt_connect
+		debug_printf("114 \n");
+	
+		session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
+		if (session_id_candidates_set_iter != session_id_candidates_set.end()) {
+			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] session id already in the record in set_candidates_test");
+			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s \n", "[ERROR] session id already in the record in set_candidates_test \n");
 			_logger_client_ptr->log_exit();
 		}
 		else {
-			debug_printf2("rescue manifest: %d already rescue manifest: %d \n", rescue_manifest, total_manifest);
-			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "rescue-peer calls peer_communication");
-			_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "rescue manifest", rescue_manifest, "already rescue manifest", total_manifest);
-			total_manifest = total_manifest | rescue_manifest;	//total_manifest has to be erased in stop_attempt_connect
-		
+			session_id_candidates_set[session_id_count] = new struct peer_com_info;
+			if (!session_id_candidates_set[session_id_count]) {
+				_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] session_id_candidates_set[session_id_count] new failed", __FUNCTION__, __LINE__);
+			}
+			/*	redundant code
 			session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
-			if (session_id_candidates_set_iter != session_id_candidates_set.end()) {
-				_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] session id already in the record in set_candidates_test");
-				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s \n", "[ERROR] session id already in the record in set_candidates_test \n");
+			if (session_id_candidates_set_iter == session_id_candidates_set.end()) {
+				_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : session id cannot find in the record in set_candidates_test\n");
 				_logger_client_ptr->log_exit();
 			}
-			else {
-				session_id_candidates_set[session_id_count] = new struct peer_com_info;
-				if (!session_id_candidates_set[session_id_count]) {
-					_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] session_id_candidates_set[session_id_count] new failed", __FUNCTION__, __LINE__);
-				}
-				/*	redundant code
-				session_id_candidates_set_iter = session_id_candidates_set.find(session_id_count);	//manifest_candidates_set has to be erased in stop_attempt_connect
-				if (session_id_candidates_set_iter == session_id_candidates_set.end()) {
-					_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : session id cannot find in the record in set_candidates_test\n");
-					_logger_client_ptr->log_exit();
-				}
-				*/
-				int level_msg_size;
-				int offset = 0;
-				level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + candidates_num * sizeof(struct level_info_t *);
+			*/
+			int level_msg_size;
+			int offset = 0;
+			level_msg_size = sizeof(struct chunk_header_t) + sizeof(unsigned long) + sizeof(unsigned long) + candidates_num * sizeof(struct level_info_t *);
 
-				session_id_candidates_set[session_id_count]->peer_num = candidates_num;
-				session_id_candidates_set[session_id_count]->manifest = rescue_manifest;
-				session_id_candidates_set[session_id_count]->role = caller;
-				session_id_candidates_set[session_id_count]->list_info = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
-				if (!session_id_candidates_set[session_id_count]->list_info) {
-					_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] session_id_candidates_set[session_id_count]->list_info new failed", __FUNCTION__, __LINE__);
+			session_id_candidates_set[session_id_count]->peer_num = candidates_num;
+			session_id_candidates_set[session_id_count]->manifest = rescue_manifest;
+			session_id_candidates_set[session_id_count]->role = caller;
+			session_id_candidates_set[session_id_count]->list_info = (struct chunk_level_msg_t *) new unsigned char[level_msg_size];
+			if (!session_id_candidates_set[session_id_count]->list_info) {
+				_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] session_id_candidates_set[session_id_count]->list_info new failed", __FUNCTION__, __LINE__);
+			}
+			memset(session_id_candidates_set[session_id_count]->list_info, 0, level_msg_size);
+			memcpy(session_id_candidates_set[session_id_count]->list_info, testing_info, (level_msg_size - candidates_num * sizeof(struct level_info_t *)));
+
+			offset += (level_msg_size - candidates_num * sizeof(struct level_info_t *));
+
+			for (unsigned int i = 0; i < candidates_num; i++) {
+				debug_printf("candidates_num: %d, i: %d \n", candidates_num, i);
+				session_id_candidates_set[session_id_count]->list_info->level_info[i] = new struct level_info_t;
+				if (!session_id_candidates_set[session_id_count]->list_info->level_info[i]) {
+					_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] session_id_candidates_set[session_id_count]->list_info->level_info[i] new failed", __FUNCTION__, __LINE__);
 				}
-				memset(session_id_candidates_set[session_id_count]->list_info, 0, level_msg_size);
-				memcpy(session_id_candidates_set[session_id_count]->list_info, testing_info, (level_msg_size - candidates_num * sizeof(struct level_info_t *)));
+				memset(session_id_candidates_set[session_id_count]->list_info->level_info[i], 0, sizeof(struct level_info_t));
+				memcpy(session_id_candidates_set[session_id_count]->list_info->level_info[i], testing_info->level_info[i], sizeof(struct level_info_t));
+				
+				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] pid =", session_id_candidates_set[session_id_count]->list_info->level_info[i]->pid);
+				offset += sizeof(struct level_info_t);
+			}
 
-				offset += (level_msg_size - candidates_num * sizeof(struct level_info_t *));
-
-				for (int i = 0; i < candidates_num; i++) {
-					debug_printf("candidates_num: %d, i: %d \n", candidates_num, i);
-					session_id_candidates_set[session_id_count]->list_info->level_info[i] = new struct level_info_t;
-					if (!session_id_candidates_set[session_id_count]->list_info->level_info[i]) {
-						_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] session_id_candidates_set[session_id_count]->list_info->level_info[i] new failed", __FUNCTION__, __LINE__);
-					}
-					memset(session_id_candidates_set[session_id_count]->list_info->level_info[i], 0, sizeof(struct level_info_t));
-					memcpy(session_id_candidates_set[session_id_count]->list_info->level_info[i], testing_info->level_info[i], sizeof(struct level_info_t));
-					
-					_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] pid =", session_id_candidates_set[session_id_count]->list_info->level_info[i]->pid);
-					offset += sizeof(struct level_info_t);
+			for (unsigned int i = 0; i < candidates_num; i++) {
+				char public_IP[16] = {0};
+				char private_IP[16] = {0};
+				memcpy(public_IP, inet_ntoa(*(struct in_addr *)&testing_info->level_info[0]->public_ip), strlen(inet_ntoa(*(struct in_addr *)&testing_info->level_info[0]->public_ip)));
+				memcpy(private_IP, inet_ntoa(*(struct in_addr *)&testing_info->level_info[0]->private_ip), strlen(inet_ntoa(*(struct in_addr *)&testing_info->level_info[0]->private_ip)));
+				
+				// Self not behind NAT, candidate-peer not behind NAT
+				if (self_info->private_ip == self_info->public_ip && testing_info->level_info[i]->private_ip == testing_info->level_info[i]->public_ip) {	
+					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "candidate-peer IP =", public_IP, private_IP, "Both are not behind NAT, active connect");
+					non_blocking_build_connection(testing_info->level_info[i], caller, rescue_manifest,testing_info->level_info[i]->pid, 0, session_id_count);
 				}
-
-				for (int i = 0; i < candidates_num; i++) {
-					struct in_addr privateIP;
-					struct in_addr publicIP;
-					memcpy(&privateIP, &testing_info->level_info[i]->private_ip, sizeof(struct in_addr));
-					memcpy(&publicIP, &testing_info->level_info[i]->public_ip, sizeof(struct in_addr));
-					
-					// Self not behind NAT, candidate-peer not behind NAT
-					if (self_info->private_ip == self_info->public_ip && testing_info->level_info[i]->private_ip == testing_info->level_info[i]->public_ip) {	
-						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "candidate-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are not behind NAT, active connect");
-						non_blocking_build_connection(testing_info->level_info[i], caller, rescue_manifest,testing_info->level_info[i]->pid, 0, session_id_count);
-					}
-					// Self not behind NAT, candidate-peer is behind NAT
-					else if (self_info->private_ip == self_info->public_ip && testing_info->level_info[i]->private_ip != testing_info->level_info[i]->public_ip) {	
-						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "candidate-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Candidate-peer is behind NAT, passive connect");
-						accept_check(testing_info->level_info[i],0,rescue_manifest,testing_info->level_info[i]->pid,session_id_count);
-					}
-					// Self is behind NAT, candidate-peer not behind NAT
-					else if (self_info->private_ip != self_info->public_ip && testing_info->level_info[i]->private_ip == testing_info->level_info[i]->public_ip) {	
-						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "candidate-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Rescue-peer is behind NAT, active connect");
-						non_blocking_build_connection(testing_info->level_info[i], caller, rescue_manifest,testing_info->level_info[i]->pid, 0, session_id_count);
-					}
-					// Self is behind NAT, candidate-peer is behind NAT
-					else if (self_info->private_ip != self_info->public_ip && testing_info->level_info[i]->private_ip != testing_info->level_info[i]->public_ip) {	
-						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__,"candidate-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are behind NAT");
+				// Self not behind NAT, candidate-peer is behind NAT
+				else if (self_info->private_ip == self_info->public_ip && testing_info->level_info[i]->private_ip != testing_info->level_info[i]->public_ip) {	
+					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "candidate-peer IP =", public_IP, private_IP, "Candidate-peer is behind NAT, passive connect");
+					accept_check(testing_info->level_info[i],0,rescue_manifest,testing_info->level_info[i]->pid,session_id_count);
+				}
+				// Self is behind NAT, candidate-peer not behind NAT
+				else if (self_info->private_ip != self_info->public_ip && testing_info->level_info[i]->private_ip == testing_info->level_info[i]->public_ip) {	
+					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "candidate-peer IP =", public_IP, private_IP, "Rescue-peer is behind NAT, active connect");
+					non_blocking_build_connection(testing_info->level_info[i], caller, rescue_manifest,testing_info->level_info[i]->pid, 0, session_id_count);
+				}
+				// Self is behind NAT, candidate-peer is behind NAT
+				else if (self_info->private_ip != self_info->public_ip && testing_info->level_info[i]->private_ip != testing_info->level_info[i]->public_ip) {	
+					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__,"candidate-peer IP =", public_IP, private_IP, "Both are behind NAT");
+					non_blocking_build_connection(testing_info->level_info[i], caller, rescue_manifest,testing_info->level_info[i]->pid, 1, session_id_count);
+					/*
+					// if both are in the same NAT
+					if (self_info->public_ip == testing_info->level_info[i]->public_ip) {
+						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__,"candidate-peer IP =", public_IP, private_IP, "Both are behind NAT(identical private IP)");
 						non_blocking_build_connection(testing_info->level_info[i], caller, rescue_manifest,testing_info->level_info[i]->pid, 1, session_id_count);
-						/*
-						// if both are in the same NAT
-						if (self_info->public_ip == testing_info->level_info[i]->public_ip) {
-							_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__,"candidate-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are behind NAT(identical private IP)");
-							non_blocking_build_connection(testing_info->level_info[i], caller, rescue_manifest,testing_info->level_info[i]->pid, 1, session_id_count);
-						}
-						else {
-							debug_printf2("---------------TCP-Punch connect (actually listener)----------------- \n");
-							_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "candidate-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are behind NAT(different private IP)");
-							_stunt_mgr_ptr->tcpPunch_connection(testing_info->level_info[i], 0, rescue_manifest, testing_info->level_info[i]->pid, 0, session_id_count);
-							//accept_check(testing_info->level_info[i], 0, rescue_manifest, testing_info->level_info[0]->pid, session_id_count);
-						}
-						*/
 					}
+					else {
+						debug_printf2("---------------TCP-Punch connect (actually listener)----------------- \n");
+						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "candidate-peer IP =", public_IP, private_IP, "Both are behind NAT(different private IP)");
+						_stunt_mgr_ptr->tcpPunch_connection(testing_info->level_info[i], 0, rescue_manifest, testing_info->level_info[i]->pid, 0, session_id_count);
+						//accept_check(testing_info->level_info[i], 0, rescue_manifest, testing_info->level_info[0]->pid, session_id_count);
+					}
+					*/
 				}
 			}
-			session_id_count++;
 		}
+		session_id_count++;
+		//}
 	}
 	// Caller is the parent of the candidate-peer
 	else if (caller == CANDIDATE_PEER) {
@@ -243,7 +253,7 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest, st
 
 				offset += (level_msg_size - candidates_num * sizeof(struct level_info_t *));
 
-				for (int i = 0; i < candidates_num; i++) {
+				for (unsigned int i = 0; i < candidates_num; i++) {
 					session_id_candidates_set[session_id_count]->list_info->level_info[i] = new struct level_info_t;
 					if (!session_id_candidates_set[session_id_count]->list_info->level_info[i]) {
 						_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] session_id_candidates_set[session_id_count]->list_info->level_info[i] new failed", __FUNCTION__, __LINE__);
@@ -254,42 +264,43 @@ int peer_communication::set_candidates_handler(unsigned long rescue_manifest, st
 					offset += sizeof(struct level_info_t);
 				}
 				
-				struct in_addr privateIP;
-				struct in_addr publicIP;
-				memcpy(&privateIP, &testing_info->level_info[0]->private_ip, sizeof(struct in_addr));
-				memcpy(&publicIP, &testing_info->level_info[0]->public_ip, sizeof(struct in_addr));
+				char public_IP[16] = {0};
+				char private_IP[16] = {0};
+				memcpy(public_IP, inet_ntoa(*(struct in_addr *)&testing_info->level_info[0]->public_ip), strlen(inet_ntoa(*(struct in_addr *)&testing_info->level_info[0]->public_ip)));
+				memcpy(private_IP, inet_ntoa(*(struct in_addr *)&testing_info->level_info[0]->private_ip), strlen(inet_ntoa(*(struct in_addr *)&testing_info->level_info[0]->private_ip)));
 				
 				// Self not behind NAT, rescue-peer not behind NAT
 				if (self_info->private_ip == self_info->public_ip && testing_info->level_info[0]->private_ip == testing_info->level_info[0]->public_ip) {	
-					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "rescue-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are not behind NAT, passive connect");
+					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "rescue-peer IP =", public_IP, private_IP, "Both are not behind NAT, passive connect");
 					accept_check(testing_info->level_info[0],1,rescue_manifest,testing_info->level_info[0]->pid,session_id_count);
 				}
 				// Self not behind NAT, rescue-peer is behind NAT
 				else if (self_info->private_ip == self_info->public_ip && testing_info->level_info[0]->private_ip != testing_info->level_info[0]->public_ip) {	
-					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "rescue-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Rescue-peer is behind NAT, passive connect");
+					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "rescue-peer IP =", public_IP, private_IP, "Rescue-peer is behind NAT, passive connect");
 					accept_check(testing_info->level_info[0],1,rescue_manifest,testing_info->level_info[0]->pid,session_id_count);
 				}
 				// Self is behind NAT, rescue-peer not behind NAT
 				else if (self_info->private_ip != self_info->public_ip && testing_info->level_info[0]->private_ip == testing_info->level_info[0]->public_ip) {	
-					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "rescue-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Rescue-peer is behind NAT, active connect");
+					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "rescue-peer IP =", public_IP, private_IP, "Rescue-peer is behind NAT, active connect");
 					non_blocking_build_connection(testing_info->level_info[0], caller, rescue_manifest,testing_info->level_info[0]->pid, 0, session_id_count);
 				}
 				// Self is behind NAT, rescue-peer is behind NAT
 				else if (self_info->private_ip != self_info->public_ip && testing_info->level_info[0]->private_ip != testing_info->level_info[0]->public_ip) {	
 					_log_ptr->write_log_format("s(u) s u(u) \n", __FUNCTION__, __LINE__,"rescue-peer IP =", (testing_info->level_info[0]->public_ip), testing_info->level_info[0]->private_ip);
-					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__, __LINE__,"Rescue-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are behind NAT");
+					_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__, __LINE__,"Rescue-peer IP =", public_IP, private_IP, "Both are behind NAT");
+					
 					accept_check(testing_info->level_info[0], 1, rescue_manifest,testing_info->level_info[0]->pid, session_id_count);
 					/*
 					// if both are in the same NAT
 					if (self_info->public_ip == testing_info->level_info[0]->public_ip) {
 						_log_ptr->write_log_format("s(u) s u(u) \n", __FUNCTION__, __LINE__,"my IP =", (self_info->public_ip), (self_info->private_ip));
 						_log_ptr->write_log_format("s(u) s u(u) \n", __FUNCTION__, __LINE__,"rescue-peer IP =", (testing_info->level_info[0]->public_ip), testing_info->level_info[0]->private_ip);
-						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__, __LINE__,"rescue-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are behind NAT(identical private IP)");
+						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__, __LINE__,"rescue-peer IP =", public_IP, private_IP, "Both are behind NAT(identical private IP)");
 						accept_check(testing_info->level_info[0], 1, rescue_manifest,testing_info->level_info[0]->pid, session_id_count);
 					}
 					else {
 						debug_printf2("---------------TCP-Punch listen (actually connecter)----------------- \n");
-						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "rescue-peer IP =", inet_ntoa(publicIP), inet_ntoa(privateIP), "Both are behind NAT(different private IP)");
+						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "rescue-peer IP =", public_IP, private_IP, "Both are behind NAT(different private IP)");
 						_stunt_mgr_ptr->accept_check_nat(testing_info->level_info[0], 1, rescue_manifest,testing_info->level_info[0]->pid, session_id_count);
 					}
 					*/
@@ -476,7 +487,11 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 	}
 
 	if ((_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+#ifdef _WIN32
 		int socketErr = WSAGetLastError();
+#else
+		int socketErr = errno;
+#endif
 		debug_printf("[ERROR] Create socket failed %d %d \n", _sock, socketErr);
 		_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[ERROR] Create socket failed", _sock, socketErr);
 		_pk_mgr_ptr->handle_error(SOCKET_ERROR, "[ERROR] Create socket failed", __FUNCTION__, __LINE__);
@@ -528,6 +543,7 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 												level_info_ptr->tcp_port);
 	
 	if ((retVal = connect(_sock, (struct sockaddr*)&peer_saddr, sizeof(peer_saddr))) < 0) {
+#ifdef _WIN32
 		int socketErr = WSAGetLastError();
 		if (socketErr == WSAEWOULDBLOCK) {
 			_net_ptr->set_nonblocking(_sock);
@@ -537,7 +553,7 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 			//_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"build_ connection failure : WSAEWOULDBLOCK");
 		}
 		else {
-#ifdef _WIN32
+
 			::closesocket(_sock);
 			::WSACleanup();
 			
@@ -545,10 +561,16 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 			debug_printf("[ERROR] Build connection failed %d %d \n", retVal, socketErr);
 			_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[ERROR] Build connection failed", retVal, socketErr);
 			_logger_client_ptr->log_exit();
+		}	
 #else
-			::close(_sock);
+		int socketErr = errno;
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "[ERROR] Build connection failed", retVal, socketErr);
+		debug_printf("[ERROR] Build connection failed %d %d \n", retVal, socketErr);
+		_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[ERROR] Build connection failed", retVal, socketErr);
+		_logger_client_ptr->log_exit();
+		::close(_sock);
 #endif
-		}
+		
 
 	}
 	else {
@@ -557,7 +579,8 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[DEBUG] Build connection too fast", retVal);
 		_logger_client_ptr->log_exit();
 	}
-
+	
+	
 	/*
 	this part stores the info in each table.
 	*/
@@ -1079,8 +1102,12 @@ int peer_communication::handle_pkt_out(int sock)	//first write, then set fd to r
 
 void peer_communication::handle_pkt_error(int sock)
 {
-	
-	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in peer_communication error number : ",WSAGetLastError());
+#ifdef _WIN32
+	int socketErr = WSAGetLastError();
+#else
+	int socketErr = errno;
+#endif
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error in peer_communication error number : ",socketErr);
 	_logger_client_ptr->log_exit();
 }
 

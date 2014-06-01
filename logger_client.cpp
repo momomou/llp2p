@@ -222,7 +222,7 @@ void logger_client::send_max_source_delay()
 {
 	double max_delay = 0;
 	
-	for (int i = 0; i < sub_stream_number; i++) {
+	for (unsigned long i = 0; i < sub_stream_number; i++) {
 		if (max_source_delay[i].count > 0) {
 			max_source_delay[i].average_delay = max_source_delay[i].accumulated_delay / (double)(max_source_delay[i].count);
 			delay_list[i] = max_source_delay[i].average_delay;
@@ -241,7 +241,7 @@ void logger_client::send_max_source_delay()
 	}
 	
 	//cout << "max_delay = " << max_delay << endl;
-	for (int i = 0; i < sub_stream_number; i++) {
+	for (unsigned long i = 0; i < sub_stream_number; i++) {
 		//debug_printf("substream %d source delay = %d, count %d \n", i, static_cast<int>(delay_list[i]), max_source_delay[i].count);
 		_log_ptr->write_log_format("s(u) s d s f s f s d \n", __FUNCTION__, __LINE__,
 																"substream", i,
@@ -255,7 +255,7 @@ void logger_client::send_max_source_delay()
 	log_to_server(LOG_DATA_SOURCE_DELAY, 0, max_delay, sub_stream_number, delay_list);
 	_log_ptr->write_log_format("s(u) s f s \n", __FUNCTION__, __LINE__, "send max source delay =", max_delay, "to PK");
 	
-	for (int i = 0; i < sub_stream_number; i++) {
+	for (unsigned long i = 0; i < sub_stream_number; i++) {
 		max_source_delay[i].accumulated_delay = 0;
 		max_source_delay[i].count = 0;
 		max_source_delay[i].average_delay = 0;
@@ -1126,7 +1126,11 @@ void logger_client::log_to_server(int log_mode, ...){
 					int_size = 0;
 					d = va_arg(ap, int);
 					memset(inttostr,0x00,int_array_size);
-					int_size = _snprintf(inttostr,int_array_size,"%d",d);
+					#ifdef _WIN32
+					int_size = _snprintf(inttostr,(unsigned int)int_array_size,"%d",d);
+					#else 
+					int_size = snprintf(inttostr,(unsigned int)int_array_size,"%d",d);
+					#endif
 					if((str_buffer_offset + int_size)>=str_buffer_size){
 						break;
 					}
@@ -1137,7 +1141,12 @@ void logger_client::log_to_server(int log_mode, ...){
 					int_size = 0;
 					u = va_arg(ap, unsigned int);
 					memset(inttostr,0x00,int_array_size);
+					#ifdef _WIN32
 					int_size = _snprintf(inttostr,int_array_size,"%u",u);
+					#else 
+					int_size = snprintf(inttostr,int_array_size,"%u",u);
+					#endif
+
 					if((str_buffer_offset + int_size)>=str_buffer_size){
 						break;
 					}
@@ -1410,7 +1419,11 @@ void logger_client::log_exit()
 		_send_byte = _net_ptr->nonblock_send(log_server_sock, & (Nonblocking_Send_Ctrl_ptr->recv_ctl_info ));
 			
 		if (_send_byte <= 0) {
+#ifdef _WIN32
 			int socketErr = WSAGetLastError();
+#else
+			int socketErr = errno;
+#endif
 			exit_code = LOG_SOCKET_ERROR;
 			debug_printf("send info to log server error : %d %d \n", _send_byte, socketErr);
 			_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, socketErr);
@@ -1466,7 +1479,11 @@ void logger_client::log_exit()
 		//_net_ptr->set_nonblocking(log_server_sock);
 		
 		if (_send_byte <= 0) {
+#ifdef _WIN32
 			int socketErr = WSAGetLastError();
+#else
+			int socketErr = errno;
+#endif
 			exit_code = LOG_SOCKET_ERROR;
 			debug_printf("send info to log server error : %d %d \n", _send_byte, socketErr);
 			_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, socketErr);
@@ -1478,7 +1495,11 @@ void logger_client::log_exit()
 	list<int>::iterator fd_iter;
 	
 	// Sleep 0.5 second to flush socket buffer
+#ifdef _WIN32
 	Sleep(500);
+#else
+	usleep(500000);
+#endif
 	
 	_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "close log-server");
 	debug_printf("close log-server \n");
@@ -1518,7 +1539,7 @@ int logger_client::handle_pkt_out(int sock)
 	
 	/* Modify sending log message mechanism on 2014/01/09 */
 	if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY) {
-		if (log_buffer.size() > MAX_STORED_NUM || (log_time_dffer - previous_time_differ) > TIME_PERIOD) {
+		//if (log_buffer.size() > MAX_STORED_NUM || (log_time_dffer - previous_time_differ) > TIME_PERIOD) {
 
 			previous_time_differ = log_time_dffer;
 			
@@ -1545,6 +1566,8 @@ int logger_client::handle_pkt_out(int sock)
 					
 					buffer_size -= log_struct_size;
 
+					//_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "log_header.cmd =", log_buffer_element_ptr->log_header.cmd);
+					
 					if (buffer_size < 0) {
 						handle_error(LOG_BUFFER_ERROR, "[ERROR] buffer_size < 0", __FUNCTION__, __LINE__);
 					}
@@ -1591,28 +1614,37 @@ int logger_client::handle_pkt_out(int sock)
 				Nonblocking_Send_Ctrl_ptr->recv_ctl_info.serial_num =  chunk_buffer->header.sequence_number;
 
 				_send_byte = _net_ptr->nonblock_send(sock, &(Nonblocking_Send_Ctrl_ptr->recv_ctl_info));
-
+		
+				
 				if (_send_byte <= 0) {
-					int error_val = WSAGetLastError();
+#ifdef _WIN32
+					int socketErr = WSAGetLastError();
+#else
+					int socketErr = errno;
+#endif
 					exit_code = LOG_SOCKET_ERROR;
-					log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "send info to log server error :", _send_byte, error_val);
-					debug_printf("send info to log server error : %d %d \n", _send_byte, error_val);
-					_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, error_val);
+					log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "send info to log server error :", _send_byte, socketErr);
+					debug_printf("send info to log server error : %d %d \n", _send_byte, socketErr);
+					_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, socketErr);
 					log_exit();
 					PAUSE
 				}
 			}
-		}
+		//}
 	}
 	else if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.ctl_state == RUNNING) {
 		_send_byte = _net_ptr->nonblock_send(sock, &(Nonblocking_Send_Ctrl_ptr->recv_ctl_info));
 			
 		if (_send_byte <= 0) {
 			exit_code = LOG_SOCKET_ERROR;
-			int error_val = WSAGetLastError();
-			log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "send info to log server error :", _send_byte, error_val);
-			debug_printf("send info to log server error : %d %d \n", _send_byte, error_val);
-			_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, error_val);
+#ifdef _WIN32
+			int socketErr = WSAGetLastError();
+#else
+			int socketErr = errno;
+#endif
+			log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "send info to log server error :", _send_byte, socketErr);
+			debug_printf("send info to log server error : %d %d \n", _send_byte, socketErr);
+			_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, socketErr);
 			log_exit();
 			PAUSE
 		}
@@ -1649,7 +1681,7 @@ void logger_client::handle_job_timer()
 	log_exit();
 }
 
-void logger_client::handle_error(int err_code, char *err_msg, char *func, unsigned int line)
+void logger_client::handle_error(int err_code, const char *err_msg, const char *func, unsigned int line)
 {
 	exit_code = err_code;
 	debug_printf("\n\nERROR:0x%04x  %s  (%s:%u) \n", err_code, err_msg, func, line);

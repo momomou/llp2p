@@ -67,6 +67,9 @@ public:
 	//substreamID,delay
 	map<unsigned long, struct source_delay *> delay_table;
 
+	//substreamID, substream info
+	map<unsigned long, struct substream_info *> ss_table;
+
 	//streamID , media_header
 	map<int, struct update_stream_header *> map_streamID_header;
 
@@ -87,6 +90,7 @@ public:
 	unsigned long _channel_id;
 	unsigned long bit_rate;
 	unsigned long sub_stream_num;
+	unsigned long pkt_rate;
 
 	unsigned long inside_lane_rescue_num;
 	unsigned long outside_lane_rescue_num;
@@ -106,13 +110,16 @@ public:
 	void syn_table_init(int pk_sock);
 	void send_syn_token_to_pk(int pk_sock);
 	void syn_recv_handler(struct syn_token_receive* syn_struct_back_token);
-
 	void delay_table_init();
+	void SubstreamTableInit();
 	void source_delay_detection(int sock, unsigned long sub_id, unsigned int seq_now);
+	void SourceDelayDetection(int sock, unsigned long sub_id, unsigned int seq_now);
 	void quality_source_delay_count(int sock, unsigned long substream_id, unsigned int seq_now);	// Calculation of quality and source-delay
 	void reset_source_delay_detection(unsigned long sub_id);
 	void set_rescue_state(unsigned long sub_id,int state);
 	int check_rescue_state(unsigned long sub_id,int state);
+	void SetSubstreamState(unsigned long ss_id, int state);
+	void SetSubstreamParent(unsigned long manifest, unsigned long pid);		// Set new selected parent in these substream
 
 	void set_parent_manifest(struct peer_connect_down_t* parent_info, UINT32 manifest);
 
@@ -158,22 +165,26 @@ public:
 
 
 	void handle_stream(struct chunk_t *chunk_ptr, int sockfd);
+	void HandleStream(struct chunk_t *chunk_ptr, int sockfd);
 	void handle_kickout(struct chunk_t *chunk_ptr, int sockfd);
-	void handle_error(int exit_code, char *msg, char *func, unsigned int line);
+	void handle_error(int exit_code, const char *msg, const char *func, unsigned int line);
 
 ///new rescue function
 	//	void handleAppenSelfdPid(struct chunk_t *chunk_ptr );
 	//	void storeChildrenToSet(struct chunk_t *chunk_ptr );
 	void rescue_detecion(struct chunk_t *chunk_ptr);
+	void RescueDetecion(struct chunk_t *chunk_ptr);
 	void init_rescue_detection();
 	void measure();
-	void send_rescueManifestToPK(unsigned long manifestValue);
-	unsigned long manifestFactory(unsigned long manifestValue,unsigned int ssNumber);
+	void Measure();
+	void send_rescueManifestToPK(unsigned long manifestValue, bool need_source);
+	unsigned long manifestFactory(unsigned long manifest, int ss_num);
 
 	unsigned int rescueNumAccumulate();
 	void send_rescueManifestToPKUpdate(unsigned long manifestValue);
-	void send_parentToPK(unsigned long manifestValue ,unsigned long oldPID);
+	void send_parentToPK(unsigned long manifest, unsigned long oldPID);
 	void reSet_detectionInfo();
+	void NeedSourceDecision(bool *need_source);
 
 	// Record file
 	void record_file(chunk_t *chunk_ptr);
@@ -184,11 +195,7 @@ public:
 	unsigned long SubstreamIDToManifest(unsigned long  SubstreamID );
 	unsigned long manifestToSubstreamNum(unsigned long  manifest );
 
-	volatile int threadLockKey ;
-	void threadTimeout();
-	static void launchThread(void * arg);
-	void threadLock(int locker,unsigned long sleepTime);
-	void threadFree(int locker);
+	void HandleRescueManifest(unsigned long rescue_manifest, unsigned long *manifest_A, unsigned long *manifest_B);
 
 
 //clear
@@ -200,6 +207,7 @@ public:
 	void clear_map_pid_child_peer_info();
 
 	void clear_delay_table();
+	void ClearSubstreamTable();
 	void clear_map_streamID_header();
 
 	void peer_set(peer *peer_ptr);
@@ -207,6 +215,15 @@ public:
 	void time_handle();
 
 //	void rtmp_sock_set(int sock);
+
+	bool pkSendCapacity;
+	unsigned long my_pid;
+	unsigned long my_level;
+	unsigned long _manifest;
+	unsigned long my_public_ip;
+	unsigned short my_public_port;
+	unsigned long my_private_ip;
+	unsigned short my_private_port;
 
 private:
 	
@@ -222,20 +239,10 @@ private:
 	peer *_peer_ptr;
 	rtsp_viewer *_rtsp_viewer_ptr;
 	
-	FILE *pkmgrfile_ptr ;
-	FILE *performance_filePtr ;
-
-	unsigned long my_pid;
-	unsigned long my_level;
-	unsigned long _manifest;
-	unsigned long my_public_ip;
-	unsigned short my_public_port;
-	unsigned long my_private_ip;
-	unsigned short my_private_port;
 	
-	bool pkSendCapacity;
 	unsigned long lastPKtimer;		// Record the time that pk receives peer's sync token
-	int sentStartDelay;
+	bool sentStartDelay;
+	bool first_legal_pkt_received;
 
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 

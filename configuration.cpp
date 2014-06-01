@@ -15,6 +15,7 @@ configuration::configuration() : filename(""), tmp_only(true)
 
 configuration::configuration(string file) : filename(file), tmp_only(false) 
 {
+	
 #ifdef _FIRE_BREATH_MOD_
 	map_table["bucket_size"] = "8192";
 	map_table["channel_id"] = "0";

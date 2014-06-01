@@ -168,7 +168,7 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 		map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
 		map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
 		for(temp_map_pid_fd_out_iter = map_out_pid_fd.begin();temp_map_pid_fd_out_iter != map_out_pid_fd.end();temp_map_pid_fd_out_iter++){
-			debug_printf("map_out_pid_fd  pid : %d fd :%d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
+			debug_printf("map_out_pid_fd  pid : %u fd :%d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
 			_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_fd  pid : ",temp_map_pid_fd_out_iter->first," fd :",temp_map_pid_fd_out_iter->second);
 
 		}
@@ -187,8 +187,8 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, unsigned long pid,Nonblocking_Ctl *Nonblocking_Send_Ctrl_ptr)
 {
 	debug_printf("peer::handle_connect_request \n");
-	debug_printf("Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state: %d \n", Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state);
-	
+	_log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
+
 	if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY) {
 
 		map<unsigned long, int>::iterator map_pid_fd_iter;
@@ -232,11 +232,13 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 		chunk_request_ptr->header.length = sizeof(struct request_info_t);
 		chunk_request_ptr->info.pid = pid;
 		chunk_request_ptr->info.channel_id = channel_id;
-		chunk_request_ptr->info.private_ip = _net_ptr->getLocalIpv4();
+		//chunk_request_ptr->info.private_ip = _net_ptr->getLocalIpv4();
+		chunk_request_ptr->info.private_ip = _pk_mgr_ptr->my_private_ip;
 		chunk_request_ptr->info.tcp_port = (unsigned short)atoi(svc_tcp_port.c_str());
 		chunk_request_ptr->info.udp_port = (unsigned short)atoi(svc_udp_port.c_str());
 
 		_net_ptr->set_nonblocking(sock);
+
 
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.offset = 0;
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.total_len = sizeof(struct role_struct);
@@ -245,23 +247,41 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_request_ptr;
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.serial_num = chunk_request_ptr->header.sequence_number;
 
-		debug_printf("header.cmd = %d, total_len = %d \n", chunk_request_ptr->header.cmd, chunk_request_ptr->header.length);
+		//debug_printf("header.cmd = %d, total_len = %d \n", chunk_request_ptr->header.cmd, chunk_request_ptr->header.length);
+		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "chunk_request_ptr->info.pid =", pid);
 
+		
 		_send_byte = _net_ptr->nonblock_send(sock, & (Nonblocking_Send_Ctrl_ptr->recv_ctl_info ));
-
+		//_net_ptr->set_blocking(sock);
+		//_send_byte = send(sock, (char *)chunk_request_ptr, sizeof(struct role_struct), 0);
+		//_net_ptr->set_nonblocking(sock);
+		
 		if (_send_byte < 0) {
-			if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr) {
-				delete Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr;
+			if (chunk_request_ptr) {
+				delete chunk_request_ptr;
 			}
+			//if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr) {
+			//	delete Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr;
+			//}
 			Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr = NULL;
 			data_close(sock, "PEER　COM error", CLOSE_PARENT);
+			
 			return RET_SOCK_ERROR;
 
 		}
 		else if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY ) {
-			if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr) {
-				delete Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr;
+			debug_printf("111 \n");
+			if (chunk_request_ptr) {
+				debug_printf("222 \n");
+				delete chunk_request_ptr;
 			}
+			debug_printf("333 \n");
+			//if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr) {
+			//	debug_printf("444 \n");
+			//	delete Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr;
+			//}
+			debug_printf("555 \n");
+			
 			Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = NULL;
 			return 0;
 		}
@@ -287,6 +307,8 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 		}
 	}
 
+	
+	
 	//send_byte = send(sock, (char *)chunk_request_ptr, sizeof(struct chunk_request_msg_t), 0);
 	//
 	//if( send_byte <= 0 ) {
@@ -416,7 +438,8 @@ int peer::handle_pkt_in(int sock)
 		//the main handle
 
 		//不刪除 chunk_ptr 全權由handle_stream處理
-		_pk_mgr_ptr->handle_stream(chunk_ptr, sock);
+		//_pk_mgr_ptr->handle_stream(chunk_ptr, sock);
+		_pk_mgr_ptr->HandleStream(chunk_ptr, sock);
 		
 		return RET_OK;
 	}
@@ -523,10 +546,11 @@ int peer::handle_pkt_in(int sock)
 						if (replyManifest == _pk_mgr_ptr->full_manifest && _pk_mgr_ptr ->map_pid_peerDown_info.size() == 2) {
 							for (unsigned long substreamID = 0; substreamID < _pk_mgr_ptr->sub_stream_num; substreamID++) {
 								// send topology to PK
-								_pk_mgr_ptr->send_parentToPK(_pk_mgr_ptr->SubstreamIDToManifest(substreamID), PK_PID+1);
+								//_pk_mgr_ptr->send_parentToPK(_pk_mgr_ptr->SubstreamIDToManifest(substreamID), PK_PID+1);
 								
 							}
-							_pk_mgr_ptr->send_capacity_to_pk(_pk_mgr_ptr->_sock);
+							_pk_mgr_ptr->pkSendCapacity = true;
+							//_pk_mgr_ptr->send_capacity_to_pk(_pk_mgr_ptr->_sock);
 							//_pk_mgr_ptr ->send_rescueManifestToPKUpdate(0);
 						}
 						/*
@@ -550,7 +574,16 @@ int peer::handle_pkt_in(int sock)
 							_pk_mgr_ptr->reSet_detectionInfo();
 						} 
 						*/
+						_log_ptr->write_log_format("s(u) d d \n", __FUNCTION__, __LINE__, replyManifest, _pk_mgr_ptr->sub_stream_num);
 
+						UINT32 temp_manifest = replyManifest;
+						for (unsigned long i = 0; i < _pk_mgr_ptr->sub_stream_num; i++) {
+							if ((1 << i) & temp_manifest) {
+								_pk_mgr_ptr->SetSubstreamState(i, SS_TEST);
+							}
+						}
+						
+						
 						_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
 						_pk_mgr_ptr->reSet_detectionInfo();
 
@@ -575,27 +608,37 @@ int peer::handle_pkt_in(int sock)
 							debug_printf("_pk_mgr_ptr ->map_pid_peer_info.size(): %d \n", _pk_mgr_ptr ->map_pid_peer_info.size());
 							debug_printf("_pk_mgr_ptr ->map_pid_peer_info  pid : %d \n", pid_peer_info_iter->first);
 							peerInfoPtr = pid_peer_info_iter->second;
-
+							_log_ptr->write_log_format("s(u) s u s u s u s u \n", __FUNCTION__, __LINE__,
+																			"pid =", peerInfoPtr->pid,
+																			"manifest =", peerInfoPtr->manifest,
+																			"replyManifest =", replyManifest,
+																			"count =", _pk_mgr_ptr ->map_pid_peer_info.count(peerInfoPtr->pid));
 							if (peerInfoPtr->manifest == replyManifest) {
+								_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[DEBUG]");
 								//若是自己或是先前已經建立過連線的parent 則不close (會關到正常連線)  
 								if (pid_peer_info_iter ->first == _peer_mgr_ptr->self_pid) {
+									_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[DEBUG]");
 									pid_peer_info_iter++;
 									continue;
 								} else if (_pk_mgr_ptr->map_pid_peerDown_info.find(pid_peer_info_iter ->first) != _pk_mgr_ptr->map_pid_peerDown_info.end()) {
+									_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[DEBUG]");
 									pid_peer_info_iter++;
 									continue;
 								}
-
+								_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[DEBUG]");
 								if (map_in_pid_fd.find( peerInfoPtr->pid ) != map_in_pid_fd.end()) {
+									_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[DEBUG]");
 									//只剩最後一個才關socket
 									if(_pk_mgr_ptr ->map_pid_peer_info.count(peerInfoPtr->pid) == 1){
-										
+										_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[DEBUG]");
 										data_close(map_in_pid_fd[peerInfoPtr->pid ],"close by firstReplyPid ",CLOSE_PARENT);
 										pid_peer_info_iter = _pk_mgr_ptr ->map_pid_peer_info.begin();
 										continue;	// 為了不要在刪除iter後還跑到650行的iter++ 因此加上continue
 									}else{
+										_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[DEBUG]");
 									//do nothing 
 									}
+									_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[DEBUG]");
 								}
 								else{
 								
@@ -664,7 +707,8 @@ int peer::handle_pkt_in(int sock)
 		if (((struct chunk_manifest_set_t *)chunk_ptr)->manifest == 0) {
 			data_close(sock, "close by Children SET Manifest = 0", CLOSE_PARENT);
 		}
-		_pk_mgr_ptr->send_capacity_to_pk(_pk_mgr_ptr->_sock);
+		_pk_mgr_ptr->pkSendCapacity = true;
+		//_pk_mgr_ptr->send_capacity_to_pk(_pk_mgr_ptr->_sock);
 	} 
 	else {
 		_pk_mgr_ptr->handle_error(UNKNOWN, "[ERROR] Unknown header.cmd", __FUNCTION__, __LINE__);
@@ -683,7 +727,7 @@ int peer::handle_pkt_out(int sock)
 {
 	struct sockaddr_in addr;
 	int addrLen = sizeof(struct sockaddr_in);
-	int n = getpeername(sock, (struct sockaddr *)&addr, &addrLen);
+	int n = getpeername(sock, (struct sockaddr *)&addr, (socklen_t *)&addrLen);
 	//debug_printf("%s  n:%2d  sock: %2d , DstAddr: %s:%d \n", __FUNCTION__, n, sock, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 	map<int, unsigned long>::iterator iter = map_fd_pid.find(sock);
 	if (iter != map_fd_pid.end()) {
@@ -1075,7 +1119,8 @@ void peer::data_close(int cfd, const char *reason ,int type)
 	unsigned long  testingManifest=0;
 	for(unsigned long i =0  ; i < _pk_mgr_ptr ->sub_stream_num;i++){
 		//if(  ((_pk_mgr_ptr->ssDetect_ptr) + i) ->isTesting ){
-		if(!(_pk_mgr_ptr ->check_rescue_state(i,0))){
+		//if(!(_pk_mgr_ptr ->check_rescue_state(i,0))){
+		if (_pk_mgr_ptr->ss_table[i]->state.state == SS_TEST) {
 			testingManifest |= _pk_mgr_ptr ->SubstreamIDToManifest(i);
 		}
 	}
@@ -1124,7 +1169,7 @@ void peer::data_close(int cfd, const char *reason ,int type)
 		pid = map_fd_pid_iter->second;
 		map_pid_fd_out_iter= map_out_pid_fd .find(pid);
 		map_pid_fd_in_iter=  map_in_pid_fd.find(pid);
-
+		/*
 		//清除所有跟這個peer相關的 previousParentPID
 		for(unsigned long i=0 ; i<  _pk_mgr_ptr->sub_stream_num ; i++){
 			if ((_pk_mgr_ptr->ssDetect_ptr +i) -> previousParentPID == pid) {
@@ -1132,6 +1177,7 @@ void peer::data_close(int cfd, const char *reason ,int type)
 			}
 
 		}
+		*/
 		//CLOSE CHILD
 		if (map_pid_fd_out_iter != map_out_pid_fd.end()  && (map_pid_fd_out_iter ->second == cfd)){
 
@@ -1230,9 +1276,10 @@ void peer::data_close(int cfd, const char *reason ,int type)
 					_pk_mgr_ptr->set_parent_manifest(peerDownInfoPtr, 0);
 					for(unsigned long i=0 ; i<  _pk_mgr_ptr->sub_stream_num ; i++){
 						if( peerTestingManifest & _pk_mgr_ptr->SubstreamIDToManifest(i)){
-							 (_pk_mgr_ptr->ssDetect_ptr +i) ->isTesting =false ;
-							 (_pk_mgr_ptr->ssDetect_ptr +i) ->previousParentPID = PK_PID +1 ;
+							 //(_pk_mgr_ptr->ssDetect_ptr +i) ->isTesting =false ;
+							 //(_pk_mgr_ptr->ssDetect_ptr +i) ->previousParentPID = PK_PID +1 ;
 							 //set recue stat 0
+							 /*
 							 if(_pk_mgr_ptr->check_rescue_state(i,1)){
 								 _pk_mgr_ptr->set_rescue_state(i,2);
 								 _pk_mgr_ptr->set_rescue_state(i,0);
@@ -1243,7 +1290,10 @@ void peer::data_close(int cfd, const char *reason ,int type)
 								 _pk_mgr_ptr->set_parent_manifest(_pk_mgr_ptr->pkDownInfoPtr, _pk_mgr_ptr->pkDownInfoPtr->peerInfo.manifest | _pk_mgr_ptr->SubstreamIDToManifest(i));
 								 _pk_mgr_ptr->set_rescue_state(i,0);
 							 }
-							 _pk_mgr_ptr->send_parentToPK(_pk_mgr_ptr->SubstreamIDToManifest(i),PK_PID +1);
+							 */
+							 //_pk_mgr_ptr->ss_table[i]->state.state = SS_STABLE;
+							 //_pk_mgr_ptr->ss_table[i]->state.is_testing = false;
+							 //_pk_mgr_ptr->send_parentToPK(_pk_mgr_ptr->SubstreamIDToManifest(i),PK_PID +1);
 
 						}
 					}

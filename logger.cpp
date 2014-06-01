@@ -4,6 +4,8 @@
 #include <string.h>
 
 
+
+
 static const char *levels[] = {
   "CRIT", "ERROR", "WARNING", "INFO", "DEBUG", "DEBUG2"
 };
@@ -387,6 +389,15 @@ unsigned int logger::gettimeofday_ms(/*struct timeval *tv*/)
 	time_ms= (tv.tv_sec)*1000 + (unsigned int)(tv.tv_usec)/1000 ;
 	return time_ms;
 }
+#else
+unsigned int logger::gettimeofday_ms(/*struct timeval *tv*/)
+{
+	unsigned int time_ms;
+	struct timeval tv;
+	::gettimeofday(&tv, NULL) ;
+	time_ms= (tv.tv_sec)*1000 + (unsigned int)(tv.tv_usec)/1000 ;
+	return time_ms;
+}
 #endif
 
 #ifdef WIN32
@@ -402,6 +413,12 @@ DWORD logger::getTime()
 
 #ifdef WIN32
 DWORD logger::diffgetTime_ms(DWORD startTime,DWORD endTime)
+{
+	int diffValue = endTime-startTime;
+    return abs(diffValue);
+}
+#else
+unsigned long logger::diffgetTime_ms(unsigned long startTime,unsigned long endTime)
 {
 	int diffValue = endTime-startTime;
     return abs(diffValue);
@@ -492,13 +509,18 @@ void logger::timerGet(struct timerStruct *timmer)
 	timmer->clockTime = gettimeofday_ms();
 	timmer->initClockFlag = INITED;
 }
+#else
+void logger::timerGet(struct timerStruct *timmer)
+{
+	timmer->clockTime = gettimeofday_ms();
+	timmer->initClockFlag = INITED;
+}
 #endif
 
 
 #ifdef WIN32
 unsigned int logger::diff_TimerGet_ms(struct timerStruct *start, struct timerStruct *end)
 {
-	
 	if (start->initClockFlag != INITED) {
 		//debug_printf("start timer initClockFlag  not INITED \n");
 		write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "start timer initClockFlag  not INITED");
@@ -547,5 +569,29 @@ unsigned int logger::diff_TimerGet_ms(struct timerStruct *start, struct timerStr
 	else {
 		return clockReturn;
 	}
+	
+}
+#else
+unsigned int logger::diff_TimerGet_ms(struct timerStruct *start, struct timerStruct *end)
+{
+	if (start->initClockFlag != INITED) {
+		//debug_printf("start timer initClockFlag  not INITED \n");
+		write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "start timer initClockFlag  not INITED");
+		//PAUSE
+	}
+
+	if (end->initClockFlag != INITED) {
+		//debug_printf("end timer initClockFlag  not INITED \n");
+		write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "end timer initClockFlag  not INITED");
+		//PAUSE
+	}
+
+	unsigned int clockReturn = diffgetTime_ms(start->clockTime, end->clockTime);
+
+	if (clockReturn < 2) {
+		clockReturn = 2;
+	}
+	
+	return clockReturn;
 }
 #endif

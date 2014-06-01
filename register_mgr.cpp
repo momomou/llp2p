@@ -23,19 +23,27 @@ void register_mgr::build_connect(int channel_id)
 	char buff[50] = {0};
 	
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
+#ifdef _WIN32
 		int socketErr = WSAGetLastError();
+#else
+		int socketErr = errno;
+#endif
 		debug_printf("[ERROR] Create socket failed %d %d \n", sock, socketErr);
 		return ;
 	}
 
 	memset(&pk_saddr, 0, sizeof(struct sockaddr_in));
-	//pk_saddr.sin_addr.s_addr = inet_addr("140.114.236.72");
-	pk_saddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	pk_saddr.sin_addr.s_addr = inet_addr("140.114.236.72");
+	//pk_saddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	pk_saddr.sin_port = htons(8840);
 	pk_saddr.sin_family = AF_INET;
 
 	if ((retVal = connect(sock, (struct sockaddr*)&pk_saddr, sizeof(pk_saddr))) < 0) {
+#ifdef _WIN32
 		int socketErr = WSAGetLastError();
+#else
+		int socketErr = errno;
+#endif
 		debug_printf("Connect to register server fail %d \n", retVal, socketErr);
 		return ;
 	}
@@ -45,7 +53,11 @@ void register_mgr::build_connect(int channel_id)
 	
 	// Send channel ID
 	if ((retVal = send(sock, buff, strlen(buff), 0)) < 0) {
+#ifdef _WIN32
 		int socketErr = WSAGetLastError();
+#else
+		int socketErr = errno;
+#endif
 		debug_printf("Send message to register server fail %d \n", retVal, socketErr);
 		return ;
 	}
@@ -53,10 +65,15 @@ void register_mgr::build_connect(int channel_id)
 	memset(buff, 0, sizeof(buff));
 	// Receive PK address
 	if ((retVal = recv(sock, buff, sizeof(buff), 0)) < 0) {
+#ifdef _WIN32
 		int socketErr = WSAGetLastError();
+#else
+		int socketErr = errno;
+#endif
 		debug_printf("Send message to register server fail %d \n", retVal, socketErr);
 		return ;
 	}
+	debug_printf("Receive message from register: %s \n", buff);
 	
 	got_pk = true;
 	
@@ -66,8 +83,11 @@ void register_mgr::build_connect(int channel_id)
 	int n = ssss.find(":");
 	pk_ip = ssss.substr(0, n);
 	pk_port = ssss.substr(n+1, ssss.length());
-		
+#ifdef _WIN32
 	closesocket(sock);
+#else
+	close(sock);
+#endif
 }
 
 int register_mgr::handle_pkt_in(int sock)
