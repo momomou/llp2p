@@ -516,14 +516,14 @@ int stunt_mgr::handle_pkt_in(int sock)
 			}
 
 			memset(map_fd_info_iter->second,0x00,sizeof(struct fd_information));
-			map_fd_info_iter->second->flag = 1;					// 0:I am child, 1:I am parent
+			map_fd_info_iter->second->role = 1;					// 0:I am child, 1:I am parent
 			map_fd_info_iter->second->manifest = _map_pid_peerInfo_itr->second.manifest;
 			map_fd_info_iter->second->pid = peerID;				// The other peer's PID
 			map_fd_info_iter->second->session_id = _map_pid_peerInfo_itr->second.session_id;
 			
 			//_peer_communication_ptr->session_id_count++;
 			
-			_log_ptr->write_log_format("s =>u s d s d s d s d s d s\n", __FUNCTION__,__LINE__,"non blocking connect fd : ",map_fd_info_iter->first," manifest : ",map_fd_info_iter->second->manifest," session_id : ",map_fd_info_iter->second->session_id," role : ",map_fd_info_iter->second->flag," pid : ",map_fd_info_iter->second->pid," non_blocking_build_connection (candidate peer)\n");
+			_log_ptr->write_log_format("s =>u s d s d s d s d s d s\n", __FUNCTION__,__LINE__,"non blocking connect fd : ",map_fd_info_iter->first," manifest : ",map_fd_info_iter->second->manifest," session_id : ",map_fd_info_iter->second->session_id," role : ",map_fd_info_iter->second->role," pid : ",map_fd_info_iter->second->pid," non_blocking_build_connection (candidate peer)\n");
 	
 			
 			
@@ -686,25 +686,25 @@ int stunt_mgr::tcpPunch_connection(struct level_info_t *level_info_ptr,int fd_ro
 			}
 		}
 
-		// map_pid_peer_info: temp parent-peer
-		pid_peer_info_iter = _pk_mgr_ptr ->map_pid_peer_info.find(level_info_ptr ->pid);
-		if(pid_peer_info_iter !=  _pk_mgr_ptr ->map_pid_peer_info.end() ){
+		// map_pid_parent_temp: temp parent-peer
+		pid_peer_info_iter = _pk_mgr_ptr ->map_pid_parent_temp.find(level_info_ptr ->pid);
+		if(pid_peer_info_iter !=  _pk_mgr_ptr ->map_pid_parent_temp.end() ){
 			//兩個以上就沿用第一個的連線
-			if(_pk_mgr_ptr ->map_pid_peer_info.count(level_info_ptr ->pid) >= 2 ){
-				printf("pid =%d already in connect find in map_pid_peer_info  testing",level_info_ptr ->pid);
-				_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_peer_info testing");
-				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd already in map_pid_peer_info in non_blocking_build_connection (rescue peer)");	
+			if(_pk_mgr_ptr ->map_pid_parent_temp.count(level_info_ptr ->pid) >= 2 ){
+				printf("pid =%d already in connect find in map_pid_parent_temp  testing",level_info_ptr ->pid);
+				_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_parent_temp testing");
+				_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd already in map_pid_parent_temp in non_blocking_build_connection (rescue peer)");	
 				return 1;
 			}
 		}
 
-		// 若在map_pid_peerDown_info 則不再次建立連線
-		// map_pid_peerDown_info: real parent-peer
-		pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_peerDown_info.find(level_info_ptr ->pid);
-		if(pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_peerDown_info.end()){
-			printf("pid =%d already in connect find in map_pid_peerDown_info",level_info_ptr ->pid);
-			_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_peerDown_info");
-			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd already in map_pid_peerdown_info in non_blocking_build_connection (rescue peer)");
+		// 若在map_pid_parent 則不再次建立連線
+		// map_pid_parent: real parent-peer
+		pid_peerDown_info_iter = _pk_mgr_ptr ->map_pid_parent.find(level_info_ptr ->pid);
+		if(pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_parent.end()){
+			printf("pid =%d already in connect find in map_pid_parent",level_info_ptr ->pid);
+			_log_ptr->write_log_format("s =>u s u s\n", __FUNCTION__,__LINE__,"pid =",level_info_ptr ->pid,"already in connect find in map_pid_parent");
+			_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"fd already in map_pid_parent in non_blocking_build_connection (rescue peer)");
 			return 1;
 		}
 		

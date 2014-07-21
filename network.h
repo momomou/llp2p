@@ -3,12 +3,14 @@
 
 #include "common.h"
 //#include "logger.h"
+#include "peer.h"
 #ifdef _WIN32
 	#include "EpollFake.h"
 #endif
 #include "basic_class.h"
 
 class peer;
+class logger;
 
 class network {
 	
@@ -61,6 +63,7 @@ public:
 	int recv(int s, char *buf, size_t len, int flags);	
 	int recvfrom(int s, char *buf, size_t len, int flags, struct sockaddr *from, socklen_t *fromlen);
 	void peer_set(peer *peer_ptr);
+	void log_set(logger *log_ptr);
 	int close(int sock);
 	int nonblock_recv(int sock, Nonblocking_Ctl* send_info);
 	int nonblock_send(int sock, Network_nonblocking_ctl* send_info);
@@ -75,6 +78,7 @@ private:
 	
 	// class variable
 	peer *_peer_ptr;
+	logger *_log_ptr;
 	int epfd, nfds;
 	int _channel_id;
 	struct epoll_event events[EVENTSIZE];

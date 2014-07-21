@@ -7,6 +7,7 @@
 #include <map>
 
 class network;
+class network_udp;
 class logger;
 class pk_mgr;
 class peer;
@@ -18,6 +19,7 @@ public:
 
 	peer *peer_ptr;
 	list<int> *fd_list_ptr;
+	list<int> *fd_udp_list_ptr;
 //	list<unsigned long> rescue_pid_list;
 //	map<int, int> map_rescue_fd_count;	// <fd, count>
 //	map<int, unsigned long> map_fd_pid;	// <fd, pid>
@@ -26,7 +28,7 @@ public:
 	
 	peer_mgr(list<int> *fd_list);
 	~peer_mgr();
-	void peer_mgr_set(network *net_ptr , logger *log_ptr , configuration *prep, pk_mgr * pk_mgr_ptr, logger_client * logger_client_ptr);
+	void peer_mgr_set(network *net_ptr, network_udp *net_udp_ptr, logger *log_ptr , configuration *prep, pk_mgr * pk_mgr_ptr, logger_client * logger_client_ptr);
 	void peer_communication_set(peer_communication *peer_communication_ptr);
 	peer * get_peer_object();	//call after peer_mgr_set
 	//void pk_mgr_set(pk_mgr * pk_mgr_ptr);
@@ -57,12 +59,16 @@ public:
 
 	
 	///2013/01/23
-	void send_test_delay(int _sock,unsigned long manifest);
-	int handle_test_delay(unsigned long manifest);
+	void send_test_delay(int _sock,unsigned long manifest, UINT32 session_id);
+	void send_test_delay_udp(int _sock,unsigned long manifest, UINT32 session_id);
+	int handle_test_delay(int session_id);
 	void send_manifest_to_parent(unsigned long manifestValue,unsigned long parentPid);
+	void send_manifest_to_parent_udp(unsigned long manifestValue,unsigned long parentPid);
 	void handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr);
 
 	void data_close(int cfd, const char *reason); 
+
+	void ArrangeResource();
 
 	peer_communication *_peer_communication_ptr;
 
@@ -71,13 +77,14 @@ private:
 	int _sock;
 	logger_client * _logger_client_ptr;
 	network *_net_ptr;
+	network_udp *_net_udp_ptr;
 	logger *_log_ptr;
 	configuration *_prep;
 	pk_mgr *_pk_mgr_ptr;
 	unsigned long _peer_list_member;
     unsigned long self_public_ip;
 
-	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
+	//map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 
 	struct sockaddr_in _sin, _cin;
 	

@@ -7,10 +7,12 @@
 #include "peer.h"
 #include "peer_communication.h"
 #include "logger_client.h"
+#include "io_nonblocking.h"
 
 using namespace std;
 
-io_connect::io_connect(network *net_ptr,logger *log_ptr,configuration *prep_ptr,peer_mgr * peer_mgr_ptr,peer *peer_ptr,pk_mgr * pk_mgr_ptr, peer_communication *peer_communication_ptr, logger_client * logger_client_ptr){
+io_connect::io_connect(network *net_ptr,logger *log_ptr,configuration *prep_ptr,peer_mgr * peer_mgr_ptr,peer *peer_ptr,pk_mgr * pk_mgr_ptr, peer_communication *peer_communication_ptr, logger_client * logger_client_ptr)
+{
 	_net_ptr = net_ptr;
 	_log_ptr = log_ptr;
 	_prep = prep_ptr;
@@ -32,26 +34,14 @@ int io_connect::handle_pkt_in(int sock)
 	we will not inside this part
 	*/
 	
-	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : place in io_connect::handle_pkt_in\n");
-	_logger_client_ptr->log_exit();
-
-	return RET_OK;
-}
-
-int io_connect::handle_pkt_out(int sock)
-{
-	/*
-	in this part means the fd is built. it finds its role and sends protocol to another to tell its role.
-	bind to peer_com~ for handle_pkt_in/out.
-	*/
-	
-	_net_ptr->set_nonblocking(sock);
 	int error_return;
 	int error_num,error_len;
 
 	error_len = sizeof(error_num);
 	error_num = -1;
 	error_return = getsockopt(sock,SOL_SOCKET, SO_ERROR, (char*)&error_num, (socklen_t *)&error_len);
+	
+	_log_ptr->write_log_format("s(u) s d s d (d) \n", __FUNCTION__, __LINE__, "[ERROR] sock", sock, "call getsockopt error num :", error_return, error_num);
 	
 	if (error_return != 0) {
 #ifdef _WIN32
@@ -63,12 +53,53 @@ int io_connect::handle_pkt_out(int sock)
 		debug_printf("[ERROR] call getsockopt error num : %d (%d) (%d) \n", error_return, socketErr, error_num);
 		_log_ptr->write_log_format("s(u) s d (d) (d) \n", __FUNCTION__, __LINE__, "[ERROR] call getsockopt error num :", error_return, socketErr, error_num);
 		_logger_client_ptr->log_exit();
+		PAUSE
+	}
+	
+	
+	
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : place in io_connect::handle_pkt_in\n");
+	_logger_client_ptr->log_exit();
+
+	PAUSE
+	
+	return RET_OK;
+}
+
+int io_connect::handle_pkt_out(int sock)
+{
+	/*
+	in this part means the fd is built. it finds its role and sends protocol to another to tell its role.
+	bind to peer_com~ for handle_pkt_in/out.
+	*/
+	
+	//_net_ptr->set_nonblocking(sock);
+	int error_return;
+	int error_num;
+	int error_len;
+
+	// Check the connection is successful or not
+	error_len = sizeof(error_num);
+	error_num = -1;
+	error_return = getsockopt(sock,SOL_SOCKET, SO_ERROR, (char*)&error_num, (socklen_t *)&error_len);
+	
+	_log_ptr->write_log_format("s(u) s d s d (d) \n", __FUNCTION__, __LINE__, "[ERROR] sock", sock, "call getsockopt error num :", error_return, error_num);
+	
+	if (error_return != 0) {
+#ifdef _WIN32
+		int socketErr = WSAGetLastError();
+#else
+		int socketErr = errno;
+#endif
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s d (d) (d) \n", "[ERROR] call getsockopt error num :", error_return, socketErr, error_num);
+		debug_printf("[ERROR] call getsockopt error num : %d (%d) (%d) \n", error_return, socketErr, error_num);
+		_log_ptr->write_log_format("s(u) s d (d) (d) \n", __FUNCTION__, __LINE__, "[ERROR] call getsockopt error num :", error_return, socketErr, error_num);
+		_logger_client_ptr->log_exit();
+		PAUSE
 	}
 	else {
-		/*
-		the fd is built.
-		the peer starts to find the role and tell another. 
-		*/
+		// The connection is built. Next, we should determine the stream direction
+		
 		struct role_struct *role_protocol_ptr = NULL;
 		Nonblocking_Ctl *Nonblocking_Send_Ctrl_ptr = NULL;
 		int _send_byte = 0;
@@ -115,11 +146,12 @@ int io_connect::handle_pkt_out(int sock)
 				_logger_client_ptr->log_exit();
 			}
 
-			if(map_fd_info_iter->second->flag == 0) {
-				role_protocol_ptr->flag = 1;
+			// Tell that peer what my role is
+			if (map_fd_info_iter->second->role == CHILD_PEER) {
+				role_protocol_ptr->flag = PARENT_PEER;
 			}
 			else {
-				role_protocol_ptr->flag = 0;
+				role_protocol_ptr->flag = CHILD_PEER;
 			}
 
 			role_protocol_ptr->manifest = map_fd_info_iter->second->manifest;
@@ -167,7 +199,7 @@ int io_connect::handle_pkt_out(int sock)
 				_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY first send OK");
 				_net_ptr->epoll_control(sock, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT);
 				_net_ptr->set_fd_bcptr_map(sock, dynamic_cast<basic_class *> (_peer_communication_ptr));
-
+				//_net_ptr->set_fd_bcptr_map(sock, dynamic_cast<basic_class *> (_peer_communication_ptr->_peer_ptr));
 				if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr) {
 					delete Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr;
 				}
@@ -179,6 +211,8 @@ int io_connect::handle_pkt_out(int sock)
 
 			_send_byte = _net_ptr->nonblock_send(sock, &(Nonblocking_Send_Ctrl_ptr->recv_ctl_info));
 
+			PAUSE
+			
 			//if(!(_logger_client_ptr->log_bw_out_init_flag)){
 			//	_logger_client_ptr->log_bw_out_init_flag = 1;
 			//	_logger_client_ptr->bw_out_struct_init(_send_byte);

@@ -1,5 +1,5 @@
 #include "network.h"
-#include "peer.h"
+//#include "peer.h"
 
 
 void network::timer() 
@@ -26,7 +26,7 @@ void network::garbage_collection()
 	if (_map_fd_bc_tbl.size()) {
 		for(_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin() ; _map_fd_bc_tbl_iter != _map_fd_bc_tbl.end() ;) {
 			if(close(_map_fd_bc_tbl_iter->first) == -1){
-				printf("_map_fd_bc_tbl_iter error");
+				debug_printf("_map_fd_bc_tbl_iter error \n");
 				//PAUSE
 
 			}
@@ -243,7 +243,8 @@ void network::epoll_dispatcher(void)
 					else if (cfd == log_fd) {
 						// TODO: handle log-server socket
 						debug_printf("log-server socket error");
-						PAUSE
+						*_errorRestartFlag = RESTART;
+						//PAUSE
 					}
 					else {
 						debug_printf("%s %d, handle in sock error\n", __FUNCTION__, cfd);
@@ -259,11 +260,13 @@ void network::epoll_dispatcher(void)
 					if (cfd == pk_fd) {
 						// TODO: handle pk socket 
 						debug_printf("pk socket error");
+						*_errorRestartFlag = RESTART;
 						PAUSE
 					}
 					else if (cfd == log_fd) {
 						// TODO: handle log-server socket
 						debug_printf("log-server socket error");
+						*_errorRestartFlag = RESTART;
 						PAUSE
 					}
 					else {
@@ -296,6 +299,9 @@ void network::epoll_control(int sock, int op, unsigned int event)
 	ev.data.fd = sock;
 	ev.events = event | EPOLLRDHUP | EPOLLERR;			// We forece to monitor EPOLLRDHUP and EPOLLERR event.
 	
+	//debug_printf("sock %d op = %d event = %d \n", sock, op, event);
+	if (sock > 65536) PAUSE
+
 #ifdef _FIRE_BREATH_MOD_
 	epoll_ctl(epfd, op, sock, &ev, &epollVar);
 	ret = epoll_ctl(epfd, op, sock, &ev, &epollVar);
@@ -415,6 +421,11 @@ void network::peer_set(peer *peer_ptr)
 	_peer_ptr = peer_ptr;		
 }
 
+void network::log_set(logger *log_ptr)
+{
+	_log_ptr = log_ptr;
+}
+
 //close "sock" in _map_fd_bc_tbl and erase the key-value
 //delete sock in epoll_control
 //shutdown socket and close socket
@@ -470,6 +481,7 @@ int network::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 //	LARGE_INTEGER teststart,testend;
 
 	recv_rt_val = recv(sock, send_info->recv_ctl_info.buffer + send_info->recv_ctl_info.offset, send_info->recv_ctl_info.expect_len, 0);
+	//debug_printf("Recv %d(expected:%d) bytes to sock %d \n", recv_rt_val, send_info->recv_ctl_info.expect_len, sock);
 
 	if (recv_rt_val < 0) {
 		
@@ -501,7 +513,8 @@ int network::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 
 			//send_info->recv_ctl_info.ctl_state = RUNNING;
 			return RET_OK;
-		} else {
+		} 
+		else {
 			debug_printf("recv %d byte from sock: %d, expected len = %d \n", recv_rt_val, sock, send_info->recv_ctl_info.expect_len);
 			#ifdef _WIN32 
 			debug_printf("WSAGetLastError() = %d \n", socket_error);
@@ -633,17 +646,20 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 	int send_rt_val;
 	if (send_info->ctl_state == READY) {
 		send_rt_val = send(sock, send_info->buffer + send_info->offset, send_info->expect_len, 0);
-		//DBG_PRINTF("%s: send_rt = %d, expect_len = %d", __FUNCTION__, send_rt_val, send_info->expect_len);
+		//debug_printf("Send %d(expected:%d) bytes to sock %d \n", send_rt_val, send_info->expect_len, sock);
 	
 		if (send_rt_val < 0) {
 #ifdef _WIN32 
-			if (WSAGetLastError() == WSAEWOULDBLOCK) {
+			int socketErr = WSAGetLastError();
+			if (socketErr == WSAEWOULDBLOCK) {
 #else
 			if (errno == EINTR || errno == EAGAIN) {
 #endif
 				send_info->ctl_state = RUNNING;
 				return RET_OK;
-			} else {
+			}
+			else {
+				debug_printf("send info to log server error : %d %d \n", send_rt_val, socketErr);
 				return RET_SOCK_ERROR;
 			}
 		} else if (send_rt_val == 0) {
@@ -673,8 +689,8 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 		}
 
 		send_rt_val = send(sock, send_info->buffer + send_info->offset, send_info->expect_len, 0);
+		//debug_printf("Send %d(expected:%d) bytes to sock %d \n", send_rt_val, send_info->expect_len, sock);
 		
-		//Log(LOGDEBUG, "%s: offset = %d, send_rt_val = %d, expect_len = %d", __FUNCTION__, _send_ctl_info.offset, send_rt_val, _send_ctl_info.expect_len);
 		if (send_rt_val < 0) {
 #ifdef _WIN32 
 			if (WSAGetLastError() == WSAEWOULDBLOCK) {

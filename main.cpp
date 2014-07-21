@@ -24,6 +24,7 @@
 #include "configuration.h"
 #include "logger.h"
 #include "network.h"
+#include "network_udp.h"
 #include "basic_class.h" 
 #include "pk_mgr.h"
 #include "peer_mgr.h"
@@ -35,16 +36,26 @@
 #include "peer_communication.h"
 #include "io_connect.h"
 #include "io_accept.h"
+#include "io_accept_udp.h"
 #include "logger_client.h"
 #ifdef STUNT_FUNC
 #include "stunt_mgr.h"
 #endif
 #include "register_mgr.h"
+#include "udt_lib/udt.h"
 
 #include "irc/irc_client.h"
 
-using namespace std;
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
+using namespace std;
+using namespace UDT;
+
+//#pragma comment(lib,"ws2_32.lib")
+//#pragma comment(lib,"my_udt.lib")
+//#pragma comment(lib,"../udt.lib")
 
 const char version[] = "1.0.0.0";
 
@@ -58,6 +69,7 @@ typedef struct {
 	//static logger_client *logger_client_ptr = NULL;
 	volatile unsigned short streamingPort;
 	list<int> *fd_list;
+	list<int> *udp_fd_list;
 	map<string, string> *map_config;
 	pk_mgr *pk_mgr_ptr_copy;
 	volatile sig_atomic_t is_Pk_mgr_ptr_copy_delete;
@@ -89,7 +101,8 @@ static volatile sig_atomic_t srv_shutdown = 0;
 static int errorRestartFlag = 0;
 //static logger_client *logger_client_ptr = NULL;
 static volatile unsigned short streamingPort = 0;
-list<int> fd_list;
+list<int> fd_list;			// Store tcp socket fd
+list<int> udp_fd_list;		// Store udp socket fd
 
 #endif
 //};
@@ -593,28 +606,13 @@ int main(int argc, char **argv){
 
 	
 	cout << "tst_speed_svr " << version << " (Compiled Time: "__DATE__ << " "__TIME__")" << endl << endl;
+	
 
+	map<int, int> mmmm;
+	
 	FILE *record_file_fp2 = NULL;
 	record_file_fp2 = fopen("file", "wb");
-	/*
-	printf("sizeof(int): %d \n", sizeof(int));
-	printf("sizeof(long): %d \n", sizeof(long));
-	printf("sizeof(int *): %d \n", sizeof(int *));
-	printf("sizeof(long *): %d \n", sizeof(long *));
-	printf("sizeof(void *): %d \n", sizeof(void *));
-
-	double aa = 0;
-	double bb = 0;
-	double dd = 0;
-	try {
-		dd = aa / bb;
-	} catch (...) {
-		printf("e: \n");
-	}
-	printf("dd = %f \n", dd);
 	
-	PAUSE
-	*/
 #ifdef _FIRE_BREATH_MOD_
 	while (!map_channelID_globalVar[thread_key]->srv_shutdown) {
 #else
@@ -622,82 +620,6 @@ int main(int argc, char **argv){
 #endif
 	
 
-		/*
-		// DEMO test
-		int demo_flag = 0;
-		string demo_pk_ip("");
-		string demo_pk_port("");
-		
-		{
-			WSADATA wsaData;										// Winsock initial data
-			if(WSAStartup(MAKEWORD(2, 2),&wsaData)) {
-				printf("WSAStartup ERROR\n");
-				WSACleanup();
-				exit(0);
-			}
-		
-			int sock;
-			int retVal;
-			struct sockaddr_in pk_saddr;
-			
-			if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
-				int socketErr = WSAGetLastError();
-				debug_printf("[ERROR] Create socket failed %d %d \n", sock, socketErr);
-				::WSACleanup();
-			}
-
-			memset(&pk_saddr, 0, sizeof(struct sockaddr_in));
-			//pk_saddr.sin_addr.s_addr = inet_addr("140.114.236.72");
-			pk_saddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-			pk_saddr.sin_port = htons(8840);
-			pk_saddr.sin_family = AF_INET;
-
-			retVal = connect(sock, (struct sockaddr*)&pk_saddr, sizeof(pk_saddr));
-			
-			int channel_id;
-			char buff[50] = {0};
-			
-#ifdef _FIRE_BREATH_MOD_
-			map<int, GlobalVars*>::iterator iter = map_channelID_globalVar.find(thread_key);
-			map<string, string>::iterator iter_temp = iter->second->map_config->find("channel_id");
-			
-			string str_tmp = iter_temp->second;
-			memcpy(buff, str_tmp.c_str(), str_tmp.length());
-#else
-			channel_id = 10;
-			sprintf(buff, "%d", channel_id);
-#endif
-			
-			
-			
-			
-			
-			buff[strlen(buff)] = 13;
-			
-			// Send channel ID
-			retVal = send(sock, buff, strlen(buff), 0);
-			
-			cout << retVal << endl;
-			cout << buff << endl;
-			
-			// Receive PK address
-			retVal = recv(sock, buff, sizeof(buff), 0);
-			
-			string ssss;
-			ssss.assign(buff);
-			
-			cout << ssss << endl;
-			
-		
-			int n = ssss.find(":");
-			demo_pk_ip = ssss.substr(0, n);
-			demo_pk_port = ssss.substr(n+1, ssss.length());
-				
-			closesocket(sock);
-			
-			demo_flag = 1;
-		}
-		*/
 		
 		int svc_fd_tcp;		// listening-socket for peers 
 		int	svc_fd_udp;
@@ -715,6 +637,7 @@ int main(int argc, char **argv){
 		
 		configuration *prep = NULL;
 		network *net_ptr = NULL;
+		network_udp *net_udp_ptr = NULL;
 		logger *log_ptr = NULL;					// record log on local file
 		logger_client *logger_client_ptr = NULL;	// send log Info to server
 		peer_mgr *peer_mgr_ptr = NULL;
@@ -727,10 +650,12 @@ int main(int argc, char **argv){
 		//rtmp_supplement *rtmp_supplement_ptr = NULL;
 		bit_stream_server *bit_stream_server_ptr =NULL;
 		peer_communication *peer_communication_ptr = NULL;
-		
+		io_accept_udp *io_accept_udp_ptr = NULL;
 		// Create constructors
 		//prep = new configuration(config_file);
 	
+		
+
 #ifdef _FIRE_BREATH_MOD_
 		prep = new configuration(config_file);    
 		for (map<string, string>::iterator iter = map_channelID_globalVar[thread_key]->map_config->begin(); iter != map_channelID_globalVar[thread_key]->map_config->end(); iter++) {
@@ -739,7 +664,7 @@ int main(int argc, char **argv){
 		}
 		net_ptr = new network(&(map_channelID_globalVar[thread_key]->errorRestartFlag), map_channelID_globalVar[thread_key]->fd_list);
 #else
-	
+		
 		prep = new configuration(config_file);
 		if (prep == NULL) {
 			printf("[ERROR] prep new error \n");
@@ -748,6 +673,11 @@ int main(int argc, char **argv){
 	
 		net_ptr = new network(&errorRestartFlag, &fd_list);
 		if (net_ptr == NULL) {
+			printf("[ERROR] net_ptr new error \n");
+			PAUSE
+		}
+		net_udp_ptr = new network_udp(&errorRestartFlag, &fd_list);
+		if (net_udp_ptr == NULL) {
 			printf("[ERROR] net_ptr new error \n");
 			PAUSE
 		}
@@ -802,6 +732,7 @@ int main(int argc, char **argv){
 #endif
 
 		
+		
 #ifdef _FIRE_BREATH_MOD_
 		char s[64];
 		sprintf(s,"%d",thread_key);
@@ -812,7 +743,7 @@ int main(int argc, char **argv){
 		string channel_id_tmp = map_channelID_globalVar.find(thread_key)->second->map_config->find("channel_id")->second;
 		register_mgr_ptr->build_connect(atoi(channel_id_tmp.c_str()));
 #else
-		register_mgr_ptr->build_connect(1);
+		//register_mgr_ptr->build_connect(1);
 #endif		
 
 
@@ -834,11 +765,11 @@ int main(int argc, char **argv){
 		debug_printf("svc_tcp_port = %s \n", svc_tcp_port.c_str());
 		debug_printf("svc_udp_port = %s \n", svc_udp_port.c_str());
 		debug_printf("stream_local_port = %s \n", stream_local_port.c_str());
-
+		
 #ifdef _FIRE_BREATH_MOD_
 		pk_mgr_ptr = new pk_mgr(html_size, map_channelID_globalVar[thread_key]->fd_list, net_ptr , log_ptr , prep , logger_client_ptr, stunt_mgr_ptr);
 #else
-		pk_mgr_ptr = new pk_mgr(html_size, &fd_list, net_ptr , log_ptr , prep , logger_client_ptr, stunt_mgr_ptr);
+		pk_mgr_ptr = new pk_mgr(html_size, &fd_list, net_ptr, net_udp_ptr , log_ptr , prep , logger_client_ptr, stunt_mgr_ptr);
 #endif
 		if (!pk_mgr_ptr) {
 			printf("pk_mgr_ptr error !!!!!!!!!!!!!!!\n");
@@ -847,13 +778,14 @@ int main(int argc, char **argv){
 		pk_mgr_ptr->record_file_fp = record_file_fp2;
 		
 		net_ptr->epoll_creater();
+		net_udp_ptr->epoll_creater();
 		//log_ptr->start_log_record(SYS_FREQ);
 
-		peer_mgr_ptr->peer_mgr_set(net_ptr, log_ptr, prep, pk_mgr_ptr, logger_client_ptr);
+		peer_mgr_ptr->peer_mgr_set(net_ptr, net_udp_ptr, log_ptr, prep, pk_mgr_ptr, logger_client_ptr);
 		//peer_mgr_ptr->pk_mgr_set(pk_mgr_ptr);
 		pk_mgr_ptr->peer_mgr_set(peer_mgr_ptr);
 
-		peer_communication_ptr = new peer_communication(net_ptr,log_ptr,prep,peer_mgr_ptr,peer_mgr_ptr->get_peer_object(),pk_mgr_ptr,logger_client_ptr);
+		peer_communication_ptr = new peer_communication(net_ptr,net_udp_ptr,log_ptr,prep,peer_mgr_ptr,peer_mgr_ptr->get_peer_object(),pk_mgr_ptr,logger_client_ptr);
 		if (!peer_communication_ptr) {
 			printf("peer_commuication_ptr error!!!!!!!!!!\n");
 		}
@@ -940,9 +872,9 @@ int main(int argc, char **argv){
 		else if (MODE == MODE_RTSP) {
 			debug_printf("MODE_RTSP \n");
 		}
-
+		
 		// Create TCP socket and UDP socket
-		if ((svc_fd_tcp = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		if ((svc_fd_tcp = ::socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 #ifdef _WIN32
 			int socketErr = WSAGetLastError();
 #else
@@ -952,7 +884,8 @@ int main(int argc, char **argv){
 			debug_printf("[ERROR] Create TCP socket failed. socket error %d %d \n", socketErr, svc_fd_tcp);
 			PAUSE
 		}
-		if ((svc_fd_udp = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+		//if ((svc_fd_udp = UDT::socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+		if ((svc_fd_udp = UDT::socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 #ifdef _WIN32
 			int socketErr = WSAGetLastError();
 #else
@@ -976,9 +909,10 @@ int main(int argc, char **argv){
 		sin.sin_family = AF_INET;
 		sin.sin_addr.s_addr = INADDR_ANY;
 		unsigned short ptop_port = (unsigned short)atoi(svc_tcp_port.c_str());		// listen-port for peer connection
-
+		
 		// Find an available port for p2p connection
 		for ( ; ; ptop_port++) {
+			debug_printf("\n");
 			sin.sin_port = htons(ptop_port);
 			if (::bind(svc_fd_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) < 0) {
 #ifdef _WIN32
@@ -987,10 +921,10 @@ int main(int argc, char **argv){
 				int socketErr = errno;
 #endif
 				log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "Socket bind failed at port", ptop_port, ". Socket error", socketErr);
-				//debug_printf("Socket bind failed at port %d. Socket error %d \n", ptop_port, WSAGetLastError());
+				debug_printf("Socket bind failed at port %d. Socket error %d \n", ptop_port, WSAGetLastError());
 				continue;
 			}
-			if (listen(svc_fd_tcp, MAX_POLL_EVENT) < 0) {
+			if (::listen(svc_fd_tcp, MAX_POLL_EVENT) < 0) {
 #ifdef _WIN32
 				int socketErr = WSAGetLastError();
 #else
@@ -1007,6 +941,70 @@ int main(int argc, char **argv){
 		
 		net_ptr->set_nonblocking(svc_fd_tcp);
 
+		
+		unsigned short udp_port = (unsigned short)atoi(svc_udp_port.c_str());		// listen-port for peer connection
+		
+		// Find an available port for p2p connection
+		for ( ; ; udp_port++) {
+			memset(&sin, 0, sizeof(struct sockaddr_in));
+			sin.sin_family = AF_INET;
+			sin.sin_addr.s_addr = INADDR_ANY;
+			sin.sin_port = htons(udp_port);
+			if (UDT::bind(svc_fd_udp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == UDT::ERROR) {
+				debug_printf("ErrCode: %d  ErrMsg: %s \n", UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
+				log_ptr->write_log_format("s(u) s d s s \n", __FUNCTION__, __LINE__, "ErrCode:", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
+				continue;
+			}
+			if (UDT::listen(svc_fd_udp, MAX_POLL_EVENT) == UDT::ERROR) {
+				debug_printf("ErrCode: %d  ErrMsg: %s \n", UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
+				log_ptr->write_log_format("s(u) s d s s \n", __FUNCTION__, __LINE__, "ErrCode:", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
+				continue;
+			}
+			break;
+		}
+		debug_printf("Create p2p listen-socket success, port = %u \n", udp_port);
+		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Create p2p listen-socket success, port =", udp_port);
+		
+		
+		/*
+		{
+			int namelen;
+			sockaddr_in their_addr;
+			UDTSOCKET recver = UDT::accept(svc_fd_udp, (sockaddr*)&their_addr, &namelen);
+		}
+		
+		{
+			int conn_amount = 0;
+			list<int> fd_list;
+			UDTSOCKET serv = UDT::socket(AF_INET, SOCK_STREAM, 0);
+
+			sockaddr_in my_addr;
+			my_addr.sin_family = AF_INET;
+			my_addr.sin_port = htons(9000);
+			my_addr.sin_addr.s_addr = INADDR_ANY;
+			memset(&(my_addr.sin_zero), '\0', 8);
+
+
+			if (UDT::ERROR == UDT::bind(serv, (sockaddr*)&my_addr, sizeof(my_addr))) {
+				cout << "bind: " << UDT::getlasterror().getErrorMessage();
+				return 0;
+			}
+
+			UDT::listen(serv, 10);
+			{
+				int namelen;
+				sockaddr_in their_addr;
+				UDTSOCKET recver = UDT::accept(serv, (sockaddr*)&their_addr, &namelen);
+			}
+			cout << "11111 " ;
+		}
+		*/
+		
+		//net_ptr->set_nonblocking(svc_fd_udp);
+
+		
+		io_accept_udp_ptr = new io_accept_udp(net_udp_ptr,log_ptr,peer_mgr_ptr,peer_communication_ptr,logger_client_ptr);
+		
 		
 		log_ptr->write_log_format("s(u) s (s)\n", __FUNCTION__, __LINE__, "PF", "ready now");
 
@@ -1040,12 +1038,22 @@ int main(int argc, char **argv){
 
 		net_ptr->set_fd_bcptr_map(svc_fd_tcp, dynamic_cast<basic_class *>(peer_communication_ptr->get_io_accept_handler()));
 
+		
+		
+		net_ptr->set_nonblocking(svc_fd_udp);
+		
+		net_udp_ptr->epoll_control(svc_fd_udp, EPOLL_CTL_ADD, UDT_EPOLL_IN);
+		
+		
+		net_udp_ptr->set_fd_bcptr_map(svc_fd_udp, dynamic_cast<basic_class *>(io_accept_udp_ptr));
+		
 #ifdef _FIRE_BREATH_MOD_
 		(map_channelID_globalVar[thread_key]->fd_list)->push_back(svc_fd_tcp);
 #else
 		fd_list.push_back(svc_fd_tcp);
+		udp_fd_list.push_back(svc_fd_udp);
 #endif
-		pk_mgr_ptr->init(ptop_port);
+		pk_mgr_ptr->init(ptop_port, udp_port);
 		logger_client_ptr->log_init();
 
 
@@ -1072,7 +1080,7 @@ int main(int argc, char **argv){
 		log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "Before PAUSE");
 		//PAUSE
 		log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "After PAUSE");
-		
+		debug_printf("\n");
 		while(!map_channelID_globalVar[thread_key]->srv_shutdown && !map_channelID_globalVar[thread_key]->errorRestartFlag) {
 #else
 		while (!srv_shutdown && !errorRestartFlag) {
@@ -1090,13 +1098,18 @@ int main(int argc, char **argv){
 			net_ptr->epoll_waiter(1000);
 #endif
 			net_ptr->epoll_dispatcher();
-
+			
 			pk_mgr_ptr->time_handle();
+			
+			net_udp_ptr->epoll_waiter(10, &udp_fd_list);
+			net_udp_ptr->epoll_dispatcher();
+			//peer_mgr_ptr->ArrangeResource();
 			
 			if (*(net_ptr->_errorRestartFlag) == RESTART) {
 				log_ptr->write_log_format("s(u) s \n\n\n", __FUNCTION__, __LINE__, "Program Restart");
 				break;
 			}
+			//log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "----- A cycle -----");
 		}
 		
 		pk_exit_code = pk_mgr_ptr->exit_code;
@@ -1113,8 +1126,7 @@ int main(int argc, char **argv){
 #endif
 		
 		
-		debug_printf("Client Restart \n");
-		//PAUSE
+		
 		
 #ifdef _FIRE_BREATH_MOD_
 		log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "exit_code =", map_channelID_globalVar[thread_key]->exit_code);
@@ -1125,9 +1137,16 @@ int main(int argc, char **argv){
 #endif
 
 		net_ptr->garbage_collection();
+		net_udp_ptr->garbage_collection();
 		log_ptr->write_log_format("s => s (s)\n", (char*)__PRETTY_FUNCTION__, "PF", "graceful exit!!");
 		log_ptr->stop_log_record();
 
+		if (UDT::close(svc_fd_udp) == UDT::ERROR) {
+			debug_printf("ErrCode: %d  ErrMsg: %s \n", UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
+			log_ptr->write_log_format("s(u) s d s s \n", __FUNCTION__, __LINE__, "ErrCode:", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
+			PAUSE
+		}
+		
 		debug_printf("1 \n");
 
 		if (prep) { 
@@ -1150,7 +1169,12 @@ int main(int argc, char **argv){
 		if (net_ptr) {
 			delete net_ptr;
 		}
-		net_ptr = NULL;	
+		net_ptr = NULL;
+		
+		if (net_udp_ptr) {
+			delete net_udp_ptr;
+		}
+		net_udp_ptr = NULL;	
 
 #ifdef _FIRE_BREATH_MOD_
 		map_channelID_globalVar[thread_key]->is_Pk_mgr_ptr_copy_delete = TRUE;
@@ -1186,6 +1210,14 @@ int main(int argc, char **argv){
 			Sleep(1000);
 		}
 		*/
+
+		debug_printf("Client Restart \n");
+		PAUSE
+
+		srand(time(NULL));
+		Sleep(rand()%10+1);
+		
+		
 #ifdef _FIRE_BREATH_MOD_
 		map_channelID_globalVar[thread_key]->errorRestartFlag =0;
 #else

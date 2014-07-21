@@ -1,0 +1,54 @@
+/* 2013.09.06 */
+1. peer::data_close()竟然會在map_fd_pid找不到該socket對應的pid,代表整個系統的table維護有問題
+2. 懷疑在peer::data_close()有可能刪除到不該刪除的table,導致產生"The descriptor is not a socket"這個錯誤訊息
+
+/* 2013.09.10 */
+1. source delay的計算在經過22'32"後會出現問題(過那時間之後計算出來的source delay都一樣)
+2. buf_chunk_t指向chunk_ptr,如果chunk_ptr被delete後會不會有問題(buf_chunk_t指向NULL)?
+
+/* 2013.10.24 */
+1. peer.cpp(1274)會發生segmentation fault，原因可能是map_in_pid_fd在1236行已事先被清除
+
+/* 2013.11.21 */
+1. 定期10分鐘重連PK的版本中，peer可能會收到兩次CHNK_CMD_PEER_REG，第二次的訊息完全錯誤，可能是PK有資料沒清乾淨
+
+/* 2013.11.26 */
+1. 有時候如果網路不穩導致peer有幾秒鐘時間沒收到
+
+/* 2013.11.27 */
+1. Client程式有問題而pause的話，先讓他與其他人的連線(包括PK)中斷 (PK timeout的情況)
+2. Segmentation fault 256 Expression:map/set iterator not incrementable
+
+/* 2013.12.22 */
+發現2013.10.24的segmentation fault原因，並修正完畢(原因是pid誤打成cfd。所以其實每次判斷上都錯誤，發生segmen fault的情況則剛好是pid=cfd的時候)
+
+/* 2013.12.26 */
+ratio(localBitrate/sourceBitrate)會發生分母是0的情形
+
+/* 2014.01.08 */
+logger_client裡的log_buffer, pop出來後沒有free?
+
+/* 2014.01.20 */
+1. FireBreath自身include的header檔要最優先放，不然m_host->getDOMWindow()的時候會發生"Pure virtual function call"的runtime error
+2. plugin的thread改成plugin回傳一個unique的key作為map的key，不再以channel_id作為map的key
+
+/* 2014.02.14 */
+1. 改變source-delay的計算方式:
+		origin: 在testing狀態時是以test-peer來的封包計算source-delay，而不計算PK下來的
+		modify: 只要收到新的封包(過濾後)就會計算source-delay
+
+/* 2014.02.21 */
+1. 送log訊息改成一個p2p chunk只包一個log command
+
+/* 2014.02.23 */
+1. my_public_ip沒有設定
+2. 收到pk的REGISTER後再開始送第一筆message給log-server
+3. log data裡的log header內容不重要
+
+/*  2014.03.05 */
+1. 太多次的WSACleanup()會造成socket error, 錯誤碼是10093
+
+/* 2014.03.21 */
+1. 手動關閉parent-peer時, child-peer沒有送topology給log server
+2. netword.cpp:217 收到list名單後，正在連向那些list名單時被pk踢掉，造成connect error
+3. leastCurrDiff < 0 的問題已解決

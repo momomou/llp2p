@@ -34,6 +34,9 @@
     <Filter Include="原始程式檔\irc">
       <UniqueIdentifier>{179abad7-e837-48f4-859c-b45c0826c5e2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="原始程式檔\udt_lib">
+      <UniqueIdentifier>{4c75bdf3-6dff-4c39-91fe-eda68e11a2b7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\peer_mgr.h">
@@ -171,6 +174,60 @@
     <ClInclude Include="..\register_mgr.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
+    <ClInclude Include="..\udt_lib\api.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\udt_lib\buffer.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\udt_lib\cache.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\udt_lib\ccc.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\udt_lib\channel.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\udt_lib\common.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\udt_lib\core.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\udt_lib\epoll.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\udt_lib\list.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\udt_lib\md5.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\udt_lib\packet.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\udt_lib\queue.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\udt_lib\udt.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\udt_lib\window.h">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\network_udp.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\io_accept_udp.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\io_nonblocking_udp.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="..\io_connect_udp.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Makefile">
@@ -284,6 +341,57 @@
       <Filter>原始程式檔\irc</Filter>
     </ClCompile>
     <ClCompile Include="..\register_mgr.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\udt_lib\api.cpp">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\udt_lib\buffer.cpp">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\udt_lib\cache.cpp">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\udt_lib\ccc.cpp">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\udt_lib\channel.cpp">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\udt_lib\common.cpp">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\udt_lib\core.cpp">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\udt_lib\epoll.cpp">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\udt_lib\list.cpp">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\udt_lib\md5.cpp">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\udt_lib\packet.cpp">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\udt_lib\queue.cpp">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\udt_lib\window.cpp">
+      <Filter>原始程式檔\udt_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\network_udp.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\io_accept_udp.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\io_nonblocking_udp.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\io_connect_udp.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
   </ItemGroup>

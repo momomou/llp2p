@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -27,23 +27,27 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -62,10 +66,10 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <TargetName>LLP2P_Client</TargetName>
+    <TargetName>LLP2P_Client_D</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <TargetName>LLP2P_Client</TargetName>
+    <TargetName>LLP2P_Client_R</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -119,8 +123,11 @@
     <ClInclude Include="..\EpollFake.h" />
     <ClInclude Include="..\io_accept.h" />
     <ClInclude Include="..\io_accept_nat.h" />
+    <ClInclude Include="..\io_accept_udp.h" />
     <ClInclude Include="..\io_connect.h" />
+    <ClInclude Include="..\io_connect_udp.h" />
     <ClInclude Include="..\io_nonblocking.h" />
+    <ClInclude Include="..\io_nonblocking_udp.h" />
     <ClInclude Include="..\irc\irc_client.h" />
     <ClInclude Include="..\irc\libircclient.h" />
     <ClInclude Include="..\irc\libirc_errors.h" />
@@ -143,6 +150,7 @@
     <ClInclude Include="..\logger.h" />
     <ClInclude Include="..\logger_client.h" />
     <ClInclude Include="..\network.h" />
+    <ClInclude Include="..\network_udp.h" />
     <ClInclude Include="..\newtest.h" />
     <ClInclude Include="..\peer.h" />
     <ClInclude Include="..\peer_communication.h" />
@@ -157,6 +165,20 @@
     <ClInclude Include="..\stunt\stuntdef.h" />
     <ClInclude Include="..\stunt\tcp_punch.h" />
     <ClInclude Include="..\stunt_mgr.h" />
+    <ClInclude Include="..\udt_lib\api.h" />
+    <ClInclude Include="..\udt_lib\buffer.h" />
+    <ClInclude Include="..\udt_lib\cache.h" />
+    <ClInclude Include="..\udt_lib\ccc.h" />
+    <ClInclude Include="..\udt_lib\channel.h" />
+    <ClInclude Include="..\udt_lib\common.h" />
+    <ClInclude Include="..\udt_lib\core.h" />
+    <ClInclude Include="..\udt_lib\epoll.h" />
+    <ClInclude Include="..\udt_lib\list.h" />
+    <ClInclude Include="..\udt_lib\md5.h" />
+    <ClInclude Include="..\udt_lib\packet.h" />
+    <ClInclude Include="..\udt_lib\queue.h" />
+    <ClInclude Include="..\udt_lib\udt.h" />
+    <ClInclude Include="..\udt_lib\window.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\config.ini" />
@@ -169,8 +191,11 @@
     <ClCompile Include="..\EpollFake.cpp" />
     <ClCompile Include="..\io_accept.cpp" />
     <ClCompile Include="..\io_accept_nat.cpp" />
+    <ClCompile Include="..\io_accept_udp.cpp" />
     <ClCompile Include="..\io_connect.cpp" />
+    <ClCompile Include="..\io_connect_udp.cpp" />
     <ClCompile Include="..\io_nonblocking.cpp" />
+    <ClCompile Include="..\io_nonblocking_udp.cpp" />
     <ClCompile Include="..\irc\irc_client.cpp" />
     <ClCompile Include="..\libBitStreamHTTP\bit_stream_httpout.cpp" />
     <ClCompile Include="..\libBitStream\bit_stream_out.cpp" />
@@ -187,6 +212,7 @@
     <ClCompile Include="..\logger_client.cpp" />
     <ClCompile Include="..\main.cpp" />
     <ClCompile Include="..\network.cpp" />
+    <ClCompile Include="..\network_udp.cpp" />
     <ClCompile Include="..\peer.cpp" />
     <ClCompile Include="..\peer_communication.cpp" />
     <ClCompile Include="..\peer_mgr.cpp" />
@@ -198,6 +224,19 @@
     <ClCompile Include="..\stream_udp.cpp" />
     <ClCompile Include="..\stunt\tcp_punch.cpp" />
     <ClCompile Include="..\stunt_mgr.cpp" />
+    <ClCompile Include="..\udt_lib\api.cpp" />
+    <ClCompile Include="..\udt_lib\buffer.cpp" />
+    <ClCompile Include="..\udt_lib\cache.cpp" />
+    <ClCompile Include="..\udt_lib\ccc.cpp" />
+    <ClCompile Include="..\udt_lib\channel.cpp" />
+    <ClCompile Include="..\udt_lib\common.cpp" />
+    <ClCompile Include="..\udt_lib\core.cpp" />
+    <ClCompile Include="..\udt_lib\epoll.cpp" />
+    <ClCompile Include="..\udt_lib\list.cpp" />
+    <ClCompile Include="..\udt_lib\md5.cpp" />
+    <ClCompile Include="..\udt_lib\packet.cpp" />
+    <ClCompile Include="..\udt_lib\queue.cpp" />
+    <ClCompile Include="..\udt_lib\window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\irc\libircclient.lib" />

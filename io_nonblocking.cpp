@@ -26,8 +26,6 @@ io_nonblocking::~io_nonblocking(){
 
 int io_nonblocking::handle_pkt_in(int sock)
 {	
-
-//	printf("io_nonblocking::handle_pkt_in\n");
 	Nonblocking_Ctl * Nonblocking_Recv_Ctl_ptr =NULL;
 	int offset = 0;
 	int recv_byte=0;
@@ -50,7 +48,6 @@ int io_nonblocking::handle_pkt_in(int sock)
 		Nonblocking_Recv_Ctl_ptr->recv_packet_state = READ_HEADER_READY;
 
 
-	
 	for(int i =0;i<5;i++){
 
 
@@ -156,15 +153,12 @@ int io_nonblocking::handle_pkt_in(int sock)
 	}
 
 
-
-
-
 	if (chunk_ptr->header.cmd == CHNK_CMD_ROLE) {
 		cout << "CHNK_CMD_ROLE" << endl;
 		_log_ptr->write_log_format("s =>u s \n", __FUNCTION__,__LINE__,"CHNK_CMD_ROLE ");
 		_log_ptr->write_log_format("s =>u s d\n", __FUNCTION__,__LINE__,"CHNK_CMD_ROLE in in io nonblocking : ",sock);
 		/*
-		this part shows the roleof this fd (rescue peer or candidate).
+		this part shows the role of this fd (rescue peer or candidate).
 		save it to the table,and bind to peer_com~
 		*/
 
@@ -179,7 +173,33 @@ int io_nonblocking::handle_pkt_in(int sock)
 		if (map_fd_info_iter != _peer_communication_ptr->map_fd_info.end()) {
 			_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","fd already in map_fd_info in in io nonblocking\n");
 			_logger_client_ptr->log_exit();
-		} else {
+			PAUSE
+		}
+		else {
+			unsigned long his_pid = role_protocol_ptr->send_pid;
+			unsigned long his_manifest = role_protocol_ptr->manifest;
+			unsigned long his_role = role_protocol_ptr->flag;
+			
+			_peer_communication_ptr->map_fd_info[sock] = new struct fd_information;
+			if (!(_peer_communication_ptr->map_fd_info[sock])) {
+				debug_printf("_peer_communication_ptr->map_fd_info[sock] iononblocking new error\n");
+				_log_ptr->write_log_format("s(u) s s u \n", __FUNCTION__,__LINE__," _peer_communication_ptr->map_fd_info[sock]  iononblocking new error");
+				PAUSE
+			}
+			
+			_peer_communication_ptr->map_fd_info[sock]->pid = his_pid;
+			_peer_communication_ptr->map_fd_info[sock]->manifest = his_manifest;
+			_peer_communication_ptr->map_fd_info[sock]->role = his_role;
+		
+			_log_ptr->write_log_format("s(u) s d s d s d s d \n", __FUNCTION__, __LINE__, "sock", sock, "pid", his_pid, "manifest", his_manifest, "role", his_role);
+
+			_net_ptr->epoll_control(sock, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT);
+			_net_ptr->set_fd_bcptr_map(sock, dynamic_cast<basic_class *> (_peer_communication_ptr));
+			
+			
+			
+			/*
+			
 			printf("_peer_communication_ptr->session_id_candidates_set.size: %d \n", _peer_communication_ptr->session_id_candidates_set.size());
 			for(session_id_candidates_set_iter = _peer_communication_ptr->session_id_candidates_set.begin();session_id_candidates_set_iter != _peer_communication_ptr->session_id_candidates_set.end();session_id_candidates_set_iter++){
 				printf("session_id_candidates_set_iter->second->manifest: %d, role_protocol_ptr->manifest: %d \n", session_id_candidates_set_iter->second->manifest, role_protocol_ptr->manifest);
@@ -287,22 +307,17 @@ int io_nonblocking::handle_pkt_in(int sock)
 				printf("_net_ptr->set_fd_bcptr_map(sock, dynamic_cast<basic_class *> (_peer_communication_ptr)); \n");
 				//					_peer_mgr_ptr->fd_list_ptr->push_back(sock);
 			}
-
+			
+			*/
+			
 		}
 
 		//
 
 
-	} else{
-
-		if(chunk_ptr->header.cmd == CHNK_CMD_PEER_CON){
+	} 
+	else {
 		
-			struct chunk_request_msg_t *chunk_request_ptr = (struct chunk_request_msg_t *)chunk_ptr ;
-			printf( "chunk_request_ptr ->info.pid  =%d  \n",chunk_request_ptr ->info.pid   );
-		}
-
-
-
 		printf("unknow or cannot handle cmd  =%d\n",chunk_ptr->header.cmd);
 		_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s d \n","error : unknow or cannot handle cmd in io nonblocking:",chunk_ptr->header.cmd);
 		_logger_client_ptr->log_exit();
@@ -316,7 +331,6 @@ int io_nonblocking::handle_pkt_in(int sock)
 
 
 	return RET_OK;
-
 
 }
 

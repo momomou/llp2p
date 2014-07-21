@@ -549,6 +549,7 @@ unsigned int logger::diff_TimerGet_ms(struct timerStruct *start, struct timerStr
 
 	unsigned int tickReturn = diffTime_ms(start->tickTime, end->tickTime);
 	unsigned int clockReturn = diffgetTime_ms(start->clockTime, end->clockTime);
+	//debug_printf("tickReturn = %u  clockReturn = %u \n", tickReturn, clockReturn);
 
 	//program run 10 hours for debug~
 	if (tickReturn >= 36000000) {

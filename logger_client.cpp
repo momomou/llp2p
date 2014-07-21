@@ -1488,7 +1488,8 @@ void logger_client::log_exit()
 			debug_printf("send info to log server error : %d %d \n", _send_byte, socketErr);
 			_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, socketErr);
 			*(_net_ptr->_errorRestartFlag) = RESTART;
-			PAUSE
+			//PAUSE
+			break;
 		}
 	}
 	
@@ -1623,11 +1624,12 @@ int logger_client::handle_pkt_out(int sock)
 					int socketErr = errno;
 #endif
 					exit_code = LOG_SOCKET_ERROR;
-					log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "send info to log server error :", _send_byte, socketErr);
+					//log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "send info to log server error :", _send_byte, socketErr);
 					debug_printf("send info to log server error : %d %d \n", _send_byte, socketErr);
 					_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, socketErr);
-					log_exit();
-					PAUSE
+					//log_exit();
+					//PAUSE
+					*(_net_ptr->_errorRestartFlag) = RESTART;
 				}
 			}
 		//}
@@ -1642,11 +1644,12 @@ int logger_client::handle_pkt_out(int sock)
 #else
 			int socketErr = errno;
 #endif
-			log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "send info to log server error :", _send_byte, socketErr);
+			//log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "send info to log server error :", _send_byte, socketErr);
 			debug_printf("send info to log server error : %d %d \n", _send_byte, socketErr);
 			_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "send info to log server error :", _send_byte, socketErr);
-			log_exit();
-			PAUSE
+			//log_exit();
+			//PAUSE
+			*(_net_ptr->_errorRestartFlag) = RESTART;
 		}
 	}
 	

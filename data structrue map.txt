@@ -1,0 +1,147 @@
+                                                                                                                                                                                                                                                                                                                                                   
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+                                                                                                                                                                                                                                                                                                   +--cmd             <unsigned char>                                                                                                             
+                                                                                                                                                                                                                                                                                                   +--stream          <unsigned char 3 bit>                                                           
+                                                                                                                                                                                                                                                                                                   +--payload_type    <unsigned char 5 bit>                                                           
+                                                                                                                                                                                                  +--buffer <char*>                                                                                +--rsv_1           <unsigned char 1 bit>                      
+                                                                                                                                                                                                  |                                            +--header <struct chunk_header_t>--P2P main header--+--mf              <unsigned char 1 bit> 
+                                                                                                                                                                                                  +--chunk_ptr <struct chunk_t*>---------------|                                                   +--part_seq        <unsigned char 6 bit>                                                                                   
+                                                                                                                                                                                                  |                                            +--buf <unsigned char[0]>                           +--stream_id       <unsigned char>                
+                                                                                                                                           +--recv_packet_state <enum pkg_nonblocking_ctl_state>  +--offset <unsigned int>                                                                         +--sequence_number <unsigned int> 
+                                                                                      +--nonBlockingRecv     <struct nonblocking_ctrl>-----|                                                      |                                                                                                +--timestamp       <unsigned int>                        
+                                                                                      |                                                    +--recv_ctl_info <Network_nonblocking_ctl>-------------+--total_len <unsigned int>                                                                      +--length          <unsigned long> 
+                                               +--io_nonblockBuff <Nonblocking_Buff>--+--nonBlockingSendData <struct nonblocking_ctrl>                                                            |  
+                                               |                                      |                                                                                                           +--expect_len <unsigned int>                                                        
+                                               |                                      +--nonBlockingSendCtrl <struct nonblocking_ctrl>                                                            |    
+                                               |                                                                                                                                                  +--serial_num <unsigned int>                                                                                                                                      
+map_fd_NonBlockIO <int, struct innonBlocking>--+--outPutQue <queue<struct chunk_t*>>                                                                                                              |                                                                  
+                                               |                                                                                                                                                  +--ctl_state <enum network_nonblocking_ctl_state>                        
+                                               +--ioFinishFlag <unsigned long>                                                                                                                                                                                                                                
+                                                                                                                                          
+                                                                                                                                          
+                                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                          +--pid           <unsigned long>      
+                                                                          +--level         <unsigned long>   
+                                                                          +--public_ip     <unsigned long>        
+                                                                          +--private_ip    <unsigned long>         
+                                                                          +--tcp_port      <unsigned short>        
+                              +--peerInfo       <struct peer_info_t>------+--udp_port      <unsigned short>                                                  
+                              |                                           +--public_port   <unsigned short>         
+                              +rescueStatsArry  <int [PARAMETER_M]>       +--private_port  <unsigned short>                                                                 
+                              |                                           +--upnp_acess    <unsigned long>        
+                              +timeOutLastSeq   <volatile unsigned int>   +--NAT_type      <unsigned long>                                              
+<struct peer_connect_down_t>--|                                           +--manifest      <unsigned long>                                     
+                              +timeOutNewSeq    <volatile unsigned int>                                                                                                                                           
+                              |                                                                                                                                            
+                              +lastTriggerCount <volatile unsigned int>                                                      
+                              |                                                       
+                              +outBuffCount     <volatile unsigned int>                                                       
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+                                                                                     
+Rescue觸發原因
+1. source_delay_detection，封包的delay過大的時候會觸發rescue
+2. pk_mgr(2289) packet lost太多，當收到(Xcount*BUFF_SIZE*PARAMETER_X)多個packet之後會檢查packet lost的數量，如果
+	超過((CHUNK_LOSE*PARAMETER_X*Xcount)/sub_stream_num)這個數目就觸發rescue                                                              
+3.                                                                                     
+                                   
+尋找rescue觸發點:		"Rescue triggered"
+尋找source delay的值:	"source delay"
+尋找start delay的值:	"start_delay"
+尋找capacity的值:		"capacity"
+
+[ERROR] 有error發生
+[DEBUG] 可能有問題的點
+[PROBLEM] 系統不該出現的狀況卻發生
+[QUESTION] 疑惑的點 
+[CHECK POINT] 找BUG的檢查點
+[WARNING] 警告的地方，最好不要發生
+ratio: bandwidth detection (child_input_bandwidth/parent_output_bandwidth)
+
+best reducing ratio: 0.4%
+best seed/total ratio: 0.74%        
+
+送capacity給PK的三種情況
+1. JOIN狀態收到empty list
+2. JOIN狀態不是收到empty list，不管最後連線有沒有成功(parent-peer可能是PK抑或是peer)
+3. 收到CHNK_CMD_PEER_SET_MANIFEST
+
+
+substream number 必須是2的倍數
+
+
+累加每個chunk的source-delay: 	pk_mgr::handle_stream() -> 	pk_mgr::quality_source_delay_count() 	-> logger_client::set_source_delay()
+送max_source_delay給PK: 		pk_mgr::time_handle() 	-> 	logger_client::send_max_source_delay()
+累加每個chunk的quality:			pk_mgr::handle_stream() -> 	pk_mgr::quality_source_delay_count()
+累加每個進來的chunk的大小:		pk_mgr::handle_stream() ->	set_in_bw()
+累加每個出去的chunk的大小:		peer::handle_pkt_out()	->	set_out_bw()
+送bandwidth和quality給PK:		pk_mgr::time_handle()	->	logger_client::send_bw()
+                          
+
+防錯機制code:
+_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u \n", "[ERROR] can not find sub stream struct in quality_source_delay_count", __LINE__);
+debug_printf("[ERROR] can not find sub stream struct in quality_source_delay_count \n");
+_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "can not find sub stream struct in quality_source_delay_count");
+_logger_client_ptr->log_exit();
+data_close(_sock, "[ERROR] send_capacity_to_pk");
+PAUSE
+			
+			
+
+multi-stream:
+目前client這邊並沒有一個port對應多個streamID，將來要修。streamID是根據PK給的chunk中定義的
+
+偵測rescue:
+rescue_detecion()  ->  measure()	// 針對頻寬流量判斷是否要觸發rescue
+source_delay_detection()
+handle_stream()						// 檢查遺失封包的seq超過buff的數量太多
+
+
+"Program Restart":		程式restart, 向PK拿一個新的PID
+
+開個player的listen socket port 區分 channel_ID		// port <-> channel ID. e.g. 127.0.0.1:3000 給 channel id 1
+player要求的xxxx.flv 區分 stream_ID					// xxxx.flv <-> stream ID. e.g. 01.flv 給 stream id 1
+
+jwplayer可以容忍超過一個keyframe時間間隔以上的封包不見
+
+system_log:
+"LOG_PEER_LEAVE": 解peer離開的原因
+"LOG_REG_LIST_TESTING" \ "LOG_RESCUE_TESTING": peer選到的pid,並開始test delay
+"LOG_REG_LIST_DETECTION_TESTING_SUCCESS" \ "LOG_RESCUE_DETECTION_TESTING_SUCCESS": peer選到的pid成功,成為真正的parent
+LOG_TEST_DETECTION_FAIL: peer選到的pid失敗,parent還給PK
+
+已完成exit_code的檔案:pk_mgr, peer_com, peer_mgr, peer, 
+
+
+pk timeout觸發情況:
+只要有收到pk的封包,flag(timeoutPass_flag)設成1，如果5秒內都沒從pk收到更新的seq，flag設成0，若再經過一次5秒後flag依舊是0，判定為pk timeout(可以判定pk的確超過5秒的時間沒送封包)
+
+如果malloc錯誤，立刻回傳error message給main thread，並中斷所有程序
+
+如果delay會拉很長，要注意bucket_size(config.ini)的值；Xcount*PARAMETER_X:一秒鐘收到的packet數量，
+因此最大可容忍的delay不要超過bucket_size的值(Xcount*PARAMETER_X*BUFF_SIZE < bucket_size)，否則
+leastCurrDiff的計算可能會產生bug
+
+
+Rescue type:
+[800 peers, 1M]
+type 0: 6407
+type 1: 594
+type 2:	973
+
+[450 peers, 2M]
+type 0: 3254
+type 1: 413
+type 2:	52
+
+
+peer_mgr::handle_test_delay: 同一台電腦的程式能不能互連開關在這裡

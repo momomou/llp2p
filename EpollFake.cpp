@@ -383,7 +383,8 @@ int epoll_wait (int __epfd, struct epoll_event *__events, int __maxevents, int _
 
 	max_fd = find_max_fd(fd_list);
 	num_ready = select(max_fd + 1, &read_fds, &write_fds, &error_fds, &tv);
-
+	//printf("fd size = %d  read_fds.fd_count= %d write_fds.fd_count = %d  \n", fd_list->size(), read_fds.fd_count, write_fds.fd_count);
+						
 	if(num_ready < 0) {
 		//cout << "max_fd = " << max_fd << endl;
 		//cout << "select" << endl;
@@ -420,8 +421,19 @@ int epoll_wait (int __epfd, struct epoll_event *__events, int __maxevents, int _
 					printf("The socket is not connected (connection-oriented sockets only). ");
 					break;
 		    	case WSAENOTSOCK:
-					printf("The descriptor is not a socket. ");
+					printf("The descriptor is not a socket. \n");
 					printf(" %d \n", num_ready);
+					printf(" max_fd = %d \n", max_fd);
+					for (fd_iter = fd_list->begin(); fd_iter != fd_list->end(); fd_iter++) {
+						printf("fd size = %d  read_fds.fd_count= %d write_fds.fd_count = %d fd = %d \n", fd_list->size(), read_fds.fd_count, write_fds.fd_count, *fd_iter);
+						struct sockaddr_in addr;
+						int addrLen = sizeof(struct sockaddr_in);
+						int	aa;
+						aa = getsockname(*fd_iter, (struct sockaddr *)&addr, &addrLen);
+						printf("  aa:%2d  cfd: %2d , %s:%d", aa, *fd_iter, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+						aa = getpeername(*fd_iter, (struct sockaddr *)&addr, &addrLen);
+						printf("  aa:%2d  cfd: %2d , %s:%d \n", aa, *fd_iter, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+					}
 					PAUSE
 					//system("PAUSE");
 					break;

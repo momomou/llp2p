@@ -8,6 +8,7 @@
 #include <map>
 
 class network;
+class network_udp;
 class logger;
 class peer_mgr;
 class rtsp_viewer;
@@ -31,7 +32,7 @@ public:
 	struct timerStruct start;
 	struct timerStruct end;
 	struct timerStruct reconnect_timer;	// Test for reconnect
-	volatile unsigned long Xcount;		// Number of average received packets per unit time. Xcount*PARAMETER_X:一秒鐘收到的packet數量
+	volatile unsigned long Xcount;		// Number of average received packets per unit time. Xcount:一秒鐘收到的packet數量
 	unsigned long totalMod ;
 	unsigned long reSynTime;
 	struct timerStruct lastSynStartclock;
@@ -51,14 +52,16 @@ public:
 //	LARGE_INTEGER teststart,testend;
 //	LARGE_INTEGER syn_round_start;
 	
+	// The main table storing peer state
+	multimap <unsigned long, struct peer_info_t *> map_pid_parent_temp;		// My temp parent (life: get-rescue-list <-----> recv-test-delay)
+	multimap <unsigned long, struct peer_info_t *> map_pid_child_temp;		// My temp child
+	map<unsigned long, struct peer_connect_down_t *> map_pid_parent;		// My real parent-peer (第一個回test reply的peer會塞進去) (life: recv-test-delay <-----> rescue-triggered)
+	map<unsigned long, struct peer_info_t *> map_pid_child;					// My real child-peer
+	map<unsigned long, struct peer_info_t *> map_pid_child2;				// My real child-peer ????
 
-	//temp parent 
-	multimap <unsigned long, struct peer_info_t *> map_pid_peer_info;
-	//temp child
-	multimap <unsigned long, struct peer_info_t *> map_pid_child_peer_info;
-
-	map<unsigned long, struct peer_info_t *> map_pid_rescue_peer_info;		 // real child-peer
-	map<unsigned long, struct peer_connect_down_t *> map_pid_peerDown_info ; // real parent-peer
+	// These two tables are to prevent more than 2 connections (upstream + downstream)
+	map<unsigned long, int> parents_table;									// <pid, state> table, to prevent too much connections(no more than 2)
+	map<unsigned long, int> children_table;									// <pid, state> table, to prevent too much connections(no more than 2)
 
 	//about player  ,delete by bit_stream_server
 	map<int, stream *> _map_stream_fd_stream;					// <stream_fd, stream *>
@@ -133,12 +136,12 @@ public:
 
 	unsigned long stream_number;	//channel 下stream的個數
 	
-	pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr , logger *log_ptr , configuration *prep , logger_client * logger_client_ptr, stunt_mgr *stunt_mgr);
+	pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr,  network_udp *net_udp_ptr , logger *log_ptr , configuration *prep , logger_client * logger_client_ptr, stunt_mgr *stunt_mgr);
 	~pk_mgr();
 
-	void init(unsigned short ptop_port);
+	void init(unsigned short ptop_port, unsigned short ptop_udp_port);
 	int build_connection(string ip, string port); 
-	int handle_register(unsigned short ptop_port, string svc_udp_port);
+	int handle_register(unsigned short ptop_port, unsigned short svc_udp_port);
 	void peer_mgr_set(peer_mgr *peer_mgr_ptr);
 	
 	void add_stream(int stream_fd, stream *strm, unsigned strm_type);
@@ -196,15 +199,15 @@ public:
 	unsigned long manifestToSubstreamNum(unsigned long  manifest );
 
 	void HandleRescueManifest(unsigned long rescue_manifest, unsigned long *manifest_A, unsigned long *manifest_B);
-
+	void ArrangeResource();
 
 //clear
-	void clear_map_pid_peer_info();
-	void clear_map_pid_peer_info(unsigned long manifest);
-	void clear_map_pid_peerDown_info();
-	void clear_map_pid_rescue_peer_info();
-	void clear_map_pid_child_peer_info(unsigned long pid,unsigned long manifest);
-	void clear_map_pid_child_peer_info();
+	void clear_map_pid_parent_temp();
+	void clear_map_pid_parent_temp(unsigned long manifest);
+	void clear_map_pid_parent();
+	void clear_map_pid_child1();
+	void clear_map_pid_child_temp(unsigned long pid,unsigned long manifest);
+	void clear_map_pid_child_temp();
 
 	void clear_delay_table();
 	void ClearSubstreamTable();
@@ -225,6 +228,8 @@ public:
 	unsigned long my_private_ip;
 	unsigned short my_private_port;
 
+	int session_id;
+
 private:
 	
 
@@ -233,6 +238,7 @@ private:
 	stunt_mgr *_stunt_mgr_ptr;
 	logger_client * _logger_client_ptr;
 	network *_net_ptr;
+	network_udp *_net_udp_ptr;
 	logger *_log_ptr;
 	configuration *_prep;
 	peer_mgr * _peer_mgr_ptr;
@@ -244,7 +250,7 @@ private:
 	bool sentStartDelay;
 	bool first_legal_pkt_received;
 
-	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
+	//map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 
 };
 

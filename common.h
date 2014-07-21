@@ -41,8 +41,8 @@
 #endif
 */
 // Role of function caller
-#define RESCUE_PEER		0	// the function caller is child
-#define CANDIDATE_PEER	1	// the function caller is parent
+#define CHILD_PEER		0	// the function caller is child
+#define PARENT_PEER		1	// the function caller is parent
 
 // Substream states
 #define SS_INIT			0	// The substream is in join state when not receive the first data
@@ -59,12 +59,14 @@
 
 ////resuce PARAMETER////
 #define PARAMETER_X		4				// chunk packets per (1000/PARAMETER_X) ms
-#define MAX_DELAY 		2000			// source delay PARAMETER ms
+#define MAX_DELAY 		500			// source delay PARAMETER ms
 #define SOURCE_DELAY_CONTINUOUS 0.5		// The maximal permissive times that souce-delay is bigger than MAX_DELAY. SOURCE_DELAY_CONTINUOUS * x(packets/s) / substream
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue(頻寬檢查)
 #define PARAMETER_M		16		// 8
 #define PARAMETER_N		10		// 5
 #define PARAMETER_P		6		// 3
+
+#define TEST_DELAY_TIME	4
 
 // LOG SERVER
 #define LOGPORT		8754
@@ -72,6 +74,7 @@
 //ms
 #define CONNECT_TIME_OUT	2000
 #define NETWORK_TIMEOUT		5000		// Period of check peer's unnormal disconnection
+#define DATA_TIMEOUT		5000		// Timeout for rescue type 3
 #define BASE_RESYN_TIME		20000
 
 #define NEEDSOURCE_THRESHOLD	0.96	// substream在stable或有duplicate source狀態的數目 / 全部substream數目, 超過這個threshold可以不必向pk要source
@@ -85,7 +88,7 @@
 
 
 // Time interval of calculation Xcount
-#define XCOUNT_INTERVAL		10000
+#define XCOUNT_INTERVAL		20000
 //io_accept fd remain period
 #define FD_REMAIN_PERIOD	1000
 
@@ -243,7 +246,7 @@ using std::bitset;
 #pragma pack(1)
 
 // Defined Macro
-#define PAUSE for (;;) { cout << "PAUSE , Press any key to continue..." << __FUNCTION__ << ":" << __LINE__; fgetc(stdin); }
+#define PAUSE for (;;) { cout << "PAUSE , Press any key to continue..." << __FUNCTION__ << ":" << __LINE__ << endl; fgetc(stdin); }
 #ifdef DEBUG
     #define debug_printf(...) do { printf("(%d)\t", __LINE__); printf(__VA_ARGS__); } while (0)
 #else
@@ -286,6 +289,21 @@ using std::bitset;
 #define RTMP_PKT_BUF_MAX	30000	// This value defines the max rtmp packet size
 #define RTMP_PKT_BUF_PAY_SIZE	(RTMP_PKT_BUF_MAX - sizeof(struct chunk_header_t))	// This value defines the max rtp packet size
 
+
+// Peer state in peer-table
+#define PEER_INIT					0x01
+#define PEER_OPENED					0x02
+#define PEER_LISTENING				0x03
+#define PEER_CONNECTING				0x04
+#define PEER_CONNECTED				0x05
+#define PEER_CONNECTED_PARENT		0x06
+#define PEER_CONNECTED_CHILDREN		0x07
+#define PEER_BROKEN					0x08
+#define PEER_CLOSING				0x09
+#define PEER_CLOSED					0x10
+#define PEER_NONEXIST				0x11
+
+
 #define CHNK_CMD_PEER_REG				0x01	// register
 //#define CHNK_CMD_RESCUE_LIST			0x02	// recv rescue list
 //#define CHNK_CMD_PEER_RSC				0x03	// rescue cmd
@@ -320,7 +338,7 @@ using std::bitset;
 //#define CHNK_CMD_PEER_START_DELAY_UPDATE			0X1C
 //#define CHNK_CMD_PEER_PARENT_CHILDREN	0xF0	//暫時不用
 #define CHNK_CMD_TOPO_INFO				0x1E
-#define CHNK_CMD_ROLE					0x1F
+#define CHNK_CMD_ROLE					0x1F	// Determine stream direction
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 #define CHNK_CMD_LOG					0x20	// Send to log-server for data
 #define CHNK_CMD_LOG_DEBUG 				0X21	// Send to log-server for debug
@@ -468,6 +486,7 @@ struct peer_info_t {
 	UINT32 NAT_type;					//unsigned long NAT_type;	//from 1 to 4 (4 cannot punch)
 //////////NAT////////////
 	UINT32 manifest;					//unsigned long manifest;
+	UINT32 session_id;
 };
 
 
@@ -627,6 +646,8 @@ struct peer_connect_down_t {
 
 struct chunk_delay_test_t{
 	struct chunk_header_t header;
+	UINT32 pid;
+	UINT32 session_id;
 	UINT8 buf[0];								//unsigned char buf[0];
 };
 
@@ -884,15 +905,22 @@ struct substream_state {
 	bool dup_src;						// A flag whether the peer needs source from pk when in SS_RESCUE and SS_TEST state
 };
 
+struct substream_timer {
+	struct timerStruct timer;			// timer refresh if this data packet of this substream has received
+	bool timeout_flag;
+};
+
 struct substream_info {
 	bool first_pkt_received;
 	bool timeout_flag;					
 	UINT32 first_pkt_seq;						// Record the first packet
 	UINT32 latest_pkt_seq;						// The latest packet received so far
 	struct timerStruct latest_pkt_client_time;	// The time when the latest packet received in local time
+	struct timerStruct parent_changed_time;		// The time when parent of the substream has changed(避免Rescue_type 1 的誤判)
 	UINT32 latest_pkt_timestamp;				// The timestamp of the latest packet
 	struct substream_state state;
 	struct source_delay source_delay_table;
+	struct substream_timer timer;				// Record the time(for rescue type 3)
 	struct substream_data data;
 	UINT32 current_parent_pid;					// The current parent pid
 	UINT32 previous_parent_pid;					
@@ -988,11 +1016,11 @@ struct peer_com_info{
 
 struct manifest_timmer_flag{
 	UINT32 pid;									//unsigned long	pid;
-	UINT32 firstReplyFlag;						//unsigned long	firstReplyFlag;
+	UINT32 firstReplyFlag;						//unsigned long	firstReplyFlag;		// A flag for the session if get the first reply peer
 	UINT32 networkTimeOutFlag;					//unsigned long	networkTimeOutFlag;
 	UINT32 connectTimeOutFlag;					//unsigned long	connectTimeOutFlag;
 	UINT32 rescue_manifest;						//unsigned long	rescue_manifest;	//may be rescue peer or candidates
-	INT32 peer_role;							//int peer_role;	//0 rescue peer 1 candidate
+	INT32 peer_role;							//int peer_role;	// The role of that peer, not mine
 	//timer
 	struct	 timerStruct	networkTimeOut;
 	struct	 timerStruct	connectTimeOut;
@@ -1006,7 +1034,7 @@ struct chunk_child_info {
 };
 
 struct fd_information {
-	INT32 flag;									//int flag;	//flag 0 rescue peer, flag 1 candidates, and delete in stop
+	INT32 role;									//int flag;	//flag 0 rescue peer, flag 1 candidates, and delete in stop
 	UINT32 manifest;							//unsigned long manifest;	//must be store before io_connect, and delete in stop
 	UINT32 pid;									//unsigned long pid;	//must be store before io_connect, and delete in stop
 	UINT32 session_id;							//unsigned long session_id;	//must be store before io_connect, and delete in stop
@@ -1271,8 +1299,8 @@ struct log_topology {
 	UINT32 manifest;
 };
 
-#define INIT 0
-#define IO_FINISH 1
+//#define INIT 0
+//#define IO_FINISH 1
 
 
 struct ioNonBlocking {
