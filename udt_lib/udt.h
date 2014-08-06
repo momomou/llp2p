@@ -60,6 +60,10 @@ written by
 #include <vector>
 
 
+//#include "../stund/stun.h"
+//#include "../stund/udp.h"
+
+
 ////////////////////////////////////////////////////////////////////////////////
 
 //if compiling on VC6.0 or pre-WindowsXP systems
@@ -110,6 +114,22 @@ written by
 typedef SYSSOCKET UDPSOCKET;
 typedef int UDTSOCKET;
 
+////////////////////////////////////////////////////////////////////////////////
+
+// STUN part
+/*
+typedef struct
+{
+	INT16 port;
+	INT32 addr;
+} StunAddress4;
+
+typedef struct
+{
+	char value[256];
+	UINT16 sizeValue;
+} StunAtrString;
+*/
 ////////////////////////////////////////////////////////////////////////////////
 
 typedef std::set<UDTSOCKET> ud_set;
@@ -353,6 +373,7 @@ UDT_API int getlasterror_code();
 UDT_API const char* getlasterror_desc();
 UDT_API int perfmon(UDTSOCKET u, TRACEINFO* perf, bool clear = true);
 UDT_API UDTSTATUS getsockstate(UDTSOCKET u);
+//int stunRandomPort();
 
 }  // namespace UDT
 

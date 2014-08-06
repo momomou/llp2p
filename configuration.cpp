@@ -1,4 +1,4 @@
-// Copyright (c) 2010, NetXtream Inc.
+﻿// Copyright (c) 2010, NetXtream Inc.
 // All rights reserved.
 // 
 // Author: Yeh-Sheng-Lin
@@ -7,54 +7,49 @@
 
 #include "configuration.h"
 #include "common.h"
+#include "json_lib/json.h"
+#include <string>
+#include <algorithm> // sort
+#include <stdio.h>
+
+using namespace std;
+
 
 configuration::configuration() : filename(""), tmp_only(true) 
 {
-	
+	PAUSE	
 }
 
 configuration::configuration(string file) : filename(file), tmp_only(false) 
 {
-	
-#ifdef _FIRE_BREATH_MOD_
-	map_table["bucket_size"] = "8192";
-	map_table["channel_id"] = "0";
-	map_table["html_size"] = "8192";
-	map_table["lane_depth"] = "3";
-	map_table["max_lane"] = "8";
-	map_table["min_lane"] = "1";
-	map_table["pk_ip"] = "140.114.71.174";
-	map_table["pk_port"] = "8856";
-	map_table["log_ip"] = "140.114.71.174";
-	map_table["log_port"] = "9956";
-	map_table["stream_local_port"] = "3000";
-	map_table["sub_stream_num"] = "4";
-	map_table["svc_tcp_port"] = "5566";
-	map_table["svc_udp_port"] = "7788";
-#else
-	fstream fh(filename.c_str(), fstream::in);
-	if (fh.is_open()) {
-		string linebuf;
-		while(getline(fh, linebuf)) {
-			size_t pos;                                     // we don't need initial this value
+	std::string input = readConfigFile("llp2p.conf");
+	Json::Reader reader;
+	Json::Value value;
+	if (reader.parse(input, value)) {
+		map_table["bucket_size"] = value["BUCKET_SIZE"].asString();
+		map_table["channel_id"] = value["CHANNEL_ID"].asString();
+		map_table["html_size"] = value["HTML_SIZE"].asString();
+		map_table["lane_depth"] = value["LANE_DEPTH"].asString();
+		map_table["max_lane"] = value["MAX_LANE"].asString();
+		map_table["min_lane"] = value["MIN_LANE"].asString();
+		map_table["pk_ip"] = value["PK_SERVER"]["IP"].asString();
+		map_table["pk_port"] = value["PK_SERVER"]["PORT"].asString();
+		map_table["reg_ip"] = value["REG_SERVER"]["IP"].asString();
+		map_table["reg_port"] = value["REG_SERVER"]["PORT"].asString();
+		map_table["log_ip"] = value["LOG_SERVER"]["IP"].asString();
+		map_table["log_port"] = value["LOG_SERVER"]["PORT"].asString();
+		map_table["stun_ip"] = value["STUN_SERVER"]["IP"].asString();
+		map_table["stream_local_port"] = value["STREAM"]["PORT"].asString();
+		map_table["svc_tcp_port"] = value["P2P_TCP_PORT"].asString();
+		map_table["svc_udp_port"] = value["P2P_UDP_PORT"].asString();
 
-			if(linebuf.empty()) continue;          // equal empty string
-			if((pos = linebuf.find_first_of("=")) == string::npos) continue;
-			if(pos+1 == linebuf.size()) continue;           // avoid KEY=[NULL]
-
-			string key = linebuf.substr(0, pos);
-			string val = linebuf.substr(pos+1);
-
-			if(key.empty() || val.empty()) continue;
-
-			map_table[key] = val;                           // if duplicate key, it will override the value
+		debug_printf("---------Configuration Setting--------- \n");
+		for (map<string, string>::iterator iter = map_table.begin(); iter != map_table.end(); iter++) {
+			debug_printf("%s : %s \n", iter->first.c_str(), iter->second.c_str());
 		}
-
-		fh.close();
+		debug_printf("--------------------------------------- \n");
 	}
-    else{
-		printf("can't open 'config.ini'\n");
-
+	else {
 		map_table["bucket_size"] = "8192";
 		map_table["channel_id"] = "0";
 		map_table["html_size"] = "8192";
@@ -63,15 +58,16 @@ configuration::configuration(string file) : filename(file), tmp_only(false)
 		map_table["min_lane"] = "1";
 		map_table["pk_ip"] = "140.114.71.174";
 		map_table["pk_port"] = "8856";
+		map_table["reg_ip"] = "140.114.71.174";
+		map_table["reg_port"] = "7756";
 		map_table["log_ip"] = "140.114.71.174";
 		map_table["log_port"] = "9956";
 		map_table["stream_local_port"] = "3000";
-		map_table["sub_stream_num"] = "4";
+		//map_table["sub_stream_num"] = "4";
 		map_table["svc_tcp_port"] = "5566";
 		map_table["svc_udp_port"] = "7788";
-	
+		debug_printf("----------------*****------------------ \n");
 	}
-#endif
 	
 /*
 #ifdef _FIRE_BREATH_MOD_
@@ -143,9 +139,34 @@ configuration::~configuration()
 
 }
 
+std::string configuration::readConfigFile(const char *path) {
+	FILE *file = fopen(path, "rb");
+	if (!file)
+		return std::string("");
+	fseek(file, 0, SEEK_END);
+	long size = ftell(file);
+	fseek(file, 0, SEEK_SET);
+	std::string text;
+	char *buffer = new char[size + 1];
+	buffer[size] = 0;
+	if (fread(buffer, 1, size, file) == (unsigned long)size)
+		text = buffer;
+	fclose(file);
+	delete[] buffer;
+	return text;
+}
+
 void configuration::add_key(const char *key,std::string val)
 {
     map_table[key] = val; 
+}
+
+void configuration::add_key(const char *key, unsigned short val)
+{
+	string s;
+	stringstream ss(s);
+	ss << (int)val;
+	map_table[key] = ss.str();
 }
 
 void configuration::read_key(const char *key, bool & retval) const

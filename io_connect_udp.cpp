@@ -29,6 +29,7 @@ io_connect_udp::~io_connect_udp()
 
 int io_connect_udp::handle_pkt_in(int sock)
 {
+
 	return RET_OK;
 }
 
@@ -37,7 +38,10 @@ int io_connect_udp::handle_pkt_in_udp(int sock)
 	/*
 	we will not inside this part
 	*/
-
+	debug_printf("sock %d  state %d \n", sock, UDT::getsockstate(sock));
+	if (UDT::getsockstate(sock) != UDTSTATUS::CONNECTED) {
+		debug_printf("sock %d  state %d \n", sock, UDT::getsockstate(sock));
+	}
 	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : place in io_connect_udp::handle_pkt_in\n");
 	_logger_client_ptr->log_exit();
 
@@ -57,7 +61,10 @@ int io_connect_udp::handle_pkt_out_udp(int sock)
 	in this part means the fd is built. it finds its role and sends protocol to another to tell its role.
 	bind to peer_com~ for handle_pkt_in/out.
 	*/
-	
+	debug_printf("sock %d  state %d \n", sock, UDT::getsockstate(sock));
+	if (UDT::getsockstate(sock) != UDTSTATUS::CONNECTED) {
+		//debug_printf("sock %d  state %d \n", sock, UDT::getsockstate(sock));
+	}
 	int error_return;
 	
 	_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "sock", sock, "state", UDT::getsockstate(sock));

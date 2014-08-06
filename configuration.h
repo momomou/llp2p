@@ -22,8 +22,11 @@ public:
 	configuration(string file);						// read-write preference  
 	virtual ~configuration();
 
+	string readConfigFile(const char *path);
+
     //void configuration::add_key(const char *key,std::string val);
-	void add_key(const char *key,std::string val);
+	void add_key(const char *key, std::string val);
+	void add_key(const char *key, unsigned short val);
 
 	void read_key(const char *key, bool & retval) const;		// find the value of parameter in config.ini  
 

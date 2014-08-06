@@ -94,7 +94,7 @@ int rtmp_server::handle_pkt_in(int sock)
 	_rtmp_viewer = new rtmp_viewer(_stream_id, _net_ptr, _log_ptr, this, _amf_ptr, _rtmp_ptr, _rtmp_supplement_ptr, _pk_mgr_ptr, fd_list_ptr);
 	if (!_rtmp_viewer) {
 		cout << "can not allocate rtmp viewer!!!" << endl;
-		::close(new_fd);
+		::_close(new_fd);
 		return RET_ERROR;
 	}
 

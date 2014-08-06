@@ -89,8 +89,6 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr, ne
 
 	_prep->read_key("bucket_size", _bucket_size);
 
-	debug_printf("_bucket_size=%d \n", _bucket_size);
-	
 	buf_chunk_t = NULL;
 	buf_chunk_t = (struct chunk_t **)malloc(_bucket_size * sizeof(struct chunk_t **) ) ;
 	memset( buf_chunk_t, 0, _bucket_size * sizeof(struct chunk_t **) );
@@ -720,12 +718,6 @@ void pk_mgr::init(unsigned short ptop_port, unsigned short ptop_udp_port)
 	//_prep->read_key("svc_tcp_port", svc_tcp_port);	//svc_tcp_port is replaced by ptop_port
 	//_prep->read_key("svc_udp_port", svc_udp_port);	//svc_tcp_port is replaced by ptop_udp_port
 
-	debug_printf("_bucket_size: %d \n", _bucket_size);
-	debug_printf("pk_ip: %s \n", pk_ip.c_str());
-	debug_printf("pk_port: %s \n", pk_port.c_str());
-	debug_printf("channel_id: %d \n", _channel_id);
-	debug_printf("svc_udp_port: %s \n", svc_udp_port.c_str());
-
 	pkDownInfoPtr = new struct peer_connect_down_t ;
 	if (!pkDownInfoPtr) {
 		handle_error(MALLOC_ERROR, "[ERROR] pkDownInfoPtr new error", __FUNCTION__, __LINE__);
@@ -1108,6 +1100,7 @@ int pk_mgr::handle_pkt_in(int sock)
 		debug_printf("bit_rate = %lu \n", bit_rate);
 		debug_printf("sub_stream_num = %lu \n", sub_stream_num);
 		debug_printf("my_public_ip = %s \n", inet_ntoa(*(struct in_addr *)&my_public_ip));
+		debug_printf("my_private_ip = %s \n", inet_ntoa(*(struct in_addr *)&my_private_ip));
 		debug_printf("inside_lane_rescue_num = %lu \n", inside_lane_rescue_num);
 		debug_printf("is_seed = %lu \n", chunk_register_reply->is_seed);
 		debug_printf("pkt_rate = %lu \n", pkt_rate);
@@ -1304,6 +1297,8 @@ int pk_mgr::handle_pkt_in(int sock)
 	else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_RESCUE_LIST) {
 		debug_printf("===================CHNK_CMD_PEER_RESCUE_LIST=================\n");
 		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_PEER_RESCUE_LIST");
+
+
 
 		//set recue stat true
 		_logger_client_ptr->log_to_server(LOG_RESCUE_TRIGGER_BACK, ((struct chunk_rescue_list*)chunk_ptr)->manifest);
@@ -3722,7 +3717,16 @@ void pk_mgr::time_handle()
 		*(_net_ptr->_errorRestartFlag) = RESTART;
 	}
 	*/
-	
+
+	// Timer for building UDP connection in NAT environment
+	for (multimap<int, struct build_udp_conn>::iterator iter = _peer_mgr_ptr->_peer_communication_ptr->mmap_build_udp_conn.begin(); iter != _peer_mgr_ptr->_peer_communication_ptr->mmap_build_udp_conn.end(); iter++) {
+		if (_log_ptr->diff_TimerGet_ms(&(iter->second.timer), &new_timer) >= 500) {
+			_peer_mgr_ptr->_peer_communication_ptr->non_blocking_build_connection_udp_now(iter->second);
+			_peer_mgr_ptr->_peer_communication_ptr->mmap_build_udp_conn.erase(iter);
+			iter = _peer_mgr_ptr->_peer_communication_ptr->mmap_build_udp_conn.begin();
+		}
+	}
+
 	/////////////////for connect timeout START/////////////////////////////
 	for (substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer.begin(); substream_first_reply_peer_iter != _peer_ptr->substream_first_reply_peer.end(); ) {
 			
@@ -3885,6 +3889,7 @@ void pk_mgr::time_handle()
 				_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__, __LINE__, "ss_id", ss_id, "parent", ss_table[ss_id]->current_parent_pid);
 			}
 			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "_peer_ptr->substream_first_reply_peer.size()", _peer_ptr->substream_first_reply_peer.size());
+			
 		}
 	}
 	

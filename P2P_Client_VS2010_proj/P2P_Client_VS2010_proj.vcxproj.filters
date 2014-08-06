@@ -37,6 +37,9 @@
     <Filter Include="原始程式檔\udt_lib">
       <UniqueIdentifier>{4c75bdf3-6dff-4c39-91fe-eda68e11a2b7}</UniqueIdentifier>
     </Filter>
+    <Filter Include="原始程式檔\json_lib">
+      <UniqueIdentifier>{352aa349-f3af-4b85-b3ed-cea7ea26ad7f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\peer_mgr.h">
@@ -228,6 +231,39 @@
     <ClInclude Include="..\io_connect_udp.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
+    <ClInclude Include="..\json_lib\assertions.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json_lib\autolink.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json_lib\config.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json_lib\features.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json_lib\forwards.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json_lib\json.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json_lib\json_tool.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json_lib\reader.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json_lib\value.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json_lib\writer.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json_lib\json_batchallocator.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Makefile">
@@ -393,6 +429,15 @@
     </ClCompile>
     <ClCompile Include="..\io_connect_udp.cpp">
       <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json_lib\json_reader.cpp">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json_lib\json_value.cpp">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json_lib\json_writer.cpp">
+      <Filter>原始程式檔\json_lib</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

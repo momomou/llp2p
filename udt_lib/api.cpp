@@ -1610,6 +1610,7 @@ int CUDT::bind(UDTSOCKET u, const sockaddr* name, int namelen)
 
 int CUDT::bind(UDTSOCKET u, UDPSOCKET udpsock)
 {
+	printf("%s:%d \n", __FUNCTION__, __LINE__);
    try
    {
       return s_UDTUnited.bind(u, udpsock);
@@ -1674,7 +1675,6 @@ UDTSOCKET CUDT::accept(UDTSOCKET u, sockaddr* addr, int* addrlen)
 
 int CUDT::connect(UDTSOCKET u, const sockaddr* name, int namelen)
 {
-	printf("%s \n", __FUNCTION__);
    try
    {
       return s_UDTUnited.connect(u, name, namelen);
@@ -2152,7 +2152,63 @@ UDTSTATUS CUDT::getsockstate(UDTSOCKET u)
       return NONEXIST;
    }
 }
+/*
+int CUDT::stunTest(UDTSOCKET myFd, StunAddress4& dest, int port, int testNum, bool verbose, StunAddress4* sAddr)
+{
+	INT32 interfaceIp = 0;
+	if (sAddr)
+	{
+		interfaceIp = sAddr->addr;
+		if (sAddr->port != 0)
+		{
+			port = sAddr->port;
+		}
+	}
+	//Socket myFd = openPort(port,interfaceIp,verbose);
 
+	StunAtrString username;
+	StunAtrString password;
+
+	username.sizeValue = 0;
+	password.sizeValue = 0;
+
+#ifdef USE_TLS
+	stunGetUserNameAndPassword(dest, username, password);
+#endif
+	stunSendTest(myFd, dest, username, password, testNum, verbose);
+
+	char msg[STUN_MAX_MESSAGE_SIZE];
+	int msgLen = STUN_MAX_MESSAGE_SIZE;
+
+	StunAddress4 from;
+	getMessage(myFd,
+		msg,
+		&msgLen,
+		&from.addr,
+		&from.port, verbose);
+
+	StunMessage resp;
+	memset(&resp, 0, sizeof(StunMessage));
+
+	if (verbose) clog << "Got a response" << endl;
+	bool ok = stunParseMessage(msg, msgLen, resp, verbose);
+
+	if (verbose)
+	{
+		clog << "\t ok=" << ok << endl;
+		clog << "\t id=" << resp.msgHdr.id << endl;
+		clog << "\t mappedAddr=" << resp.mappedAddress.ipv4 << endl;
+		clog << "\t changedAddr=" << resp.changedAddress.ipv4 << endl;
+		clog << endl;
+	}
+
+	if (sAddr)
+	{
+		sAddr->port = resp.mappedAddress.ipv4.port;
+		sAddr->addr = resp.mappedAddress.ipv4.addr;
+	}
+}
+*/
 
 ////////////////////////////////////////////////////////////////////////////////
 

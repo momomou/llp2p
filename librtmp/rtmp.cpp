@@ -342,7 +342,7 @@ rtmp::RTMP_SetupStream_t(RTMP_LNK* link,
   if (sockshost)
     {
       const char *socksport = strchr(sockshost, ':');
-      char *hostname = strdup(sockshost);
+      char *hostname = _strdup(sockshost);
 
       if (socksport)
 	hostname[socksport - sockshost] = '\0';

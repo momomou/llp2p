@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
-#pragma warning (disable: 4127 4057 4100 4389)
+#pragma warning (disable: 4127 4057 4100 4389 4996)
 
 
 //#include "Client.h"

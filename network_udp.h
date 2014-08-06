@@ -51,6 +51,7 @@ public:
 	int network_udp::GetSockState(int sock);
 	void set_nonblocking(int sock);	// I/O function
 	void set_blocking(int sock);
+	void set_rendezvous(int sock);
 
 	// socket function
 	int socket(int domain, int type, int protocol);

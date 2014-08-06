@@ -33,6 +33,9 @@ public:
 	void clear_udpfd_in_peer_com(int sock);
 	int non_blocking_build_connection(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, int flag, unsigned long session_id);
 	int non_blocking_build_connection_udp(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, int flag, unsigned long session_id);
+	int non_blocking_build_connection_udp_now(struct build_udp_conn build_udp_conn_temp);
+	int fake_conn_udp(struct level_info_t *level_info_ptr, int fd_role, unsigned long manifest, unsigned long fd_pid, int flag, unsigned long session_id);
+	int non_blocking_build_connectionNAT_udp(struct level_info_t *level_info_ptr, int fd_role, unsigned long manifest, unsigned long fd_pid, int flag, unsigned long session_id);
 	io_accept * get_io_accept_handler();
 	void accept_check(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, unsigned long session_id);
 	int CheckConnectionExist(int caller, unsigned long pid);
@@ -65,6 +68,8 @@ public:
 	map<int , struct ioNonBlocking*> map_udpfd_NonBlockIO;				// «ØUDP connection®É·|¶ë
 	map<int ,  struct ioNonBlocking*>::iterator map_fd_NonBlockIO_iter;
 	map<int ,  struct ioNonBlocking*>::iterator map_udpfd_NonBlockIO_iter;
+
+	multimap<int, struct build_udp_conn> mmap_build_udp_conn;
 	/*map<int, int> map_fd_flag;	//flag 0 rescue peer, flag 1 candidates, and delete in stop
 	map<int, unsigned long> map_fd_session_id;	//must be store before io_connect, and delete in stop
 	map<int, unsigned long> map_peer_com_fd_pid;	//must be store before io_connect, and delete in stop

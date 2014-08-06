@@ -236,22 +236,18 @@ void peer_communication::set_candidates_handler(unsigned long rescue_manifest, s
 					// Self is behind NAT, candidate-peer is behind NAT
 					else if (self_info->private_ip != self_info->public_ip && testing_info->level_info[i]->private_ip != testing_info->level_info[i]->public_ip) {	
 						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__,"candidate-peer IP =", public_IP, private_IP, "Both are behind NAT");
-						//non_blocking_build_connection(testing_info->level_info[i], caller, rescue_manifest,testing_info->level_info[i]->pid, 1, session_id);
-						non_blocking_build_connection_udp(testing_info->level_info[i], caller, rescue_manifest,testing_info->level_info[i]->pid, PARENT_PEER, session_id);
 						
-						/*
 						// if both are in the same NAT
 						if (self_info->public_ip == testing_info->level_info[i]->public_ip) {
 							_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__,"candidate-peer IP =", public_IP, private_IP, "Both are behind NAT(identical private IP)");
-							non_blocking_build_connection(testing_info->level_info[i], caller, rescue_manifest,testing_info->level_info[i]->pid, 1, session_id);
+							//non_blocking_build_connection_udp(testing_info->level_info[i], caller, rescue_manifest, testing_info->level_info[i]->pid, 0, session_id);
+							non_blocking_build_connection_udp(testing_info->level_info[i], caller, rescue_manifest, testing_info->level_info[i]->pid, 1, session_id);
 						}
 						else {
-							debug_printf2("---------------TCP-Punch connect (actually listener)----------------- \n");
 							_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "candidate-peer IP =", public_IP, private_IP, "Both are behind NAT(different private IP)");
-							_stunt_mgr_ptr->tcpPunch_connection(testing_info->level_info[i], 0, rescue_manifest, testing_info->level_info[i]->pid, 0, session_id);
-							//accept_check(testing_info->level_info[i], 0, rescue_manifest, testing_info->level_info[0]->pid, session_id);
+							non_blocking_build_connection_udp(testing_info->level_info[i], caller, rescue_manifest, testing_info->level_info[i]->pid, 1, session_id);
 						}
-						*/
+						
 					}
 				}
 			}
@@ -337,22 +333,21 @@ void peer_communication::set_candidates_handler(unsigned long rescue_manifest, s
 					// Self is behind NAT, rescue-peer is behind NAT
 					else if (self_info->private_ip != self_info->public_ip && testing_info->level_info[0]->private_ip != testing_info->level_info[0]->public_ip) {	
 						_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__, __LINE__,"Rescue-peer IP =", public_IP, private_IP, "Both are behind NAT");
-						
+						//non_blocking_build_connectionNAT_udp(testing_info->level_info[0], caller, rescue_manifest, testing_info->level_info[0]->pid, 0, session_id);
 						//accept_check(testing_info->level_info[0], 1, rescue_manifest,testing_info->level_info[0]->pid, session_id);
-						/*
+						
 						// if both are in the same NAT
 						if (self_info->public_ip == testing_info->level_info[0]->public_ip) {
 							_log_ptr->write_log_format("s(u) s u(u) \n", __FUNCTION__, __LINE__,"my IP =", (self_info->public_ip), (self_info->private_ip));
 							_log_ptr->write_log_format("s(u) s u(u) \n", __FUNCTION__, __LINE__,"rescue-peer IP =", (testing_info->level_info[0]->public_ip), testing_info->level_info[0]->private_ip);
 							_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__, __LINE__,"rescue-peer IP =", public_IP, private_IP, "Both are behind NAT(identical private IP)");
-							accept_check(testing_info->level_info[0], 1, rescue_manifest,testing_info->level_info[0]->pid, session_id);
+							fake_conn_udp(testing_info->level_info[0], caller, rescue_manifest, testing_info->level_info[0]->pid, 0, session_id);
 						}
 						else {
-							debug_printf2("---------------TCP-Punch listen (actually connecter)----------------- \n");
 							_log_ptr->write_log_format("s(u) s s(s) s \n", __FUNCTION__,__LINE__, "rescue-peer IP =", public_IP, private_IP, "Both are behind NAT(different private IP)");
-							_stunt_mgr_ptr->accept_check_nat(testing_info->level_info[0], 1, rescue_manifest,testing_info->level_info[0]->pid, session_id);
+							fake_conn_udp(testing_info->level_info[0], caller, rescue_manifest, testing_info->level_info[0]->pid, 0, session_id);
 						}
-						*/
+						
 					}
 				}
 			}
@@ -740,7 +735,10 @@ int peer_communication::non_blocking_build_connection_udp(struct level_info_t *l
 	struct sockaddr_in peer_saddr;
 	int retVal;
 	int _sock;		// UDP socket
+	char public_IP[16] = { 0 };
+	char private_IP[16] = { 0 };
 	
+
 	_log_ptr->write_log_format("s(u) s d s d s d \n", __FUNCTION__, __LINE__, "caller =", caller, "manifest =", manifest, "pid =", pid);
 	
 	// Check is there any connection already built
@@ -748,6 +746,24 @@ int peer_communication::non_blocking_build_connection_udp(struct level_info_t *l
 		return 1;
 	}
 	
+	// Put into queue, and start building connection until timeout. This for building connection in NAT environment
+	struct build_udp_conn build_udp_conn_temp;
+	memset(&build_udp_conn_temp, 0, sizeof(struct build_udp_conn));
+	build_udp_conn_temp.caller = caller;
+	build_udp_conn_temp.flag = flag;
+	build_udp_conn_temp.manifest = manifest;
+	build_udp_conn_temp.peer_saddr.sin_addr.s_addr = flag == 1 ? level_info_ptr->public_ip : level_info_ptr->private_ip;
+	//build_udp_conn_temp.peer_saddr.sin_addr.s_addr = level_info_ptr->private_ip;
+	build_udp_conn_temp.peer_saddr.sin_port = htons(level_info_ptr->udp_port);
+	build_udp_conn_temp.peer_saddr.sin_family = AF_INET;
+	build_udp_conn_temp.pid = pid;
+	build_udp_conn_temp.session_id = session_id;
+	_log_ptr->timerGet(&(build_udp_conn_temp.timer));
+
+	mmap_build_udp_conn.insert((pair<int, build_udp_conn>(session_id, build_udp_conn_temp)));
+	
+
+	/*
 	if ((_sock = UDT::socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 #ifdef _WIN32
 		int socketErr = WSAGetLastError();
@@ -782,28 +798,40 @@ int peer_communication::non_blocking_build_connection_udp(struct level_info_t *l
 	//_net_ptr ->set_nonblocking(_sock);		//non-blocking connect
 	memset((struct sockaddr_in*)&peer_saddr, 0, sizeof(struct sockaddr_in));
 
+
     if (flag == 0) {	
 	    peer_saddr.sin_addr.s_addr = level_info_ptr->public_ip;
-		//_log_ptr->write_log_format("s =>u s u s s s u\n", __FUNCTION__,__LINE__,"connect to PID ",level_info_ptr ->pid,"public_ip",inet_ntoa (ip),"port= ",level_info_ptr->tcp_port );
+		_log_ptr->write_log_format("s(u) s u s d\n", __FUNCTION__, __LINE__, "connect to pid", level_info_ptr->pid, inet_ntoa(peer_saddr.sin_addr), level_info_ptr->udp_port);
 	}
 	else if (flag == 1) {	//in the same NAT
 		peer_saddr.sin_addr.s_addr = level_info_ptr->private_ip;
-		//debug_printf("connect to private_ip %s  port= %d \n", inet_ntoa(ip),level_info_ptr->tcp_port);	
-		//_log_ptr->write_log_format("s =>u s u s s s u\n", __FUNCTION__,__LINE__,"connect to PID ",level_info_ptr ->pid,"private_ip",inet_ntoa (ip),"port= ",level_info_ptr->tcp_port );
+		_log_ptr->write_log_format("s(u) s u s d\n", __FUNCTION__, __LINE__, "connect to pid", level_info_ptr->pid, inet_ntoa(peer_saddr.sin_addr), level_info_ptr->udp_port);
 	}
 	else {
 		_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : unknown flag in non_blocking_build_connection\n");
 		_logger_client_ptr->log_exit();
 	}
 	
+
+
 	peer_saddr.sin_port = htons(level_info_ptr->udp_port);
 	peer_saddr.sin_family = AF_INET;
 	
-	_log_ptr->write_log_format("s(u) s d s s(s) d \n", __FUNCTION__, __LINE__,
-												"Connecting to pid", level_info_ptr->pid, 
-												"IP", inet_ntoa(*(struct in_addr *)&level_info_ptr->public_ip), inet_ntoa(*(struct in_addr *)&level_info_ptr->private_ip), 
-												level_info_ptr->udp_port);
-	
+	_log_ptr->write_log_format("s(u) s u s d\n", __FUNCTION__, __LINE__, "connect to pid", level_info_ptr->pid, inet_ntoa(peer_saddr.sin_addr), level_info_ptr->udp_port);
+
+	string svc_udp_port;
+	_prep->read_key("svc_udp_port", svc_udp_port);
+	struct sockaddr_in sin;
+	memset(&sin, 0, sizeof(struct sockaddr_in));
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = INADDR_ANY;
+	sin.sin_port = htons((unsigned short)atoi(svc_udp_port.c_str()));
+	if (UDT::bind(_sock, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == UDT::ERROR) {
+		debug_printf("ErrCode: %d  ErrMsg: %s \n", UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
+		//log_ptr->write_log_format("s(u) s d s s \n", __FUNCTION__, __LINE__, "ErrCode:", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
+		PAUSE
+	}
+
 	if (UDT::ERROR == UDT::connect(_sock, (struct sockaddr*)&peer_saddr, sizeof(peer_saddr))) {
 		cout << "connect: " << UDT::getlasterror().getErrorMessage() << "  " << UDT::getlasterror().getErrorCode();
 		PAUSE
@@ -827,9 +855,9 @@ int peer_communication::non_blocking_build_connection_udp(struct level_info_t *l
 		PAUSE
 	}
 	
-	/*
-	this part stores the info in each table.
-	*/
+	
+	// This part stores the info in each table.
+	
 	_log_ptr->write_log_format("s(u) s d s d s d s d s d s \n", __FUNCTION__, __LINE__,
 																"non blocking connect (before) fd =", _sock,
 																"manifest =", manifest,
@@ -864,7 +892,365 @@ int peer_communication::non_blocking_build_connection_udp(struct level_info_t *l
 																"role =", map_udpfd_info_iter->second->role,
 																"pid =", map_udpfd_info_iter->second->pid,
 																"non_blocking_build_connection (candidate peer)");
+	*/
+	return RET_OK;
+}
+
+int peer_communication::non_blocking_build_connection_udp_now(struct build_udp_conn build_udp_conn_temp)
+{
+	int retVal;
+	int _sock;		// UDP socket
+	char public_IP[16] = { 0 };
+	char private_IP[16] = { 0 };
+
+	int caller = build_udp_conn_temp.caller;
+	unsigned long manifest = build_udp_conn_temp.manifest;
+	unsigned long pid = build_udp_conn_temp.pid;
+	int flag = build_udp_conn_temp.flag;
+	unsigned long session_id = build_udp_conn_temp.session_id;
+	struct sockaddr_in peer_saddr;
+	memcpy(&peer_saddr, &build_udp_conn_temp.peer_saddr, sizeof(struct sockaddr_in));
+
+	_log_ptr->write_log_format("s(u) s d s d s d \n", __FUNCTION__, __LINE__, "caller =", caller, "manifest =", manifest, "pid =", pid);
+
 	
+	if ((_sock = UDT::socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+#ifdef _WIN32
+		int socketErr = WSAGetLastError();
+#else
+		int socketErr = errno;
+#endif
+		debug_printf("[ERROR] Create socket failed %d %d \n", _sock, socketErr);
+		_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[ERROR] Create socket failed", _sock, socketErr);
+		_pk_mgr_ptr->handle_error(SOCKET_ERROR, "[ERROR] Create socket failed", __FUNCTION__, __LINE__);
+
+		_net_ptr->set_nonblocking(_sock);
+#ifdef _WIN32
+		::WSACleanup();
+#endif
+		PAUSE
+	}
+
+	_net_udp_ptr->set_nonblocking(_sock);
+
+	//map_fd_NonBlockIO_iter = map_fd_NonBlockIO.find(_sock);
+	if (map_udpfd_NonBlockIO.find(_sock) != map_udpfd_NonBlockIO.end()) {
+		_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] Not found map_fd_NonBlockIO", __FUNCTION__, __LINE__);
+	}
+
+	map_udpfd_NonBlockIO[_sock] = new struct ioNonBlocking;
+	if (!map_udpfd_NonBlockIO[_sock]) {
+		_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] ioNonBlocking new error", __FUNCTION__, __LINE__);
+	}
+	memset(map_udpfd_NonBlockIO[_sock], 0, sizeof(struct ioNonBlocking));
+	map_udpfd_NonBlockIO[_sock]->io_nonblockBuff.nonBlockingRecv.recv_packet_state = READ_HEADER_READY;
+	map_udpfd_NonBlockIO[_sock]->io_nonblockBuff.nonBlockingSendCtrl.recv_ctl_info.ctl_state = READY;
+	
+	_log_ptr->write_log_format("s(u) s u s d\n", __FUNCTION__, __LINE__, "connect to pid", pid, inet_ntoa(peer_saddr.sin_addr), ntohs(peer_saddr.sin_port));
+
+	string svc_udp_port;
+	_prep->read_key("svc_udp_port", svc_udp_port);
+	struct sockaddr_in sin;
+	memset(&sin, 0, sizeof(struct sockaddr_in));
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = INADDR_ANY;
+	sin.sin_port = htons((unsigned short)atoi(svc_udp_port.c_str()));
+	if (UDT::bind(_sock, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == UDT::ERROR) {
+		debug_printf("ErrCode: %d  ErrMsg: %s \n", UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
+		//log_ptr->write_log_format("s(u) s d s s \n", __FUNCTION__, __LINE__, "ErrCode:", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
+		PAUSE
+	}
+
+	if (UDT::ERROR == UDT::connect(_sock, (struct sockaddr*)&peer_saddr, sizeof(peer_saddr))) {
+		cout << "connect: " << UDT::getlasterror().getErrorMessage() << "  " << UDT::getlasterror().getErrorCode();
+		PAUSE
+	}
+
+	_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "sock", _sock, "state =", UDT::getsockstate(_sock));
+	debug_printf("sock = %d  state = %d \n", _sock, UDT::getsockstate(_sock));
+
+
+	if (UDT::getsockstate(_sock) == CONNECTING || UDT::getsockstate(_sock) == CONNECTED) {
+		_net_udp_ptr->epoll_control(_sock, EPOLL_CTL_ADD, UDT_EPOLL_IN | UDT_EPOLL_OUT);
+		_net_udp_ptr->set_fd_bcptr_map(_sock, dynamic_cast<basic_class *> (_io_connect_udp_ptr));
+		//_peer_mgr_ptr->fd_udp_list_ptr->push_back(_sock);	
+		_net_udp_ptr->fd_list_ptr->push_back(_sock);
+	}
+	else {
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[ERROR] Build connection failed. state =", UDT::getsockstate(_sock));
+		debug_printf("[ERROR] Build connection failed. state = %d \n", UDT::getsockstate(_sock));
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s d \n", "[ERROR] Build connection failed. state", UDT::getsockstate(_sock));
+		_logger_client_ptr->log_exit();
+		PAUSE
+	}
+
+	
+	// This part stores the info in each table.
+	
+	_log_ptr->write_log_format("s(u) s d s d s d s d s d s \n", __FUNCTION__, __LINE__,
+		"non blocking connect (before) fd =", _sock,
+		"manifest =", manifest,
+		"session_id =", session_id,
+		"my role =", caller,
+		"pid =", pid,
+		"non_blocking_build_connection (candidate peer)");
+
+	if (map_udpfd_info.find(_sock) != map_udpfd_info.end()) {
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s d \n", "error : fd %d already in map_udpfd_info in non_blocking_build_connection\n", _sock);
+		_logger_client_ptr->log_exit();
+		PAUSE
+	}
+
+	map_udpfd_info[_sock] = new struct fd_information;
+	if (!map_udpfd_info[_sock]) {
+		_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] fd_information new error", __FUNCTION__, __LINE__);
+	}
+
+	map_udpfd_info_iter = map_udpfd_info.find(_sock);
+
+	memset(map_udpfd_info_iter->second, 0, sizeof(struct fd_information));
+	map_udpfd_info_iter->second->role = caller == CHILD_PEER ? PARENT_PEER : CHILD_PEER;
+	map_udpfd_info_iter->second->manifest = manifest;
+	map_udpfd_info_iter->second->pid = pid;
+	map_udpfd_info_iter->second->session_id = session_id;
+
+	_log_ptr->write_log_format("s(u) s d s d s d s d s d s \n", __FUNCTION__, __LINE__,
+		"non blocking connect fd =", map_udpfd_info_iter->first,
+		"manifest =", map_udpfd_info_iter->second->manifest,
+		"session_id =", map_udpfd_info_iter->second->session_id,
+		"role =", map_udpfd_info_iter->second->role,
+		"pid =", map_udpfd_info_iter->second->pid,
+		"non_blocking_build_connection (candidate peer)");
+	
+	return RET_OK;
+}
+
+
+int peer_communication::fake_conn_udp(struct level_info_t *level_info_ptr, int caller, unsigned long manifest, unsigned long pid, int flag, unsigned long session_id)
+{
+	int retVal;
+	int _sock;		// UDP socket
+	char public_IP[16] = { 0 };
+	char private_IP[16] = { 0 };
+	struct sockaddr_in peer_saddr;
+
+	_log_ptr->write_log_format("s(u) s d s d s d \n", __FUNCTION__, __LINE__, "caller =", caller, "manifest =", manifest, "pid =", pid);
+
+
+	peer_saddr.sin_addr.s_addr = level_info_ptr->public_ip;
+	peer_saddr.sin_port = htons(level_info_ptr->udp_port);
+	peer_saddr.sin_family = AF_INET;
+
+	if ((_sock = UDT::socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+#ifdef _WIN32
+		int socketErr = WSAGetLastError();
+#else
+		int socketErr = errno;
+#endif
+		debug_printf("[ERROR] Create socket failed %d %d \n", _sock, socketErr);
+		_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[ERROR] Create socket failed", _sock, socketErr);
+		_pk_mgr_ptr->handle_error(SOCKET_ERROR, "[ERROR] Create socket failed", __FUNCTION__, __LINE__);
+
+		_net_ptr->set_nonblocking(_sock);
+#ifdef _WIN32
+		::WSACleanup();
+#endif
+		PAUSE
+	}
+
+	_net_udp_ptr->set_nonblocking(_sock);
+
+	string svc_udp_port;
+	_prep->read_key("svc_udp_port", svc_udp_port);
+	struct sockaddr_in sin;
+	memset(&sin, 0, sizeof(struct sockaddr_in));
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = INADDR_ANY;
+	sin.sin_port = htons((unsigned short)atoi(svc_udp_port.c_str()));
+	if (UDT::bind(_sock, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == UDT::ERROR) {
+		debug_printf("ErrCode: %d  ErrMsg: %s \n", UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
+		//log_ptr->write_log_format("s(u) s d s s \n", __FUNCTION__, __LINE__, "ErrCode:", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
+		PAUSE
+	}
+
+	if (UDT::ERROR == UDT::connect(_sock, (struct sockaddr*)&peer_saddr, sizeof(peer_saddr))) {
+		cout << "connect: " << UDT::getlasterror().getErrorMessage() << "  " << UDT::getlasterror().getErrorCode();
+		PAUSE
+	}
+
+	_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "sock", _sock, "state =", UDT::getsockstate(_sock));
+	debug_printf("sock = %d  state = %d \n", _sock, UDT::getsockstate(_sock));
+
+	UDT::close(_sock);
+	return RET_OK;
+}
+
+// This function is for RENDEZVOUS connection for both peers behind NAT
+// Both peers must connect to each other. Wait until the sockstate is "CONNECTED"
+int peer_communication::non_blocking_build_connectionNAT_udp(struct level_info_t *level_info_ptr, int caller, unsigned long manifest, unsigned long pid, int flag, unsigned long session_id)
+{
+
+	struct sockaddr_in peer_saddr;
+	int retVal;
+	int _sock;		// UDP socket
+	char public_IP[16] = { 0 };
+	char private_IP[16] = { 0 };
+
+
+	_log_ptr->write_log_format("s(u) s d s d s d \n", __FUNCTION__, __LINE__, "caller =", caller, "manifest =", manifest, "pid =", pid);
+
+	// Check is there any connection already built
+	if (CheckConnectionExist(caller, level_info_ptr->pid) == 1) {
+		return 1;
+	}
+
+	if ((_sock = UDT::socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+#ifdef _WIN32
+		int socketErr = WSAGetLastError();
+#else
+		int socketErr = errno;
+#endif
+		debug_printf("[ERROR] Create socket failed %d %d \n", _sock, socketErr);
+		_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[ERROR] Create socket failed", _sock, socketErr);
+		_pk_mgr_ptr->handle_error(SOCKET_ERROR, "[ERROR] Create socket failed", __FUNCTION__, __LINE__);
+
+		_net_ptr->set_nonblocking(_sock);
+#ifdef _WIN32
+		::WSACleanup();
+#endif
+		PAUSE
+	}
+
+	_net_udp_ptr->set_nonblocking(_sock);
+	_net_udp_ptr->set_rendezvous(_sock);
+
+	//map_fd_NonBlockIO_iter = map_fd_NonBlockIO.find(_sock);
+	if (map_udpfd_NonBlockIO.find(_sock) != map_udpfd_NonBlockIO.end()) {
+		_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] Not found map_fd_NonBlockIO", __FUNCTION__, __LINE__);
+	}
+
+	map_udpfd_NonBlockIO[_sock] = new struct ioNonBlocking;
+	if (!map_udpfd_NonBlockIO[_sock]) {
+		_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] ioNonBlocking new error", __FUNCTION__, __LINE__);
+	}
+	memset(map_udpfd_NonBlockIO[_sock], 0, sizeof(struct ioNonBlocking));
+	map_udpfd_NonBlockIO[_sock]->io_nonblockBuff.nonBlockingRecv.recv_packet_state = READ_HEADER_READY;
+	map_udpfd_NonBlockIO[_sock]->io_nonblockBuff.nonBlockingSendCtrl.recv_ctl_info.ctl_state = READY;
+	
+	memset((struct sockaddr_in*)&peer_saddr, 0, sizeof(struct sockaddr_in));
+	peer_saddr.sin_addr.s_addr = level_info_ptr->public_ip;
+	peer_saddr.sin_port = htons(level_info_ptr->udp_port);
+	peer_saddr.sin_family = AF_INET;
+
+	_log_ptr->write_log_format("s(u) s u s d\n", __FUNCTION__, __LINE__, "connect to pid", level_info_ptr->pid, inet_ntoa(peer_saddr.sin_addr), level_info_ptr->udp_port);
+
+	string svc_udp_port;
+	_prep->read_key("svc_udp_port", svc_udp_port);
+	struct sockaddr_in sin;
+	memset(&sin, 0, sizeof(struct sockaddr_in));
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = INADDR_ANY;
+	sin.sin_port = htons((unsigned short)atoi(svc_udp_port.c_str()));
+	debug_printf("----- port : %d \n", (unsigned short)atoi(svc_udp_port.c_str()));
+	if (UDT::bind(_sock, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == UDT::ERROR) {
+		debug_printf("ErrCode: %d  ErrMsg: %s \n", UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
+		//log_ptr->write_log_format("s(u) s d s s \n", __FUNCTION__, __LINE__, "ErrCode:", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
+		PAUSE
+	}
+
+	if (UDT::ERROR == UDT::connect(_sock, (struct sockaddr*)&peer_saddr, sizeof(peer_saddr))) {
+		cout << "connect: " << UDT::getlasterror().getErrorMessage() << "  " << UDT::getlasterror().getErrorCode();
+		PAUSE
+	}
+
+	_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "sock", _sock, "state =", UDT::getsockstate(_sock));
+	debug_printf("sock = %d  state = %d \n", _sock, UDT::getsockstate(_sock));
+
+
+	if (caller == CHILD_PEER) {
+		if (UDT::getsockstate(_sock) == CONNECTING || UDT::getsockstate(_sock) == CONNECTED) {
+			_net_udp_ptr->epoll_control(_sock, EPOLL_CTL_ADD, UDT_EPOLL_IN | UDT_EPOLL_OUT);
+			_net_udp_ptr->set_fd_bcptr_map(_sock, dynamic_cast<basic_class *> (_io_connect_udp_ptr));
+			//_peer_mgr_ptr->fd_udp_list_ptr->push_back(_sock);	
+			_net_udp_ptr->fd_list_ptr->push_back(_sock);
+		}
+		else {
+			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[ERROR] Build connection failed. state =", UDT::getsockstate(_sock));
+			debug_printf("[ERROR] Build connection failed. state = %d \n", UDT::getsockstate(_sock));
+			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s d \n", "[ERROR] Build connection failed. state", UDT::getsockstate(_sock));
+			_logger_client_ptr->log_exit();
+			PAUSE
+		}
+
+		
+		// Stores the info in each table.
+		_log_ptr->write_log_format("s(u) s d s d s d s d s d s \n", __FUNCTION__, __LINE__,
+			"non blocking connect (before) fd =", _sock,
+			"manifest =", manifest,
+			"session_id =", session_id,
+			"my role =", caller,
+			"pid =", pid,
+			"non_blocking_build_connection (candidate peer)");
+
+		if (map_udpfd_info.find(_sock) != map_udpfd_info.end()) {
+			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s d \n", "error : fd %d already in map_udpfd_info in non_blocking_build_connection\n", _sock);
+			_logger_client_ptr->log_exit();
+			PAUSE
+		}
+
+		map_udpfd_info[_sock] = new struct fd_information;
+		if (!map_udpfd_info[_sock]) {
+			_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] fd_information new error", __FUNCTION__, __LINE__);
+		}
+
+		map_udpfd_info_iter = map_udpfd_info.find(_sock);
+
+		memset(map_udpfd_info_iter->second, 0, sizeof(struct fd_information));
+		map_udpfd_info_iter->second->role = caller == CHILD_PEER ? PARENT_PEER : CHILD_PEER;
+		map_udpfd_info_iter->second->manifest = manifest;
+		map_udpfd_info_iter->second->pid = pid;
+		map_udpfd_info_iter->second->session_id = session_id;
+
+		_log_ptr->write_log_format("s(u) s d s d s d s d s d s \n", __FUNCTION__, __LINE__,
+			"non blocking connect fd =", map_udpfd_info_iter->first,
+			"manifest =", map_udpfd_info_iter->second->manifest,
+			"session_id =", map_udpfd_info_iter->second->session_id,
+			"role =", map_udpfd_info_iter->second->role,
+			"pid =", map_udpfd_info_iter->second->pid,
+			"non_blocking_build_connection (candidate peer)");
+	}
+	else {
+		if (UDT::getsockstate(_sock) == CONNECTING || UDT::getsockstate(_sock) == CONNECTED) {
+			_net_udp_ptr->epoll_control(_sock, EPOLL_CTL_ADD, UDT_EPOLL_IN | UDT_EPOLL_OUT);
+			_net_udp_ptr->set_fd_bcptr_map(_sock, dynamic_cast<basic_class *> (_io_nonblocking_udp_ptr));
+			//_peer_mgr_ptr->fd_udp_list_ptr->push_back(_sock);	
+			_net_udp_ptr->fd_list_ptr->push_back(_sock);
+		}
+		else {
+			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[ERROR] Build connection failed. state =", UDT::getsockstate(_sock));
+			debug_printf("[ERROR] Build connection failed. state = %d \n", UDT::getsockstate(_sock));
+			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s d \n", "[ERROR] Build connection failed. state", UDT::getsockstate(_sock));
+			_logger_client_ptr->log_exit();
+			PAUSE
+		}
+
+		// Check wheather new_fd is already in the map_udpfd_NonBlockIO or not
+		
+		struct ioNonBlocking* ioNonBlocking_ptr = new struct ioNonBlocking;
+		if (!ioNonBlocking_ptr) {
+			debug_printf("ioNonBlocking_ptr new error \n");
+			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "ioNonBlocking_ptr new error");
+			PAUSE
+		}
+
+		_log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "Add fd", _sock, "into map_udpfd_NonBlockIO");
+
+		memset(ioNonBlocking_ptr, 0, sizeof(struct ioNonBlocking));
+		ioNonBlocking_ptr->io_nonblockBuff.nonBlockingRecv.recv_packet_state = READ_HEADER_READY;
+		map_udpfd_NonBlockIO[_sock] = ioNonBlocking_ptr;
+		
+	}
+
 	return RET_OK;
 }
 
@@ -1060,6 +1446,10 @@ void peer_communication::stop_attempt_connect(unsigned long stop_session_id)
 
 				delete_fd_flag = 1;
 
+				_log_ptr->write_log_format("s =>u s d s u \n", __FUNCTION__, __LINE__,
+					"connect faild delete table and close fd", map_fd_info_iter->first,
+					"pid", map_fd_info_iter->second->pid);
+
 				if(_peer_ptr->map_fd_pid.find(map_fd_info_iter->first) == _peer_ptr->map_fd_pid.end()){
 					/*
 					connect faild delete table and close fd
@@ -1110,6 +1500,7 @@ void peer_communication::stop_attempt_connect(unsigned long stop_session_id)
 				map_fd_info_iter++;
 			}
 		}
+
 	}
 	else if (session_id_candidates_set_iter->second->role == PARENT_PEER){	//caller is candidate
 		_log_ptr->write_log_format("s(u) s d s d s d s d \n", __FUNCTION__, __LINE__,

@@ -25,11 +25,12 @@ void network_udp::setall_fd_epollout()
 
 void network_udp::garbage_collection() 
 {
-	for (std::map<int, basic_class *>::iterator iter = _map_fd_bc_tbl.begin(); iter != _map_fd_bc_tbl.end();) {
+	for (std::map<int, basic_class *>::iterator iter = _map_fd_bc_tbl.begin(); iter != _map_fd_bc_tbl.end(); iter++) {
 		debug_printf("size = %d, fd = %d \n", _map_fd_bc_tbl.size(), iter->first);
 	}
 	for (std::map<int, basic_class *>::iterator iter = _map_fd_bc_tbl.begin(); iter != _map_fd_bc_tbl.end(); ) {
 		close(iter->first);
+		iter = _map_fd_bc_tbl.begin();
 	}
 	_map_fd_bc_tbl.clear();
 
@@ -165,14 +166,18 @@ void network_udp::epoll_dispatcher(void)
 	int fd;
 	basic_class *bc_ptr;
 	
-	//if (readfds.size() > 0 || writefds.size() > 0) {
-	if (readfds.size() > 0) {
+	
+	if (readfds.size() > 0 || writefds.size() > 0) {
+	//if (readfds.size() > 0) {
 		//debug_printf("%d  %d \n", readfds.size(), writefds.size());
 	}
 
 	for(set<UDTSOCKET>::iterator i = writefds.begin(); i != writefds.end(); ++i) {
 		fd = *i;
-		//debug_printf("%d writable state = %d \n", cfd, UDT::getsockstate(cfd));
+		//debug_printf("%d writable state = %d \n", fd, UDT::getsockstate(fd));
+		
+		
+
 		if (_map_fd_bc_tbl.find(fd) != _map_fd_bc_tbl.end()) {
 			if (_map_fd_bc_tbl[fd]->handle_pkt_out_udp(fd) == RET_SOCK_ERROR) {
 				debug_printf("handle_pkt_out_udp::RET_SOCK_ERROR  sock: %d \n", fd);
@@ -184,7 +189,21 @@ void network_udp::epoll_dispatcher(void)
 
 	for (set<UDTSOCKET>::iterator i = readfds.begin(); i != readfds.end(); ++i) {
 		fd = *i;
-		//debug_printf("%d readable state = %d \n", cfd, UDT::getsockstate(cfd));
+		/*
+		struct sockaddr_in src_addr;
+		struct sockaddr_in dst_addr;
+		int addrLen = sizeof(struct sockaddr_in);
+		int	a;
+		int b;
+		char src_IP[16] = { 0 };
+		char dst_IP[16] = { 0 };
+		a = getsockname(fd, (struct sockaddr *)&src_addr, (socklen_t *)&addrLen);
+		b = getpeername(fd, (struct sockaddr *)&dst_addr, (socklen_t *)&addrLen);
+		memcpy(src_IP, inet_ntoa(src_addr.sin_addr), strlen(inet_ntoa(src_addr.sin_addr)));
+		memcpy(dst_IP, inet_ntoa(dst_addr.sin_addr), strlen(inet_ntoa(dst_addr.sin_addr)));
+		debug_printf(" | (%d) fd:%3d, ME: %s:%d | (%d) fd:%3d, HIM: %s:%d | \n", a, fd, src_IP, ntohs(src_addr.sin_port),
+																			b, fd, dst_IP, ntohs(dst_addr.sin_port));
+		*/
 		_map_fd_bc_tbl_iter = _map_fd_bc_tbl.find(fd);
 		if (_map_fd_bc_tbl.find(fd) != _map_fd_bc_tbl.end()) {
 			if (_map_fd_bc_tbl[fd]->handle_pkt_in_udp(fd) == RET_SOCK_ERROR) {
@@ -380,6 +399,13 @@ void network_udp::set_blocking(int sock)
 	UDT::setsockopt(sock, 0, UDT_SNDSYN, &block, sizeof(bool));
 	UDT::setsockopt(sock, 0, UDT_RCVSYN, &block, sizeof(bool));
 }
+
+void network_udp::set_rendezvous(int sock)
+{
+	bool rendezvous = true;
+	UDT::setsockopt(sock, 0, UDT_RENDEZVOUS, &rendezvous, sizeof(bool));
+}
+
 
 int network_udp::socket(int af, int type, int protocol) 
 {

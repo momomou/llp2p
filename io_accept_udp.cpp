@@ -55,7 +55,9 @@ int io_accept_udp::handle_pkt_in_udp(int sock)
 	int new_fd = UDT::accept(sock, (struct sockaddr *)&_cin, &sin_len);
 	debug_printf("after accept \n");
 	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Accept fd", new_fd);
-	
+	//PAUSE
+
+
 	if (new_fd < 0) {
 		return RET_SOCK_ERROR;
 	}

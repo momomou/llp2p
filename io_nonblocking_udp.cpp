@@ -28,6 +28,10 @@ int io_nonblocking_udp::handle_pkt_in(int sock)
 
 int io_nonblocking_udp::handle_pkt_in_udp(int sock)
 {	
+	if (UDT::getsockstate(sock) != UDTSTATUS::CONNECTED) {
+		debug_printf("sock %d  state %d \n", sock, UDT::getsockstate(sock));
+	}
+
 	Nonblocking_Ctl *Nonblocking_Recv_Ctl_ptr = NULL;
 	int offset = 0;
 	int recv_byte = 0;
@@ -195,6 +199,9 @@ int io_nonblocking_udp::handle_pkt_out(int sock)
 
 int io_nonblocking_udp::handle_pkt_out_udp(int sock)
 {
+	if (UDT::getsockstate(sock) != UDTSTATUS::CONNECTED) {
+		debug_printf("sock %d  state %d \n", sock, UDT::getsockstate(sock));
+	}
 	return RET_OK;
 }
 

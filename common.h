@@ -6,7 +6,6 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
-
 #ifndef DEBUG
 #define DEBUG
 #endif
@@ -925,6 +924,17 @@ struct substream_info {
 	UINT32 current_parent_pid;					// The current parent pid
 	UINT32 previous_parent_pid;					
 };
+
+struct build_udp_conn {
+	struct sockaddr_in peer_saddr;
+	int caller;
+	unsigned long manifest;
+	unsigned long pid;
+	int flag;
+	unsigned long session_id; 
+	struct timerStruct timer;
+};
+
 /****************************************************/
 /*		Structures of Synchronization				*/
 /****************************************************/

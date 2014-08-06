@@ -51,7 +51,7 @@ int stunt_mgr::init(unsigned long myPID)
 #ifdef _WIN32	
 	int nRet, s, e, nErr;
 	_pid = myPID;
-	itoa(_pid, _pidChar, 10);
+	_itoa(_pid, _pidChar, 10);
 	printf("stunt server IP: %s \n", STUNT_SERVER_IP1);
 	nRet = _tcp_punch_ptr->XInit(STUNT_SERVER_IP1, STUNT_SERVER_IP1, &_sock, _pidChar, &nErr);
 	if (nRet == ERR_NONE) {
@@ -645,7 +645,7 @@ int stunt_mgr::tcpPunch_connection(struct level_info_t *level_info_ptr,int fd_ro
 
 	// set initial value
 	memset(&ctrlState, 0, sizeof(ctrlState));
-	itoa(peerID, peerIDChar, 10);
+	_itoa(peerID, peerIDChar, 10);
 	
 	// Check whether this peer-ID has in pid-list, if not found then store peer-ID in the pid list
 	// Must guarantee that cannot create 2 connections with a peer

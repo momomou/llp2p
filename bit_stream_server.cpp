@@ -58,8 +58,6 @@ unsigned short bit_stream_server::init(int stream_id, unsigned short bitStreamSe
 	int iMode = 1;
 	_stream_id = stream_id;
 
-	debug_printf("bitStreamServerPort = %hu \n", bitStreamServerPort);
-	
 	if ((_sock_tcp = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		debug_printf("[ERROR] Create socket failed \n");
 		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[ERROR] Create socket failed");

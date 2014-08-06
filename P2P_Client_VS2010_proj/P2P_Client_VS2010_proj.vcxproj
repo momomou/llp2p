@@ -21,6 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{ACA38406-2BC7-4A2A-AC8D-A17CEBD5BEBD}</ProjectGuid>
     <RootNamespace>P2P_Client_VS2010_proj</RootNamespace>
+    <ProjectName>P2P_Client_VS2010</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -134,6 +135,17 @@
     <ClInclude Include="..\irc\libirc_events.h" />
     <ClInclude Include="..\irc\libirc_options.h" />
     <ClInclude Include="..\irc\libirc_rfcnumeric.h" />
+    <ClInclude Include="..\json_lib\assertions.h" />
+    <ClInclude Include="..\json_lib\autolink.h" />
+    <ClInclude Include="..\json_lib\config.h" />
+    <ClInclude Include="..\json_lib\features.h" />
+    <ClInclude Include="..\json_lib\forwards.h" />
+    <ClInclude Include="..\json_lib\json.h" />
+    <ClInclude Include="..\json_lib\json_batchallocator.h" />
+    <ClInclude Include="..\json_lib\json_tool.h" />
+    <ClInclude Include="..\json_lib\reader.h" />
+    <ClInclude Include="..\json_lib\value.h" />
+    <ClInclude Include="..\json_lib\writer.h" />
     <ClInclude Include="..\libBitStreamHTTP\bit_stream_httpout.h" />
     <ClInclude Include="..\libBitStream\bit_stream_out.h" />
     <ClInclude Include="..\librtmp\amf.h" />
@@ -197,6 +209,9 @@
     <ClCompile Include="..\io_nonblocking.cpp" />
     <ClCompile Include="..\io_nonblocking_udp.cpp" />
     <ClCompile Include="..\irc\irc_client.cpp" />
+    <ClCompile Include="..\json_lib\json_reader.cpp" />
+    <ClCompile Include="..\json_lib\json_value.cpp" />
+    <ClCompile Include="..\json_lib\json_writer.cpp" />
     <ClCompile Include="..\libBitStreamHTTP\bit_stream_httpout.cpp" />
     <ClCompile Include="..\libBitStream\bit_stream_out.cpp" />
     <ClCompile Include="..\librtmp\amf.cpp" />
