@@ -7,6 +7,7 @@
 #define __CONFIGURATION_H__
 
 #include "common.h"
+#include "json_lib/json.h"
 #include <iostream>
 #include <sstream>
 #include <fstream>

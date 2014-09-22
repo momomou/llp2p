@@ -21,17 +21,17 @@ void network::setall_fd_epollout()
 	}
 }
 
-void network::garbage_collection() 
+void network::garbage_collection()
 {
 	if (_map_fd_bc_tbl.size()) {
-		for(_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin() ; _map_fd_bc_tbl_iter != _map_fd_bc_tbl.end() ;) {
-			if(close(_map_fd_bc_tbl_iter->first) == -1){
+		for (_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin(); _map_fd_bc_tbl_iter != _map_fd_bc_tbl.end();) {
+			if (close(_map_fd_bc_tbl_iter->first) == -1){
 				debug_printf("_map_fd_bc_tbl_iter error \n");
 				//PAUSE
 
 			}
 			_map_fd_bc_tbl_iter = _map_fd_bc_tbl.begin();
-			if(_map_fd_bc_tbl_iter == _map_fd_bc_tbl.end()){
+			if (_map_fd_bc_tbl_iter == _map_fd_bc_tbl.end()){
 				break;
 			}
 		}
@@ -39,12 +39,6 @@ void network::garbage_collection()
 
 	_map_fd_bc_tbl.clear();
 
-#ifdef _WIN32
-	::closesocket(epfd);
-	::WSACleanup();
-#else
-	::close(epfd);
-#endif
 }
 
 unsigned long network::getLocalIpv4() 

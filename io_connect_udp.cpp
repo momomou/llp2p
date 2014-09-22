@@ -38,14 +38,15 @@ int io_connect_udp::handle_pkt_in_udp(int sock)
 	/*
 	we will not inside this part
 	*/
+	
 	debug_printf("sock %d  state %d \n", sock, UDT::getsockstate(sock));
 	if (UDT::getsockstate(sock) != UDTSTATUS::CONNECTED) {
 		debug_printf("sock %d  state %d \n", sock, UDT::getsockstate(sock));
 	}
 	_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : place in io_connect_udp::handle_pkt_in\n");
-	_logger_client_ptr->log_exit();
+	//_logger_client_ptr->log_exit();
 
-	PAUSE
+	//PAUSE
 	
 	return RET_OK;
 }
@@ -55,15 +56,19 @@ int io_connect_udp::handle_pkt_out(int sock)
 	return RET_OK;
 }
 
+// If the socket is writable, the conection is built.
+// Then send "CHNK_CMD_ROLE" to determine the role
 int io_connect_udp::handle_pkt_out_udp(int sock)
 {
+	
 	/*
 	in this part means the fd is built. it finds its role and sends protocol to another to tell its role.
 	bind to peer_com~ for handle_pkt_in/out.
 	*/
 	debug_printf("sock %d  state %d \n", sock, UDT::getsockstate(sock));
 	if (UDT::getsockstate(sock) != UDTSTATUS::CONNECTED) {
-		//debug_printf("sock %d  state %d \n", sock, UDT::getsockstate(sock));
+		debug_printf("sock %d  state %d \n", sock, UDT::getsockstate(sock));
+		PAUSE
 	}
 	int error_return;
 	

@@ -16,6 +16,8 @@ logger_client::logger_client(logger *log_ptr)
 	log_bw_in_init_flag = 0;
 	log_bw_out_init_flag = 0;
 	log_source_delay_init_flag = 0;
+	nat_total_times = 0;
+	nat_success_times = 0;
 	self_channel_id = 0;
 	chunk_buffer =NULL;
 	max_source_delay =NULL;
@@ -96,6 +98,16 @@ void logger_client::set_pk_mgr_obj(pk_mgr *pk_mgr_ptr)
 void logger_client::set_prep_obj(configuration *prep)
 {
 	_prep = prep;
+}
+
+void logger_client::add_nat_total_times()
+{
+	nat_total_times++;
+}
+
+void logger_client::add_nat_success_times()
+{
+	nat_success_times++;
 }
 
 void logger_client::log_init()
@@ -215,6 +227,9 @@ void logger_client::set_source_delay(unsigned long substream_id, unsigned long s
 	max_source_delay[substream_id].count++;
 	max_source_delay[substream_id].delay_now = (double)source_delay;
 	max_source_delay[substream_id].accumulated_delay += (double)source_delay;
+	//if (max_source_delay[substream_id].count % 20 == 0) {
+	//	debug_printf("%d  %d \n", static_cast<int>(max_source_delay[substream_id].accumulated_delay), static_cast<int>(max_source_delay[substream_id].delay_now));
+	//}
 }
 
 // Send source delay to PK
@@ -284,7 +299,7 @@ void logger_client::bw_out_struct_init(unsigned long pkt_size){
 
 void logger_client::set_out_bw(unsigned long pkt_size){
 	_log_ptr->timerGet(&end_out_bw_record);
-	accumulated_packet_size_out += pkt_size;
+	accumulated_packet_size_out += pkt_size*8;
 	pre_out_pkt_size = pkt_size;
 }
 
@@ -292,7 +307,7 @@ void logger_client::set_in_bw(unsigned long timestamp, unsigned long pkt_size)
 {
 	end_in_bw_record.time_stamp = timestamp;
 	_log_ptr->timerGet(&(end_in_bw_record.client_time));
-	accumulated_packet_size_in += pkt_size;
+	accumulated_packet_size_in += pkt_size*8;
 	pre_in_pkt_size = pkt_size;
 }
 
@@ -303,6 +318,7 @@ void logger_client::send_bw()
 	int period_msec = 0;
 	double real_out_bw = 0;
 	double quality_result = 0.0;
+	double nat_success_ratio = 0.0;
 
 	// Calculate bandwidth-in
 	period_msec = _log_ptr->diff_TimerGet_ms(&start_in_bw_record.client_time, &end_in_bw_record.client_time);
@@ -337,6 +353,14 @@ void logger_client::send_bw()
 		quality_result = 0;
 	}
 	
+	// Calculate NAT success ratio
+	if (nat_total_times != 0) {
+		nat_success_ratio = nat_success_times / nat_total_times;
+	}
+	else {
+		nat_success_ratio = -1;
+	}
+
 	//debug_printf("real_in_bw = %.2lf, real_out_bw = %.2lf, quality_result = %.2lf, total_chunk = %u, accumulated_quality = %.2lf, average_quality = %.2lf, lost_pkt = %u \n", real_in_bw,
 	//																																		real_out_bw,
 	//																																		quality_result,
@@ -349,11 +373,33 @@ void logger_client::send_bw()
 	quality_struct_ptr->accumulated_quality = 0.0;
 	quality_struct_ptr->total_chunk = 0;
 
-	log_to_server(LOG_CLIENT_BW, 0, should_in_bw, real_in_bw,real_out_bw, quality_result);
-	log_to_server(LOG_DATA_BANDWIDTH, 0, should_in_bw, real_in_bw,real_out_bw, quality_result);
+	//log_to_server(LOG_CLIENT_BW, 0, should_in_bw, real_in_bw,real_out_bw, quality_result);
+	log_to_server(LOG_DATA_BANDWIDTH, 0, should_in_bw, real_in_bw,real_out_bw, quality_result, nat_success_ratio);
+	debug_printf("in_bw: %.0lf \n", real_in_bw);
+	debug_printf("out_bw: %.0lf \n", real_out_bw);
+	debug_printf("quality: %.4lf \n", quality_result);
+	debug_printf("nat_success_ratio: %.3lf \n", nat_success_ratio);
 
 	start_in_bw_record.client_time = end_in_bw_record.client_time;
 	start_out_bw_record = end_out_bw_record;
+}
+
+void logger_client::send_topology(unsigned long* parents, int sub_stream_number)
+{
+	double max_delay = 0;
+
+	for (unsigned long i = 0; i < sub_stream_number; i++) {
+		parent_list[i] = parents[i];
+	}
+
+	//cout << "max_delay = " << max_delay << endl;
+	debug_printf("Parent list: ");
+	for (unsigned long i = 0; i < sub_stream_number; i++) {
+		debug_printf("%u  ", static_cast<int>(parent_list[i]));
+	}
+	debug_printf("\n");
+
+	log_to_server(LOG_DATA_TOPOLOGY, 0, sub_stream_number, parent_list);
 }
 
 void logger_client::log_to_server(int log_mode, ...){
@@ -419,6 +465,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		double temp_real_in_bw = va_arg(ap, double);
 		double temp_real_out_bw = va_arg(ap, double);
 		double temp_quality = va_arg(ap, double);
+		double temp_nat_success_ratio = va_arg(ap, double);
 
 		struct log_data_bw *log_data_bw_ptr = new struct log_data_bw;
 		if (!log_data_bw_ptr) {
@@ -436,6 +483,7 @@ void logger_client::log_to_server(int log_mode, ...){
 		log_data_bw_ptr->real_in_bw = temp_real_in_bw;
 		log_data_bw_ptr->real_out_bw = temp_real_out_bw;
 		log_data_bw_ptr->quality = temp_quality;
+		log_data_bw_ptr->nat_success_ratio = temp_nat_success_ratio;
 
 		log_buffer.push((struct log_pkt_format_struct *)log_data_bw_ptr);
 		buffer_size += sizeof(struct log_data_bw);
@@ -467,6 +515,37 @@ void logger_client::log_to_server(int log_mode, ...){
 		log_data_source_delay_ptr->sub_num = sub_number;
 
 		memcpy((char *)log_pkt_format_struct_ptr + offset, delay_list, sub_number*sizeof(double));
+
+		//debug_printf("log_data_source_delay_ptr->max_delay  = %lf\n",log_data_source_delay_ptr->max_delay );
+
+		log_buffer.push((struct log_pkt_format_struct *)log_pkt_format_struct_ptr);
+		buffer_size += pkt_size;
+	}
+	else if (log_mode == LOG_DATA_TOPOLOGY) {
+		unsigned long manifest = va_arg(ap, unsigned long);
+		unsigned long sub_number = va_arg(ap, unsigned long);
+		unsigned long *parents_list = va_arg(ap, unsigned long*);
+		unsigned int pkt_size = sizeof(struct log_header_t) + sizeof(UINT32) + (sub_number * sizeof(unsigned long));
+		unsigned int offset = sizeof(struct log_header_t) + sizeof(UINT32);
+
+		struct log_pkt_format_struct *log_pkt_format_struct_ptr = NULL;
+		struct log_data_topology *log_data_topology_ptr = NULL;
+		log_pkt_format_struct_ptr = (struct log_pkt_format_struct*)new unsigned char[pkt_size];
+		if (!log_pkt_format_struct_ptr) {
+			handle_error(MALLOC_ERROR, "[ERROR] log_pkt_format_struct_ptr loggerClien new error", __FUNCTION__, __LINE__);
+		}
+		memset(log_pkt_format_struct_ptr, 0, pkt_size);
+		log_data_topology_ptr = (struct log_data_topology *)log_pkt_format_struct_ptr;
+
+		log_data_topology_ptr->log_header.cmd = LOG_DATA_TOPOLOGY;
+		log_data_topology_ptr->log_header.log_time = log_time_dffer;
+		log_data_topology_ptr->log_header.pid = self_pid;
+		log_data_topology_ptr->log_header.manifest = manifest;
+		log_data_topology_ptr->log_header.channel_id = self_channel_id;
+		log_data_topology_ptr->log_header.length = pkt_size - sizeof(struct log_header_t);
+		log_data_topology_ptr->sub_num = sub_number;
+
+		memcpy((char *)log_pkt_format_struct_ptr + offset, parents_list, sub_number*sizeof(UINT32));
 
 		//debug_printf("log_data_source_delay_ptr->max_delay  = %lf\n",log_data_source_delay_ptr->max_delay );
 
@@ -1565,6 +1644,7 @@ int logger_client::handle_pkt_out(int sock)
 					//																sizeof(struct log_header_t),
 					//																log_buffer_element_ptr->log_header.cmd);
 					
+				
 					buffer_size -= log_struct_size;
 
 					//_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "log_header.cmd =", log_buffer_element_ptr->log_header.cmd);
@@ -1582,6 +1662,7 @@ int logger_client::handle_pkt_out(int sock)
 						log_buffer_element_ptr->log_header.cmd == LOG_DATA_START_DELAY 	||
 						log_buffer_element_ptr->log_header.cmd == LOG_DATA_BANDWIDTH 	||
 						log_buffer_element_ptr->log_header.cmd == LOG_DATA_SOURCE_DELAY ||
+						log_buffer_element_ptr->log_header.cmd == LOG_DATA_TOPOLOGY		||
 						log_buffer_element_ptr->log_header.cmd == LOG_TOPO_PEER_JOIN 	||
 						log_buffer_element_ptr->log_header.cmd == LOG_TOPO_TEST_SUCCESS ||
 						log_buffer_element_ptr->log_header.cmd == LOG_TOPO_RESCUE_TRIGGER ||

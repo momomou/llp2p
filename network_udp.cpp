@@ -91,9 +91,9 @@ unsigned long network_udp::getLocalIpv4()
 void network_udp::set_fd_bcptr_map(int sock, basic_class *bcptr)
 {
 	for (map<int, basic_class *>::iterator iter = _map_fd_bc_tbl.begin(); iter != _map_fd_bc_tbl.end(); iter++) {
-		debug_printf("size:%d  _map_fd_bc_tbl[%d] \n", _map_fd_bc_tbl.size(), iter->first);
+		//debug_printf("size:%d  _map_fd_bc_tbl[%d] \n", _map_fd_bc_tbl.size(), iter->first);
 	}
-	
+	debug_printf("_map_fd_bc_tbl size : %d \n", _map_fd_bc_tbl.size());
 	_map_fd_bc_tbl[sock] = bcptr;
 }
 
@@ -109,7 +109,8 @@ void network_udp::fd_bcptr_map_delete(int sock)
 void network_udp::epoll_creater(void) 
 {
 #ifdef _FIRE_BREATH_MOD_
-	epfd = epoll_create(MAXFDS, &epollVar);
+	//epfd = epoll_create(MAXFDS, &epollVar);
+	epfd = UDT::epoll_create();
 #else
 	epfd = UDT::epoll_create();
 #endif
@@ -122,7 +123,8 @@ void network_udp::epoll_waiter(int timeout, list<int> *fd_list)
 	basic_class *bc_ptr;
 
 #ifdef _FIRE_BREATH_MOD_
-	nfds = epoll_wait(epfd, events, EVENTSIZE, timeout, fd_list, &epollVar);
+	//nfds = epoll_wait(epfd, events, EVENTSIZE, timeout, fd_list, &epollVar);
+	nfds = UDT::epoll_wait(epfd, &readfds, &writefds, timeout, NULL);
 #else
 	nfds = UDT::epoll_wait(epfd, &readfds, &writefds, timeout, NULL);
 	//debug_printf("nfds = %d \n", nfds);
@@ -327,15 +329,16 @@ void network_udp::epoll_control(int sock, int op, unsigned int events)
 	if (op == EPOLL_CTL_ADD) {
 		int eventss = events;
 		if (UDT::epoll_add_usock(epfd, sock, &eventss) == UDT::ERROR) {
-			cout <<  UDT::getlasterror().getErrorMessage() << endl;
-			PAUSE
+			// 曾經發生 20140814
+			debug_printf("%s \n", UDT::getlasterror().getErrorMessage());
+			//PAUSE
 		}
 	} 
 	else if (op == EPOLL_CTL_DEL) {
 		int eventss = events;
 		if (UDT::epoll_remove_usock(epfd, sock) == UDT::ERROR) {
-			cout <<  UDT::getlasterror().getErrorMessage() << endl;
-			PAUSE
+			debug_printf("%s \n", UDT::getlasterror().getErrorMessage());
+			//PAUSE
 		}
 	}
 	/*
@@ -510,7 +513,7 @@ int network_udp::close(int sock)
 		_map_fd_bc_tbl.erase(_map_fd_bc_tbl.find(sock));
 	}
 	else {
-		debug_printf("[ERROR] Not found sock %d in _map_fd_bc_tbl", sock);
+		debug_printf("[ERROR] Not found sock %d in _map_fd_bc_tbl \n", sock);
 		_log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "[ERROR] Not found sock", sock, "in _map_fd_bc_tbl");
 	}
 	
@@ -580,11 +583,13 @@ int network_udp::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 				break;
 			case UDTSTATUS::CLOSED:
 				debug_printf("Recv %d(expected:%d) bytes to sock %d, state: %d, ErrCode: %d, ErrMsg: %s \n", recv_rt_val, send_info->recv_ctl_info.expect_len, sock, sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
-				PAUSE
+				close(sock);
+				return RET_SOCK_ERROR;
 				break;
 			case UDTSTATUS::NONEXIST:
 				debug_printf("Recv %d(expected:%d) bytes to sock %d, state: %d, ErrCode: %d, ErrMsg: %s \n", recv_rt_val, send_info->recv_ctl_info.expect_len, sock, sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
-				PAUSE
+				close(sock);
+				return RET_SOCK_ERROR;
 				break;
 			default:
 				PAUSE
@@ -769,14 +774,17 @@ int network_udp::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 					break;
 				case UDTSTATUS::NONEXIST:
 					debug_printf("Send %d(expected:%d) bytes to sock %d, state: %d, ErrCode: %d, ErrMsg: %s \n", send_rt_val, send_info->expect_len, sock, sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
-					PAUSE
+					//PAUSE
+					return RET_SOCK_ERROR;
 					break;
 				default:
 					PAUSE
 					break;
 			}
-			
-		} else if (send_rt_val == 0) {
+		}
+		else if (send_rt_val == 0) {
+			int sock_state = UDT::getsockstate(sock);
+			debug_printf("Send %d(expected:%d) bytes to sock %d, state: %d, ErrCode: %d, ErrMsg: %s \n", send_rt_val, send_info->expect_len, sock, sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
 			if(send_info->expect_len == 0){
 				send_info->ctl_state = READY;
 				return RET_OK;

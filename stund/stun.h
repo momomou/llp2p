@@ -73,8 +73,8 @@ typedef struct
 
 typedef struct
 {
-      UInt16 port;
       UInt32 addr;
+      UInt16 port;
 } StunAddress4;
 
 typedef struct

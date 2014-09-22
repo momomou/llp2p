@@ -38,7 +38,7 @@
 #include "register_mgr.h"
 #include "udt_lib/udt.h"
 
-#include "irc/irc_client.h"
+//#include "irc/irc_client.h"
 
 #include "stund/stun.h"
 #include "stund/udp.h"
@@ -76,8 +76,10 @@ typedef struct {
 	volatile sig_atomic_t is_init;		// 0: This object is not initialized, 1: This object is initialized and can be launched as threads
 	unsigned char exit_code;		// Peer exit error code
 	FB::DOM::WindowPtr window;		// A reference to the DOM Window
+	/*  irc related
 	irc_cli_thread irc_arg;
 	irc_session_t *session;
+	*/
 	HANDLE hThread;
 	unsigned int threadID;
 } GlobalVars;
@@ -125,14 +127,14 @@ void signal_handler(int sig)
 		//logger_client_ptr->log_exit();
 		break;
 	case SIGINT:
-		srv_shutdown = 1;
+		//srv_shutdown = 1;
 #ifdef _WIN32
 		//system("PAUSE");
-		exit(1);
+		//exit(1);
 #else
 		exit(1);
 #endif
-		//errorRestartFlag = 1;
+		errorRestartFlag = 1;
 		//logger_client_ptr->log_exit();
 		break;
 #ifndef _WIN32
@@ -274,6 +276,7 @@ void llp2pFBAPI::testEvent()
 int llp2pFBAPI::create_obj(int thread_key)
 {
 	// Check whether the object of this channel is in the plugin or not
+
 	if (map_channelID_globalVar.count(thread_key) == 0) {
 		GlobalVars *temp = new GlobalVars;
 		temp->handle_sig_alarm = 0;
@@ -281,6 +284,7 @@ int llp2pFBAPI::create_obj(int thread_key)
 		temp->errorRestartFlag = 0;
 		temp->streamingPort = -1;
 		temp->fd_list = new list<int>;
+		temp->udp_fd_list = new list<int>;
 		temp->map_config = NULL;
 		temp->pk_mgr_ptr_copy = NULL;
 		temp->is_Pk_mgr_ptr_copy_delete = TRUE;
@@ -288,13 +292,14 @@ int llp2pFBAPI::create_obj(int thread_key)
 		temp->thread_num = 0;
 		temp->exit_code = PEER_ALIVE;
 		temp->window = m_host->getDOMWindow();
-		memset(temp->irc_arg.channel, 0, sizeof(temp->irc_arg.channel));
-		memcpy(temp->irc_arg.channel, "#p2ptv_game", 11);
-		memset(temp->irc_arg.ip, 0, sizeof(temp->irc_arg.ip));
-		memcpy(temp->irc_arg.ip, "140.114.71.174", 14);
-		memset(temp->irc_arg.nick, 0, sizeof(temp->irc_arg.nick));
-		memcpy(temp->irc_arg.nick, "USER1", 5);
-
+		//  irc related
+		//memset(temp->irc_arg.channel, 0, sizeof(temp->irc_arg.channel));
+		//memcpy(temp->irc_arg.channel, "#p2ptv_game", 11);
+		//memset(temp->irc_arg.ip, 0, sizeof(temp->irc_arg.ip));
+		//memcpy(temp->irc_arg.ip, "140.114.71.174", 14);
+		//memset(temp->irc_arg.nick, 0, sizeof(temp->irc_arg.nick));
+		//memcpy(temp->irc_arg.nick, "USER1", 5);
+		//
 
 		map_channelID_globalVar[thread_key] = temp;
 
@@ -378,12 +383,47 @@ unsigned short llp2pFBAPI::streamingPortIs(int channel_id)
 // Set up configuration and store in map_config
 int llp2pFBAPI::set_config(int thread_key, const std::string& msg)
 {
+	std::string input = msg;
+	Json::Reader reader;
+	Json::Value value;
+	if (reader.parse(input, value)) {
+
+		map<int, GlobalVars*>::iterator iter = map_channelID_globalVar.find(thread_key);
+		if (iter == map_channelID_globalVar.end()) {
+			return -1;
+		}
+		if (iter->second->map_config != NULL) {
+			return -1;
+		}
+
+		iter->second->map_config = new map<string, string>;
+
+		iter->second->map_config->insert(pair<string, string>("bucket_size", value["BUCKET_SIZE"].asString()));
+		iter->second->map_config->insert(pair<string, string>("channel_id", value["CHANNEL_ID"].asString()));
+		iter->second->map_config->insert(pair<string, string>("html_size", value["HTML_SIZE"].asString()));
+		iter->second->map_config->insert(pair<string, string>("lane_depth", value["LANE_DEPTH"].asString()));
+		iter->second->map_config->insert(pair<string, string>("max_lane", value["MAX_LANE"].asString()));
+		iter->second->map_config->insert(pair<string, string>("min_lane", value["MIN_LANE"].asString()));
+		iter->second->map_config->insert(pair<string, string>("pk_ip", value["PK_SERVER"]["IP"].asString()));
+		iter->second->map_config->insert(pair<string, string>("pk_port", value["PK_SERVER"]["PORT"].asString()));
+		iter->second->map_config->insert(pair<string, string>("reg_ip", value["REG_SERVER"]["IP"].asString()));
+		iter->second->map_config->insert(pair<string, string>("reg_port", value["REG_SERVER"]["PORT"].asString()));
+		iter->second->map_config->insert(pair<string, string>("log_ip", value["LOG_SERVER"]["IP"].asString()));
+		iter->second->map_config->insert(pair<string, string>("log_port", value["LOG_SERVER"]["PORT"].asString()));
+		iter->second->map_config->insert(pair<string, string>("stun_ip", value["STUN_SERVER"]["IP"].asString()));
+		iter->second->map_config->insert(pair<string, string>("stream_local_port", value["STREAM"]["PORT"].asString()));
+		iter->second->map_config->insert(pair<string, string>("svc_tcp_port", value["P2P_TCP_PORT"].asString()));
+		iter->second->map_config->insert(pair<string, string>("svc_tcp_port", value["P2P_UDP_PORT"].asString()));
+
+		iter->second->is_init = 1;
+	}
+	/*
 	map<int, GlobalVars*>::iterator iter = map_channelID_globalVar.find(thread_key);
 	if (iter == map_channelID_globalVar.end()) {
-		return -1;
+	return -1;
 	}
 	if (iter->second->map_config != NULL) {
-		return -1;
+	return -1;
 	}
 
 	iter->second->map_config = new map<string, string>;
@@ -395,15 +435,15 @@ int llp2pFBAPI::set_config(int thread_key, const std::string& msg)
 	string token;
 	map<string, string> m;
 	while ((pos = ss.find(delimiter)) != std::string::npos) {
-		token = ss.substr(0, pos);
+	token = ss.substr(0, pos);
 
-		int n = token.find(":");
-		string key(token.begin() + 1, token.begin() + n - 1);
-		string value(token.begin() + n + 2, token.end() - 1);
-		iter->second->map_config->insert(pair<string, string>(key, value));
-		//map_config.insert(pair<string, string>(key, value));
-		//ssss += key + ":" + value + "\n";
-		ss.erase(0, pos + delimiter.length());
+	int n = token.find(":");
+	string key(token.begin() + 1, token.begin() + n - 1);
+	string value(token.begin() + n + 2, token.end() - 1);
+	iter->second->map_config->insert(pair<string, string>(key, value));
+	//map_config.insert(pair<string, string>(key, value));
+	//ssss += key + ":" + value + "\n";
+	ss.erase(0, pos + delimiter.length());
 	}
 	token = ss.substr(0, pos);
 
@@ -417,6 +457,7 @@ int llp2pFBAPI::set_config(int thread_key, const std::string& msg)
 	iter->second->is_init = 1;
 
 	//set_config_done = 1;
+	*/
 	return 0;
 }
 
@@ -455,6 +496,7 @@ void llp2pFBAPI::dislaunch_irc(int thread_key)
 
 std::string llp2pFBAPI::sendtoirc(int thread_key, const std::string& msg)
 {
+#ifdef IRC_CLIENT
 	map<int, GlobalVars*>::iterator iter = map_channelID_globalVar.find(thread_key);
 	if (iter == map_channelID_globalVar.end()) {
 		return "FAIL";
@@ -462,7 +504,9 @@ std::string llp2pFBAPI::sendtoirc(int thread_key, const std::string& msg)
 
 	irc_cmd_msg(iter->second->session, iter->second->irc_arg.channel, msg.c_str());
 	//irc_cmd_msg (iter->second->session, iter->second->irc_arg.channel, "654987");
+#endif
 	return msg;
+
 }
 
 std::string llp2pFBAPI::get_config(int channel_id)
@@ -588,20 +632,15 @@ int mainFunction(int thread_key){
 int main(int argc, char **argv){
 #endif
 	
-	
-	
-	
 
 	//cout << UDT::stunRandomPort() << endl;
 
 	cout << "tst_speed_svr " << version << " (Compiled Time: "__DATE__ << " "__TIME__")" << endl << endl;
 
-
-	map<int, int> mmmm;
-
 	FILE *record_file_fp2 = NULL;
+#ifdef RECORD_FILE
 	record_file_fp2 = fopen("file", "wb");
-
+#endif
 #ifdef _FIRE_BREATH_MOD_
 	while (!map_channelID_globalVar[thread_key]->srv_shutdown) {
 #else
@@ -655,6 +694,7 @@ int main(int argc, char **argv){
 			prep->map_table[iter->first] = iter->second;
 		}
 		net_ptr = new network(&(map_channelID_globalVar[thread_key]->errorRestartFlag), map_channelID_globalVar[thread_key]->fd_list);
+		net_udp_ptr = new network_udp(&(map_channelID_globalVar[thread_key]->errorRestartFlag), map_channelID_globalVar[thread_key]->fd_list);
 #else
 
 		prep = new configuration(config_file);
@@ -697,7 +737,7 @@ int main(int argc, char **argv){
 		}
 #ifdef _FIRE_BREATH_MOD_
 		peer_mgr_ptr = new peer_mgr(map_channelID_globalVar[thread_key]->fd_list);
-		stunt_mgr_ptr = new stunt_mgr(map_channelID_globalVar[thread_key]->fd_list);
+		//stunt_mgr_ptr = new stunt_mgr(map_channelID_globalVar[thread_key]->fd_list);
 #else
 
 		peer_mgr_ptr = new peer_mgr(&fd_list);
@@ -710,18 +750,17 @@ int main(int argc, char **argv){
 		//	printf("[ERROR] stunt_mgr_ptr new error \n");
 		//	PAUSE
 		//}
-
+#endif
 
 #ifdef _WIN32
 		WSADATA wsaData;										// Winsock initial data
-		if (WSAStartup(MAKEWORD(2, 2), &wsaData)) {
-			printf("WSAStartup ERROR\n");
-			WSACleanup();
+		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+			debug_printf("WSAStartup ERROR\n");
 			exit(0);
 		}
 #endif
 
-#endif
+
 
 
 
@@ -873,7 +912,7 @@ int main(int argc, char **argv){
 		}
 
 		// Read default TCP port
-		tcp_port = (unsigned short)atoi(svc_tcp_port.c_str());		
+		tcp_port = (unsigned short)atoi(svc_tcp_port.c_str());
 
 		// Find an available TCP port
 		for (;; tcp_port++) {
@@ -881,7 +920,6 @@ int main(int argc, char **argv){
 			sin.sin_family = AF_INET;
 			sin.sin_addr.s_addr = INADDR_ANY;
 			sin.sin_port = htons(tcp_port);
-			tcp_port = (unsigned short)atoi(svc_tcp_port.c_str());		// listen-port for peer connection
 			if (::bind(svc_fd_tcp, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) < 0) {
 #ifdef _WIN32
 				int socketErr = WSAGetLastError();
@@ -911,18 +949,18 @@ int main(int argc, char **argv){
 		// Find an available UDP port and get the external port
 		string stun_ip;
 		StunAddress4 stunServerAddr;
-		StunAddress4 sAddr[2];
+		StunAddress4 sAddr;
 		int srcPort = stunRandomPort();
-		for (int i = 0; i<2; i++) {
-			sAddr[i].port = 0;
-			sAddr[i].addr = 0;
-		}
-		sAddr[0].port = udp_port_int;
+		memset(&stunServerAddr, 0, sizeof(stunServerAddr));
+		memset(&sAddr, 0, sizeof(sAddr));
+
+		sAddr.port = udp_port_int;
 		prep->read_key("stun_ip", stun_ip);
+
 		bool ret = stunParseServerName(const_cast<char *>(stun_ip.c_str()), stunServerAddr);
 
 		// Bind an available port and get public port from STUN server
-		stunTest(stunServerAddr, 1, false, &udp_port_int, &udp_port_ext, &(sAddr[0]));
+		stunTest(stunServerAddr, 1, true, &udp_port_int, &udp_port_ext, &sAddr);
 
 		// If cannot get the response from STUN, udp_port_ext will be 0. Then set it as internal port
 		if (udp_port_ext == 0) {
@@ -964,7 +1002,7 @@ int main(int argc, char **argv){
 		debug_printf("Create UDP listen-socket success, internal port = %u, external port = %u \n", udp_port_int, udp_port_ext);
 		log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "Create UDP listen-socket, internal port", udp_port_int, "external port", udp_port_ext);
 		prep->add_key("svc_udp_port", udp_port_int);
-		
+
 
 		io_accept_udp_ptr = new io_accept_udp(net_udp_ptr, log_ptr, peer_mgr_ptr, peer_communication_ptr, logger_client_ptr);
 
@@ -993,18 +1031,17 @@ int main(int argc, char **argv){
 		net_ptr->set_nonblocking(svc_fd_tcp);
 		net_ptr->epoll_control(svc_fd_tcp, EPOLL_CTL_ADD, EPOLLIN);
 		net_ptr->set_fd_bcptr_map(svc_fd_tcp, dynamic_cast<basic_class *>(peer_communication_ptr->get_io_accept_handler()));
-		
+
 		net_ptr->set_nonblocking(svc_fd_udp);
 		net_udp_ptr->epoll_control(svc_fd_udp, EPOLL_CTL_ADD, UDT_EPOLL_IN);
 		net_udp_ptr->set_fd_bcptr_map(svc_fd_udp, dynamic_cast<basic_class *>(io_accept_udp_ptr));
-		
+
 #ifdef _FIRE_BREATH_MOD_
 		(map_channelID_globalVar[thread_key]->fd_list)->push_back(svc_fd_tcp);
+		(map_channelID_globalVar[thread_key]->udp_fd_list)->push_back(svc_fd_udp);
 #else
 		fd_list.push_back(svc_fd_tcp);
-		
 		udp_fd_list.push_back(svc_fd_udp);
-		
 #endif
 		pk_mgr_ptr->init(tcp_port, udp_port_ext);
 		logger_client_ptr->log_init();
@@ -1058,7 +1095,7 @@ int main(int argc, char **argv){
 #else
 			net_udp_ptr->epoll_waiter(10, &udp_fd_list);
 #endif
-			
+
 			net_udp_ptr->epoll_dispatcher();
 			//peer_mgr_ptr->ArrangeResource();
 
@@ -1076,6 +1113,7 @@ int main(int argc, char **argv){
 		log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "pk_exit_code =", pk_exit_code, "log_exit_code =", log_exit_code);
 		debug_printf("pk_exit_code = %d, log_exit_code = %d \n", pk_exit_code, log_exit_code);
 
+
 #ifdef _FIRE_BREATH_MOD_
 		handle_restart(thread_key, pk_exit_code, log_exit_code, (int *)&(map_channelID_globalVar[thread_key]->srv_shutdown));
 #else
@@ -1086,7 +1124,7 @@ int main(int argc, char **argv){
 
 
 #ifdef _FIRE_BREATH_MOD_
-		log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "exit_code =", map_channelID_globalVar[thread_key]->exit_code);
+		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "exit_code =", map_channelID_globalVar[thread_key]->exit_code);
 		log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "srv_shutdown", map_channelID_globalVar[thread_key]->srv_shutdown, "errorRestartFlag", map_channelID_globalVar[thread_key]->errorRestartFlag);
 #else
 		log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "pk_exit_code =", pk_exit_code, "log_exit_code =", log_exit_code);
@@ -1168,11 +1206,14 @@ int main(int argc, char **argv){
 		}
 		*/
 
+		//srv_shutdown = 1;
 		debug_printf("Client Restart \n");
-		PAUSE
+		//PAUSE
 
-			srand(time(NULL));
-		Sleep(rand() % 10 + 1);
+		WSACleanup();
+
+		srand(time(NULL));
+		Sleep(rand() % 3 + 1);
 
 
 #ifdef _FIRE_BREATH_MOD_
@@ -1182,7 +1223,7 @@ int main(int argc, char **argv){
 #endif
 
 		//PAUSE
-
+		debug_printf("addr %d %s  port %d \n", stunServerAddr.addr, inet_ntoa(*(struct in_addr *)&stunServerAddr), stunServerAddr.port);
 	}
 
 #ifdef _FIRE_BREATH_MOD_
@@ -1199,6 +1240,9 @@ int main(int argc, char **argv){
 	srv_shutdown = 0;
 	errorRestartFlag = 0;
 #endif
+
+
+
 	return EXIT_SUCCESS;
 }
 

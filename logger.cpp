@@ -112,6 +112,7 @@ void logger::stop_log_record()
 	
 	fprintf(_fp, "===================================================================================================\n");
 	fflush(_fp);
+	fclose(_fp);
 }
 
 void logger::write_log_format(const char* fmt, ...) 

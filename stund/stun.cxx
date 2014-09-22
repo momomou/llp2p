@@ -1795,6 +1795,71 @@ stunSendTest( Socket myFd, StunAddress4& dest,
 
 }
 
+static void
+myStunSendTest(Socket myFd, StunAddress4* dest,
+const StunAtrString& username, const StunAtrString& password,
+int testNum, bool verbose)
+{
+	assert(dest->addr != 0);
+	assert(dest->port != 0);
+
+	bool changePort = false;
+	bool changeIP = false;
+	bool discard = false;
+
+	switch (testNum)
+	{
+	case 1:
+	case 10:
+	case 11:
+		break;
+	case 2:
+		//changePort=true;
+		changeIP = true;
+		break;
+	case 3:
+		changePort = true;
+		break;
+	case 4:
+		changeIP = true;
+		break;
+	case 5:
+		discard = true;
+		break;
+	default:
+		cerr << "Test " << testNum << " is unkown\n";
+		assert(0);
+	}
+
+	StunMessage req;
+	memset(&req, 0, sizeof(StunMessage));
+
+	stunBuildReqSimple(&req, username,
+		changePort, changeIP,
+		testNum);
+
+	char buf[STUN_MAX_MESSAGE_SIZE];
+	int len = STUN_MAX_MESSAGE_SIZE;
+
+	len = stunEncodeMessage(req, buf, len, password, verbose);
+
+	if (verbose)
+	{
+		clog << "About to send msg of len " << len << " to " << dest << endl;
+	}
+
+	sendMessage(myFd, buf, len, dest->addr, dest->port, verbose);
+
+	// add some delay so the packets don't get sent too quickly 
+#ifdef WIN32 // !cj! TODO - should fix this up in windows
+	clock_t now = clock();
+	assert(CLOCKS_PER_SEC == 1000);
+	while (clock() <= now + 10) {};
+#else
+	usleep(10 * 1000);
+#endif
+
+}
 
 void 
 stunGetUserNameAndPassword(  const StunAddress4& dest, 
@@ -1811,6 +1876,7 @@ stunGetUserNameAndPassword(  const StunAddress4& dest,
 void 
 stunTest(StunAddress4& dest, int testNum, bool verbose, unsigned short *port_int, unsigned short *port_ext, StunAddress4* sAddr)
 { 
+	printf("sAddr->addr %u %d \n", sAddr->addr, sAddr->port);
    assert( dest.addr != 0 );
    assert( dest.port != 0 );
 	
@@ -1818,7 +1884,10 @@ stunTest(StunAddress4& dest, int testNum, bool verbose, unsigned short *port_int
    UInt32 interfaceIp=0u;
    if (sAddr)
    {
+	   cout << sAddr->addr << "   " << sAddr->port << endl;
+	   printf("interfaceIp %u  sAddr->addr %u %d \n", interfaceIp, sAddr->addr, sAddr->port);
       interfaceIp = sAddr->addr;
+	  printf("interfaceIp %u  sAddr->addr %u %d \n", interfaceIp, sAddr->addr, sAddr->port);
       if ( sAddr->port != 0 )
       {
         port = sAddr->port;
@@ -1837,7 +1906,8 @@ stunTest(StunAddress4& dest, int testNum, bool verbose, unsigned short *port_int
    stunGetUserNameAndPassword( dest, username, password );
 #endif
  
-   stunSendTest( myFd, dest, username, password, testNum, verbose );
+   stunSendTest(myFd, dest, username, password, testNum, verbose);
+   //myStunSendTest( myFd, *dest, username, password, testNum, verbose );
     
    char msg[STUN_MAX_MESSAGE_SIZE];
    int msgLen = STUN_MAX_MESSAGE_SIZE;

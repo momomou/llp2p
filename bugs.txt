@@ -45,10 +45,28 @@ logger_client裡的log_buffer, pop出來後沒有free?
 2. 收到pk的REGISTER後再開始送第一筆message給log-server
 3. log data裡的log header內容不重要
 
-/*  2014.03.05 */
+/* 2014.03.05 */
 1. 太多次的WSACleanup()會造成socket error, 錯誤碼是10093
 
 /* 2014.03.21 */
 1. 手動關閉parent-peer時, child-peer沒有送topology給log server
 2. netword.cpp:217 收到list名單後，正在連向那些list名單時被pk踢掉，造成connect error
 3. leastCurrDiff < 0 的問題已解決
+
+/* 2014.08.07 */
+1. VS2013編譯的執行檔預設不支援XP，需要調一些設定:
+	(1) 專案->屬性->一般->平台工具組，改成"Visual Studio 2013 - Windows XP (v120_xp)"
+	(2) 專案->屬性->連結器->系統->子系統，改成"主控台 (/SUBSYSTEM:CONSOLE)"
+2. 靜態連結MSVC120.dll檔方法:
+	專案->屬性->C/C++->程式碼產生->執行階段程式庫，改成"多執行緒 (/MT)"
+3. Socket 由 start session 呼叫後建立，並且由 stop session 呼叫後關閉
+4. 一個 peer 的一個 substream 就是一個新 socket，換句話說，兩個 peer 之間可能存在4條socket
+
+/* 2014.08.18 */
+1. Notepad++ 搜尋目標做為參數，Example:
+	Search: ([0-9]+)\.([0-9]+)，參數一: \1，參數二: \2
+2. Excel數據整理(1): 合併有相同欄位值的列的方式 -> 小計
+
+/* 2014.08.20 */
+1. WSAStartUp 和 WSACleanUp 必須成雙成對，否則 FireBreath 會因此掛掉
+	

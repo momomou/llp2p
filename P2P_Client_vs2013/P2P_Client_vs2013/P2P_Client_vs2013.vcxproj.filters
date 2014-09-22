@@ -13,9 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="原始程式檔\irc_lib">
-      <UniqueIdentifier>{5e4893ce-d553-4891-be5a-1c4a6d4d0be9}</UniqueIdentifier>
-    </Filter>
     <Filter Include="原始程式檔\json_lib">
       <UniqueIdentifier>{68028a45-5340-4bc1-a943-f3505c96f29f}</UniqueIdentifier>
     </Filter>
@@ -39,6 +36,9 @@
     </Filter>
     <Filter Include="原始程式檔\stund">
       <UniqueIdentifier>{8d435dcb-c14e-4c4f-8433-daafa79087f7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="原始程式檔\irc">
+      <UniqueIdentifier>{968e3717-b49b-48a7-a707-f1c5d2c5b046}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -119,9 +119,6 @@
     </ClCompile>
     <ClCompile Include="..\..\stunt_mgr.cpp">
       <Filter>原始程式檔</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\irc\irc_client.cpp">
-      <Filter>原始程式檔\irc_lib</Filter>
     </ClCompile>
     <ClCompile Include="..\..\json_lib\json_reader.cpp">
       <Filter>原始程式檔\json_lib</Filter>
@@ -296,24 +293,6 @@
     <ClInclude Include="..\..\stunt_mgr.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\irc\irc_client.h">
-      <Filter>原始程式檔\irc_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\irc\libirc_errors.h">
-      <Filter>原始程式檔\irc_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\irc\libirc_events.h">
-      <Filter>原始程式檔\irc_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\irc\libirc_options.h">
-      <Filter>原始程式檔\irc_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\irc\libirc_rfcnumeric.h">
-      <Filter>原始程式檔\irc_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\irc\libircclient.h">
-      <Filter>原始程式檔\irc_lib</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\json_lib\assertions.h">
       <Filter>原始程式檔\json_lib</Filter>
     </ClInclude>
@@ -443,11 +422,24 @@
     <ClInclude Include="..\..\stund\udp.h">
       <Filter>原始程式檔\stund</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <Library Include="..\..\irc\libircclient.lib">
-      <Filter>原始程式檔\irc_lib</Filter>
-    </Library>
+    <ClInclude Include="..\..\irc\irc_client.h">
+      <Filter>原始程式檔\irc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\irc\libirc_errors.h">
+      <Filter>原始程式檔\irc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\irc\libirc_events.h">
+      <Filter>原始程式檔\irc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\irc\libirc_options.h">
+      <Filter>原始程式檔\irc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\irc\libirc_rfcnumeric.h">
+      <Filter>原始程式檔\irc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\irc\libircclient.h">
+      <Filter>原始程式檔\irc</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\json_lib\json_internalarray.inl">
@@ -459,5 +451,10 @@
     <None Include="..\..\json_lib\json_valueiterator.inl">
       <Filter>原始程式檔\json_lib</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\..\irc\libircclient.lib">
+      <Filter>原始程式檔\irc</Filter>
+    </Library>
   </ItemGroup>
 </Project>

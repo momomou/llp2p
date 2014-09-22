@@ -7,7 +7,6 @@
 
 #include "configuration.h"
 #include "common.h"
-#include "json_lib/json.h"
 #include <string>
 #include <algorithm> // sort
 #include <stdio.h>

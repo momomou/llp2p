@@ -65,6 +65,9 @@ public:
 	void send_manifest_to_parent(unsigned long manifestValue,unsigned long parentPid);
 	void send_manifest_to_parent_udp(unsigned long manifestValue,unsigned long parentPid);
 	void handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr);
+	void SendBlockRescue(int ss_id, int type);
+	void HandleBlockRescue(struct chunk_block_rescue_t *chunk_ptr);
+
 
 	void data_close(int cfd, const char *reason); 
 

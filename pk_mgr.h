@@ -53,10 +53,10 @@ public:
 //	LARGE_INTEGER syn_round_start;
 	
 	// The main table storing peer state
-	multimap <unsigned long, struct peer_info_t *> map_pid_parent_temp;		// My temp parent (life: get-rescue-list <-----> recv-test-delay)
+	multimap <unsigned long, struct peer_info_t *> map_pid_parent_temp;		// My temp parent (life: session start <-----> session stop)
 	multimap <unsigned long, struct peer_info_t *> map_pid_child_temp;		// My temp child
-	map<unsigned long, struct peer_connect_down_t *> map_pid_parent;		// My real parent-peer (第一個回test reply的peer會塞進去) (life: recv-test-delay <-----> rescue-triggered)
-	map<unsigned long, struct peer_info_t *> map_pid_child;					// My real child-peer
+	map<unsigned long, struct peer_connect_down_t *> map_pid_parent;		// My real parent-peer (第一個回test reply的peer會塞進去) (life: session start <-----> session stop)
+	map<unsigned long, struct peer_info_t *> map_pid_child;					// My real child-peer (life: session start <-----> session stop)
 	map<unsigned long, struct peer_info_t *> map_pid_child2;				// My real child-peer ????
 
 	// These two tables are to prevent more than 2 connections (upstream + downstream)
@@ -123,6 +123,8 @@ public:
 	int check_rescue_state(unsigned long sub_id,int state);
 	void SetSubstreamState(unsigned long ss_id, int state);
 	void SetSubstreamParent(unsigned long manifest, unsigned long pid);		// Set new selected parent in these substream
+	void SetSubstreamBlockRescue(unsigned long ss_id, unsigned long type);
+	void SetSubstreamUnblockRescue(unsigned long ss_id);
 
 	void set_parent_manifest(struct peer_connect_down_t* parent_info, UINT32 manifest);
 
@@ -130,7 +132,9 @@ public:
 	void send_capacity_init();
 	void send_capacity_to_pk(int sock);
 	void send_source_delay(int sock);		// Send source-delay info to pk
-	
+	void send_topology_to_log();			// Send topology to log server
+	void SendParentTestToPK(unsigned long session_id);
+
 	volatile UINT32 _least_sequence_number;			//收到目前為止最新的seq
 	volatile UINT32 _current_send_sequence_number;	//最後送給player的seq(還沒送)
 
@@ -185,8 +189,10 @@ public:
 
 	unsigned int rescueNumAccumulate();
 	void send_rescueManifestToPKUpdate(unsigned long manifestValue);
-	void send_parentToPK(unsigned long manifest, unsigned long oldPID);
+	void send_parentToPK(unsigned long manifest, unsigned long parent_pid);
 	void reSet_detectionInfo();
+	void ResetDetection(unsigned long ss_id);
+	void ResetDetection();
 	void NeedSourceDecision(bool *need_source);
 
 	// Record file

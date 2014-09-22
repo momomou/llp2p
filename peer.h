@@ -61,7 +61,7 @@ public:
 	virtual void handle_job_realtime();
 	virtual void handle_job_timer();
 
-
+	void StopSession(unsigned long session_id);
 
 	void data_close(int cfd, const char *reason ,int type); 
 	void peer::CloseParent(unsigned long pid, bool care, const char *reason);

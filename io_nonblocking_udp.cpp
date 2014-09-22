@@ -26,10 +26,13 @@ int io_nonblocking_udp::handle_pkt_in(int sock)
 	return RET_OK;
 }
 
+// If the socket is readable, the conection is built.
 int io_nonblocking_udp::handle_pkt_in_udp(int sock)
 {	
 	if (UDT::getsockstate(sock) != UDTSTATUS::CONNECTED) {
+		// 曾經發生 state = 6 (broken)
 		debug_printf("sock %d  state %d \n", sock, UDT::getsockstate(sock));
+		return RET_SOCK_ERROR;
 	}
 
 	Nonblocking_Ctl *Nonblocking_Recv_Ctl_ptr = NULL;
@@ -200,7 +203,9 @@ int io_nonblocking_udp::handle_pkt_out(int sock)
 int io_nonblocking_udp::handle_pkt_out_udp(int sock)
 {
 	if (UDT::getsockstate(sock) != UDTSTATUS::CONNECTED) {
+		// 曾經發生 state = 6 (broken)
 		debug_printf("sock %d  state %d \n", sock, UDT::getsockstate(sock));
+		return RET_SOCK_ERROR;
 	}
 	return RET_OK;
 }

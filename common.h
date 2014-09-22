@@ -58,31 +58,36 @@
 
 ////resuce PARAMETER////
 #define PARAMETER_X		4				// chunk packets per (1000/PARAMETER_X) ms
-#define MAX_DELAY 		500			// source delay PARAMETER ms
-#define SOURCE_DELAY_CONTINUOUS 0.5		// The maximal permissive times that souce-delay is bigger than MAX_DELAY. SOURCE_DELAY_CONTINUOUS * x(packets/s) / substream
+#define MAX_DELAY 		5000			// source delay PARAMETER ms
+#define SOURCE_DELAY_CONTINUOUS 3		// The maximal permissive times that souce-delay is bigger than MAX_DELAY. SOURCE_DELAY_CONTINUOUS * x(packets/s) / substream
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue(頻寬檢查)
 #define PARAMETER_M		16		// 8
 #define PARAMETER_N		10		// 5
 #define PARAMETER_P		6		// 3
 
-#define TEST_DELAY_TIME	4
+#define TEST_DELAY_TIME	6				// Test delay 的時間不能少於或接近一個 session 存活的時間(2s)，否則在 test delay 成功的那一刻可能會誤判 parnet，
+										// 因為 parent 收到 PARENT_PEER 時會直接更新 child_table
 
 // LOG SERVER
 #define LOGPORT		8754
 #define LOGIP		"140.114.90.154"
+
 //ms
-#define CONNECT_TIME_OUT	2000
+#define CONNECT_TIME_OUT	2000		// Session timer
 #define NETWORK_TIMEOUT		5000		// Period of check peer's unnormal disconnection
 #define DATA_TIMEOUT		5000		// Timeout for rescue type 3
 #define BASE_RESYN_TIME		20000
+#define NAT_WAITING_TIME	200			// waiting time for NAT traversal
+#define BLOCK_RESCUE_TIME	5000		// waiting time for block_rescue
+#define BLOCK_RESCUE_INTERVAL	2000	// Time interval between sending block_rescue
 
 #define NEEDSOURCE_THRESHOLD	0.96	// substream在stable或有duplicate source狀態的數目 / 全部substream數目, 超過這個threshold可以不必向pk要source
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
 // BUFF_SIZE sec
-#define BUFF_SIZE		2
+#define BUFF_SIZE		5
 //CHUNK_LOSE sec, mean lose about CHUNK_LOSE sec packet
-#define CHUNK_LOSE		0.5	//
+#define CHUNK_LOSE		2	//
 
 
 
@@ -152,6 +157,7 @@
 #define LOG_DATA_START_DELAY 		0x31
 #define LOG_DATA_BANDWIDTH 			0x32
 #define LOG_DATA_SOURCE_DELAY 		0x33
+#define LOG_DATA_TOPOLOGY	 		0x34
 
 /* LOG part: topology (CHNK_CMD_LOG) */
 #define LOG_TOPO_PEER_JOIN			0x40
@@ -249,7 +255,7 @@ using std::bitset;
 #ifdef DEBUG
     #define debug_printf(...) do { printf("(%d)\t", __LINE__); printf(__VA_ARGS__); } while (0)
 #else
-    #define debug_printf(str...)
+#	define debug_printf(...) do {  } while (0)
 #endif
 #ifdef DEBUG2
     #define debug_printf2(str, ...) do { printf("(%d)\t", __LINE__); printf(str, __VA_ARGS__); } while (0)
@@ -294,9 +300,9 @@ using std::bitset;
 #define PEER_OPENED					0x02
 #define PEER_LISTENING				0x03
 #define PEER_CONNECTING				0x04
-#define PEER_CONNECTED				0x05
-#define PEER_CONNECTED_PARENT		0x06
-#define PEER_CONNECTED_CHILDREN		0x07
+#define PEER_CONNECTED				0x05		// Virtual connection, not the system socket state
+#define PEER_CONNECTED_PARENT		0x06		// The peer is REAL parent
+#define PEER_CONNECTED_CHILD		0x07		// The peer is REAL child
 #define PEER_BROKEN					0x08
 #define PEER_CLOSING				0x09
 #define PEER_CLOSED					0x10
@@ -344,7 +350,9 @@ using std::bitset;
 #define CHNK_CMD_SRC_DELAY 				0X22	// Send source-delay to pk
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 #define CHNK_CMD_KICK_PEER				0x23
+#define CHNK_CMD_PARENT_TEST_INFO       0x24	// Send to PK whether test success or fail
 
+#define CHNK_CMD_PEER_BLOCK_RESCUE		0x31
 #define CHNK_CMD_PEER_UNKNOWN			0xFF	// 1 B cmd => 0xFF is reserved for unknown cmd
 
 
@@ -386,12 +394,12 @@ using std::bitset;
 #define MOD_TIME_TICK		2
 
 struct timerStruct{
-	volatile UINT32 clockTime;			//volatile unsigned long clockTime;
+	volatile UINT32 clockTime;
 #ifdef _WIN32	
 	LARGE_INTEGER tickTime;
 #endif
-	volatile UINT32 initTickFlag;		//volatile unsigned initTickFlag;
-	volatile UINT32 initClockFlag;		//volatile unsigned initClockFlag;
+	volatile UINT32 initTickFlag;
+	volatile UINT32 initClockFlag;
 };
 
 #define TE_RTSP				1
@@ -402,6 +410,10 @@ struct timerStruct{
 
 #define REQUEST				0
 #define REPLY				1
+
+#define REQ					0
+#define REQ_ACK				1
+#define ACK					2
 
 #define SYNC_UNINIT			0			// Not initialize sync data yet
 #define SYNC_ONGOING		1			// sent sync token to pk and not yet receive the response
@@ -486,6 +498,7 @@ struct peer_info_t {
 //////////NAT////////////
 	UINT32 manifest;					//unsigned long manifest;
 	UINT32 session_id;
+	UINT32 state;
 };
 
 
@@ -534,9 +547,9 @@ struct chunk_header_t {
 		stream:3,
 		payload_type:5;
 	unsigned char 
-		rsv_1:1,
+		rsv_1:2,
 		mf:1,
-		part_seq:6;
+		part_seq:5;
 	unsigned char stream_id;
 	UINT32 sequence_number;				//unsigned int sequence_number;
 	UINT32 timestamp;					//unsigned int timestamp;
@@ -680,6 +693,13 @@ struct rescue_pkt_from_server{
 	UINT32 need_source;	
 };
 
+struct chunk_block_rescue_t{
+	struct chunk_header_t header;
+	UINT32 original_pid;					// Message 的發起者
+	UINT32 ss_id;
+	UINT32 type;							// 因為哪種 rescue 而發起的
+	UINT32 value;							// 告知自己和 original_pid 的距離
+};
 
 //////////////////////////////////////////////////
 /****************************************************/
@@ -747,6 +767,15 @@ enum pkg_nonblocking_ctl_state {
 	READ_PAYLOAD_READY =10,
 	READ_PAYLOAD_RUNNING =11,
 	READ_PAYLOAD_OK=12
+};
+
+enum session_ctl_state {
+	FIRST_CONNECTED_READY = 0,
+	FIRST_CONNECTED_RUNNING = 1,
+	FIRST_CONNECTED_OK = 2,
+	FIRST_REPLY_READY = 3,
+	FIRST_REPLY_RUNNING = 4,
+	FIRST_REPLY_OK = 5
 };
 
 
@@ -846,6 +875,17 @@ struct peer_latency_measure {
 	struct peer_timestamp_info_t peer_timestamp_info[0];
 };
 
+struct update_test_info {
+	struct chunk_header_t header;
+	UINT32 pid;
+	UINT32 substream_id;
+	UINT32 sub_num;
+	UINT32 choose_parent_pid;
+	UINT32 test_success_parent_num;
+	UINT32 success_parent[0];
+};
+
+
 //////////////////////////////////////////////////////////////////////////////////measure start delay
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 
@@ -902,6 +942,7 @@ struct substream_state {
 	UINT32 state;						// The substream state
 	bool is_testing;					// Set true when receive the packet from a parent in SS_RESCUE, and set false when test-delay success
 	bool dup_src;						// A flag whether the peer needs source from pk when in SS_RESCUE and SS_TEST state
+	bool connecting_peer;				// A flag if this substream is finding parent. 避免因為收到 CHNK_CMD_PEER_SEED 斷掉 rescue
 };
 
 struct substream_timer {
@@ -921,8 +962,14 @@ struct substream_info {
 	struct source_delay source_delay_table;
 	struct substream_timer timer;				// Record the time(for rescue type 3)
 	struct substream_data data;
+	INT32 lost_packet_count;
 	UINT32 current_parent_pid;					// The current parent pid
-	UINT32 previous_parent_pid;					
+	UINT32 previous_parent_pid;					// The previous parent pid
+	// Block Rescue
+	INT32 block_rescue;							// Block the rescue action when receive a control message from parent-peer
+	INT32 can_send_block_rescue;				// A flag that determine can send block_rescue or not (for time-based rescue detection)
+	struct timerStruct block_rescue_timer;		// Timer for block_rescue 
+	struct timerStruct block_rescue_interval;	// Time interval between sending block_rescue (for time-based rescue detection)
 };
 
 struct build_udp_conn {
@@ -1021,16 +1068,21 @@ struct peer_com_info{
 	INT32 peer_num;								//int peer_num;
 	INT32 role;									//int role;	//caller's role : 0 rescue peer; 1 candidate
 	UINT32 manifest;							//unsigned long manifest;	//caller's manifest
+	UINT32 all_behind_nat;
 	struct chunk_level_msg_t *list_info;
 };
 
 struct manifest_timmer_flag{
-	UINT32 pid;									//unsigned long	pid;
-	UINT32 firstReplyFlag;						//unsigned long	firstReplyFlag;		// A flag for the session if get the first reply peer
-	UINT32 networkTimeOutFlag;					//unsigned long	networkTimeOutFlag;
-	UINT32 connectTimeOutFlag;					//unsigned long	connectTimeOutFlag;
+	INT32 session_state;
+	UINT32 child_pid;							//unsigned long	pid;	// 當我的角色是 parent 才會用到
+	UINT32 selected_pid;						// Selected peer as real parent		// 當我的角色是 child 才會用到
+	UINT32 firstReplyFlag;						//unsigned long	firstReplyFlag;		// Not used. If get the first reply peer in the session, set flag = 1
+	UINT32 networkTimeOutFlag;					//unsigned long	networkTimeOutFlag; // Not used
+	UINT32 connectTimeOutFlag;					//unsigned long	connectTimeOutFlag; // Not used. If get the fist connected peer(according to CHNK_CMD_PEER_CON, not system socket), set flag = 1
 	UINT32 rescue_manifest;						//unsigned long	rescue_manifest;	//may be rescue peer or candidates
 	INT32 peer_role;							//int peer_role;	// The role of that peer, not mine
+	UINT32 allSkipConnFlag;						// If one of peer is not in parent-table, set flag = 0. Default is 1
+	bool firstConnectedFlag;					// A flag if one of peers in the session has built connection
 	//timer
 	struct	 timerStruct	networkTimeOut;
 	struct	 timerStruct	connectTimeOut;
@@ -1044,10 +1096,10 @@ struct chunk_child_info {
 };
 
 struct fd_information {
-	INT32 role;									//int flag;	//flag 0 rescue peer, flag 1 candidates, and delete in stop
-	UINT32 manifest;							//unsigned long manifest;	//must be store before io_connect, and delete in stop
-	UINT32 pid;									//unsigned long pid;	//must be store before io_connect, and delete in stop
-	UINT32 session_id;							//unsigned long session_id;	//must be store before io_connect, and delete in stop
+	INT32 role;									// flag 0 rescue peer, flag 1 candidates, and delete in stop
+	UINT32 manifest;							// must be store before io_connect, and delete in stop
+	UINT32 pid;									// must be store before io_connect, and delete in stop
+	UINT32 session_id;							// must be store before io_connect, and delete in stop, used for child role
 };
 
 typedef struct _XconnInfo {
@@ -1293,12 +1345,18 @@ struct log_data_bw {
 	double real_in_bw;
 	double real_out_bw;
 	double quality;
+	double nat_success_ratio;
 };
 struct log_data_source_delay {
 	struct log_header_t log_header;
 	double max_delay;
 	UINT32 sub_num;	
 	double av_delay[0];
+};
+struct log_data_topology {
+	struct log_header_t log_header;
+	UINT32 sub_num;
+	UINT32 parents[0];
 };
 
 // Structure of log topology

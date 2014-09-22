@@ -30,6 +30,8 @@ public:
 	void set_net_obj(network *net_ptr);
 	void set_pk_mgr_obj(pk_mgr *pk_mgr_ptr);
 	void set_prep_obj(configuration *prep);
+	void add_nat_total_times();
+	void add_nat_success_times();
 
 //	void logger_client_getTickTime(LARGE_INTEGER *tickTime);
 //	unsigned int logger_client_diffTime_ms(LARGE_INTEGER startTime,LARGE_INTEGER endTime);
@@ -78,6 +80,11 @@ public:
 	send qualtiy and bandwidth to PK
 	*/
 	void send_bw();
+
+	/*
+	send topology to log server
+	*/
+	void send_topology(unsigned long* parent_list, int sub_stream_num);
 
 	/*
 	bw_init
@@ -148,6 +155,7 @@ public:
 	struct timerStruct log_period_source_delay_start;
 	struct log_source_delay_struct *max_source_delay;
 	double *delay_list;
+	unsigned long *parent_list;
 	unsigned long sub_stream_number;
 	int log_source_delay_init_flag;
 
@@ -161,6 +169,9 @@ public:
 	unsigned long pre_in_pkt_size;
 	unsigned long pre_out_pkt_size;
 	int log_bw_in_init_flag,log_bw_out_init_flag;
+
+	double nat_total_times;							// 嘗試的所有NAT穿透次數
+	double nat_success_times;						// 成功的NAT穿透成功次數
 
 	struct quality_struct *quality_struct_ptr;
 
@@ -176,6 +187,7 @@ public:
 	unsigned short my_private_port;
 	int log_server_sock;
 	unsigned char exit_code;		// Error code (for program exit)
+
 
 	Nonblocking_Buff non_log_recv_struct;
 };

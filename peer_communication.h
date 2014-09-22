@@ -36,10 +36,12 @@ public:
 	int non_blocking_build_connection_udp_now(struct build_udp_conn build_udp_conn_temp);
 	int fake_conn_udp(struct level_info_t *level_info_ptr, int fd_role, unsigned long manifest, unsigned long fd_pid, int flag, unsigned long session_id);
 	int non_blocking_build_connectionNAT_udp(struct level_info_t *level_info_ptr, int fd_role, unsigned long manifest, unsigned long fd_pid, int flag, unsigned long session_id);
+	void WaitForParentConn(unsigned long parent_pid, unsigned long manifest, unsigned long session_id);
 	io_accept * get_io_accept_handler();
 	void accept_check(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, unsigned long session_id);
 	int CheckConnectionExist(int caller, unsigned long pid);
 	int SendPeerCon(int sock, unsigned long pid);
+	void StopSession(unsigned long session_id);
 	void fd_close(int sock);
 	//int tcpPunch_connection(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, int flag, unsigned long session_id);
 
@@ -53,9 +55,10 @@ public:
 	virtual void handle_job_realtime();
 	virtual void handle_job_timer();
 
-	unsigned long total_manifest;			// The manifest which is in progress
+	unsigned long total_manifest;		// The manifest which is in progress
 	unsigned long session_id_count;
 	struct level_info_t *self_info;
+	list<struct fd_information *> conn_from_parent_list;	// 專門存由 Parent 主動建立連線的 Session 資訊，因為這種反向的建立連線方式(Parent connects to children)無法由 children 透過 session ID 去分析
 	map<unsigned long, struct peer_com_info *> session_id_candidates_set;	// (life: set_candidates_handler <--2s--> stop_attempt_connect)
 	map<unsigned long, struct peer_com_info *>::iterator session_id_candidates_set_iter;
 
