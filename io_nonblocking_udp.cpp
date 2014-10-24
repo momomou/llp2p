@@ -57,7 +57,6 @@ int io_nonblocking_udp::handle_pkt_in_udp(int sock)
 		Nonblocking_Recv_Ctl_ptr->recv_packet_state = READ_HEADER_READY;
 	}
 	
-	
 	for (int i = 0; i < 5; i++) {
 		if (Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_HEADER_READY) {
 			chunk_header_ptr = (struct chunk_header_t *)new unsigned char[sizeof(chunk_header_t)];

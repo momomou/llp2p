@@ -332,6 +332,10 @@ int peer_mgr::handle_test_delay(int session_id)
 	
 	_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "map_pid_parent_temp.size() =", _pk_mgr_ptr->map_pid_parent_temp.size());
 
+	for (map<unsigned long, int>::iterator iter = peer_ptr->map_in_pid_udpfd.begin(); iter != peer_ptr->map_in_pid_udpfd.end(); iter++) {
+		_log_ptr->write_log_format("s(u) s u u d \n", __FUNCTION__, __LINE__, "map_in_pid_udpfd.size() =", peer_ptr->map_in_pid_udpfd.size(), iter->first, iter->second);
+	}
+
 	// 送 CHNK_CMD_PEER_TEST_DELAY 給符合此 session_id 的所有 parent
 	for (pid_peer_info_iter = _pk_mgr_ptr->map_pid_parent_temp.begin(); pid_peer_info_iter != _pk_mgr_ptr->map_pid_parent_temp.end(); pid_peer_info_iter++) {
 		
@@ -605,7 +609,8 @@ void peer_mgr::send_manifest_to_parent(unsigned long manifestValue,unsigned long
 
 	queue_out_ctrl_ptr->push((struct chunk_t *)chunk_manifestSetPtr);
 	_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "send manifest", manifestValue, "to parent", parentPid); 
-	
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u)\ts\tu\ts\tu\tu \n", __FUNCTION__, __LINE__, "[CHNK_CMD_PEER_SET_MANIFEST] SEND mypid", self_pid, "parent", parentPid, manifestValue);
+
 	
 	/*
 	int parentSock;
@@ -702,6 +707,7 @@ void peer_mgr::send_manifest_to_parent_udp(unsigned long manifestValue,unsigned 
 
 	queue_out_ctrl_ptr->push((struct chunk_t *)chunk_manifestSetPtr);
 	_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "send manifest", manifestValue, "to parent", parentPid); 
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s u s u u \n", __FUNCTION__, __LINE__, "[CHNK_CMD_PEER_SET_MANIFEST] SEND mypid", self_pid, "parent", parentPid, manifestValue);
 }
 
 

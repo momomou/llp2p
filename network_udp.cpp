@@ -492,7 +492,8 @@ int network_udp::close(int sock)
 {
 	int ret;
 	int sock_state;
-	sock_state = UDT::getsockstate(sock);
+	int32_t pendingpkt_size = 0;
+	int len = 0;
 	//set_blocking(sock);
 	
 	// Must remove usock before close
@@ -500,7 +501,11 @@ int network_udp::close(int sock)
 		debug_printf("ErrCode: %d  ErrMsg: %s \n", UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
 		PAUSE
 	}
-	
+
+	sock_state = UDT::getsockstate(sock);
+	len = sizeof(pendingpkt_size);
+	UDT::getsockopt(sock, 0, UDT_SNDDATA, &pendingpkt_size, &len);
+	debug_printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! pending packets: %d \n", pendingpkt_size);
 	debug_printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Closing UDP socket %d, state: %d \n", sock, sock_state);
 	_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "sock", sock, "is closing, state", sock_state);
 
@@ -508,6 +513,15 @@ int network_udp::close(int sock)
 		debug_printf("ErrCode: %d  ErrMsg: %s \n", UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
 		//PAUSE
 	}
+
+	pendingpkt_size = 0;
+
+	sock_state = UDT::getsockstate(sock);
+	len = sizeof(pendingpkt_size);
+	UDT::getsockopt(sock, 0, UDT_SNDDATA, &pendingpkt_size, &len);
+	debug_printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! pending packets: %d \n", pendingpkt_size);
+	debug_printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Closing UDP socket %d, state: %d \n", sock, sock_state);
+	_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "sock", sock, "is closing, state", sock_state);
 
 	if (_map_fd_bc_tbl.find(sock) != _map_fd_bc_tbl.end()) {
 		_map_fd_bc_tbl.erase(_map_fd_bc_tbl.find(sock));
@@ -527,7 +541,8 @@ int network_udp::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 	int recv_rt_val;
 
 	recv_rt_val = recv(sock, send_info->recv_ctl_info.buffer + send_info->recv_ctl_info.offset, send_info->recv_ctl_info.expect_len, 0);
-	
+	//debug_printf("recv %d byte from sock: %d, expected len = %d \n", recv_rt_val, sock, send_info->recv_ctl_info.expect_len);
+
 	if (recv_rt_val < 0) {
 		int sock_state = UDT::getsockstate(sock);
 		switch (sock_state) {
@@ -550,6 +565,7 @@ int network_udp::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 			case UDTSTATUS::CONNECTED:
 				//debug_printf("Recv %d(expected:%d) bytes to sock %d, state: %d, ErrCode: %d, ErrMsg: %s \n", recv_rt_val, send_info->recv_ctl_info.expect_len, sock, sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
 				// Same as WSAEWOULDBLOCK
+				//debug_printf("state: %d, ErrCode: %d, ErrMsg: %s \n", sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
 				if (send_info->recv_packet_state == READ_HEADER_READY) {
 					send_info->recv_packet_state = READ_HEADER_RUNNING;
 				}
@@ -599,12 +615,9 @@ int network_udp::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 	} 
 	// The connection has been gracefully closed
 	else if (recv_rt_val == 0) {
-		debug_printf("recv 0 byte from sock: %d, expected len = %d \n", sock, send_info->recv_ctl_info.expect_len);
-		#ifdef _WIN32 
-		int socket_error = WSAGetLastError();
-		debug_printf("WSAGetLastError() = %d \n", socket_error);
-		#else
-		#endif
+		int sock_state = UDT::getsockstate(sock);
+		debug_printf("recv %d byte from sock: %d, expected len = %d \n", recv_rt_val, sock, send_info->recv_ctl_info.expect_len);
+		debug_printf("state: %d, ErrCode: %d, ErrMsg: %s \n", sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
 		PAUSE
 		if (send_info->recv_ctl_info.expect_len == 0) {
 
@@ -660,10 +673,11 @@ int network_udp::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 		}
 	} else if ((UINT32)recv_rt_val == send_info->recv_ctl_info.expect_len) {
 
-		//QueryPerformanceCounter(&teststart);
-
+		//debug_printf("recv_packet_state %d \n", send_info->recv_packet_state);
 		if(send_info ->recv_packet_state == READ_HEADER_READY){
 			send_info ->recv_packet_state = READ_HEADER_OK;
+			struct chunk_header_t* chunk_header_ptr = (chunk_header_t *)(send_info->recv_ctl_info.buffer + send_info->recv_ctl_info.offset);
+			//debug_printf("cmd %d  len %d \n", chunk_header_ptr->cmd, chunk_header_ptr->length);
 			//printf("READ_HEADER_OK\n");
 		}else if(send_info ->recv_packet_state == READ_HEADER_RUNNING){
 			send_info ->recv_packet_state = READ_HEADER_OK;
@@ -684,6 +698,7 @@ int network_udp::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 		}
 		return recv_rt_val;
 	} else {	
+		//debug_printf("recv_packet_state %d \n", send_info->recv_packet_state);
 		send_info->recv_ctl_info.expect_len -= recv_rt_val;
 		send_info->recv_ctl_info.offset += recv_rt_val;
 
@@ -722,6 +737,7 @@ int network_udp::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 	//debug_printf("send_info->ctl_state = %d \n", send_info->ctl_state);
 	if (send_info->ctl_state == READY) {
 		send_rt_val = send(sock, send_info->buffer + send_info->offset, send_info->expect_len, 0);
+		
 		int udt_max_sndbuf;
 		int len1 = sizeof(udt_max_sndbuf);
 		int32_t udt_sndbuf;
@@ -795,7 +811,8 @@ int network_udp::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 		}
 		else if ((UINT32)send_rt_val == send_info->expect_len) {
 			send_info->ctl_state = READY;
-			
+			struct chunk_header_t* chunk_header_ptr = (chunk_header_t *)(send_info->buffer + send_info->offset);
+			//debug_printf("cmd %d  len %d \n", chunk_header_ptr->cmd, chunk_header_ptr->length);
 			return send_rt_val;
 		}
 		else {

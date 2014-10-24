@@ -230,9 +230,11 @@ void peer_communication::set_candidates_handler(unsigned long rescue_manifest, s
 
 					// 防止同一台電腦互連
 					if (self_info->private_ip == testing_info->level_info[i]->private_ip && self_info->public_ip == testing_info->level_info[i]->public_ip) {
+						continue;
+					}
+					if (testing_info->level_info[i]->pid != 1) {
 						//continue;
 					}
-
 
 					struct peer_connect_down_t *parent_info_ptr = new struct peer_connect_down_t;
 					if (!parent_info_ptr) {
@@ -359,10 +361,12 @@ void peer_communication::set_candidates_handler(unsigned long rescue_manifest, s
 					memset(child_info_ptr, 0, sizeof(struct peer_info_t));
 					memcpy(child_info_ptr, testing_info->level_info[0], sizeof(struct peer_info_t));
 					child_info_ptr->manifest = testing_info->manifest;
+					child_info_ptr->session_id = session_id;
 					child_info_ptr->state = PEER_CONNECTING;
-
+					
 					_pk_mgr_ptr->map_pid_child.insert(pair<unsigned long, struct peer_info_t *>(child_info_ptr->pid, child_info_ptr));
-					_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "Insert pid", child_info_ptr->pid, "into map_pid_child");
+					_peer_ptr->priority_children.push_back(child_info_ptr->pid);
+					_log_ptr->write_log_format("s(u) s u s u u \n", __FUNCTION__, __LINE__, "Insert pid", child_info_ptr->pid, "into map_pid_child", child_info_ptr->manifest, child_info_ptr->session_id);
 
 
 
@@ -667,19 +671,16 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 	_net_ptr ->set_nonblocking(_sock);		//non-blocking connect
 	memset((struct sockaddr_in*)&peer_saddr, 0, sizeof(struct sockaddr_in));
 
-    if (flag == 0) {	
+    if (flag == 1) {	
 	    peer_saddr.sin_addr.s_addr = level_info_ptr->public_ip;
 		//_log_ptr->write_log_format("s =>u s u s s s u\n", __FUNCTION__,__LINE__,"connect to PID ",level_info_ptr ->pid,"public_ip",inet_ntoa (ip),"port= ",level_info_ptr->tcp_port );
 	}
-	else if (flag == 1) {	//in the same NAT
+	else if (flag == 0) {	//in the same NAT
 		peer_saddr.sin_addr.s_addr = level_info_ptr->private_ip;
 		//debug_printf("connect to private_ip %s  port= %d \n", inet_ntoa(ip),level_info_ptr->tcp_port);	
 		//_log_ptr->write_log_format("s =>u s u s s s u\n", __FUNCTION__,__LINE__,"connect to PID ",level_info_ptr ->pid,"private_ip",inet_ntoa (ip),"port= ",level_info_ptr->tcp_port );
 	}
-	else {
-		_logger_client_ptr->log_to_server(LOG_WRITE_STRING,0,"s \n","error : unknown flag in non_blocking_build_connection\n");
-		_logger_client_ptr->log_exit();
-	}
+	
 	
 	peer_saddr.sin_port = htons(level_info_ptr->tcp_port);
 	peer_saddr.sin_family = AF_INET;
@@ -726,7 +727,7 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 		_logger_client_ptr->log_exit();
 	}
 	
-	
+	_log_ptr->write_log_format("s(u) s u s d\n", __FUNCTION__, __LINE__, "connect to pid", pid, inet_ntoa(peer_saddr.sin_addr), ntohs(peer_saddr.sin_port));
 	/*
 	this part stores the info in each table.
 	*/
@@ -786,7 +787,7 @@ int peer_communication::non_blocking_build_connection_udp(struct level_info_t *l
 	
 
 	_log_ptr->write_log_format("s(u) s d s d s d \n", __FUNCTION__, __LINE__, "caller =", caller, "manifest =", manifest, "pid =", pid);
-	
+	_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "private port", level_info_ptr->private_port, "public port", level_info_ptr->public_port);
 	// Check is there any connection already built
 	/*
 	if (CheckConnectionExist(caller, level_info_ptr->pid) == 1) {
@@ -800,9 +801,18 @@ int peer_communication::non_blocking_build_connection_udp(struct level_info_t *l
 	build_udp_conn_temp.caller = caller;
 	build_udp_conn_temp.flag = flag;
 	build_udp_conn_temp.manifest = manifest;
-	build_udp_conn_temp.peer_saddr.sin_addr.s_addr = flag == 1 ? level_info_ptr->public_ip : level_info_ptr->private_ip;
+	if (flag == 1) {
+		build_udp_conn_temp.peer_saddr.sin_addr.s_addr = level_info_ptr->public_ip;
+		build_udp_conn_temp.peer_saddr.sin_port = htons(level_info_ptr->public_port);
+	}
+	else {
+		// LAN connection
+		build_udp_conn_temp.peer_saddr.sin_addr.s_addr = level_info_ptr->private_ip;
+		build_udp_conn_temp.peer_saddr.sin_port = htons(level_info_ptr->private_port);
+	}
+	//build_udp_conn_temp.peer_saddr.sin_addr.s_addr = flag == 1 ? level_info_ptr->public_ip : level_info_ptr->private_ip;
 	//build_udp_conn_temp.peer_saddr.sin_addr.s_addr = level_info_ptr->private_ip;
-	build_udp_conn_temp.peer_saddr.sin_port = htons(level_info_ptr->udp_port);
+	//build_udp_conn_temp.peer_saddr.sin_port = htons(level_info_ptr->udp_port);
 	build_udp_conn_temp.peer_saddr.sin_family = AF_INET;
 	build_udp_conn_temp.pid = pid;
 	build_udp_conn_temp.session_id = session_id;
@@ -953,7 +963,7 @@ int peer_communication::fake_conn_udp(struct level_info_t *level_info_ptr, int c
 
 
 	peer_saddr.sin_addr.s_addr = level_info_ptr->public_ip;
-	peer_saddr.sin_port = htons(level_info_ptr->udp_port);
+	peer_saddr.sin_port = htons(level_info_ptr->public_port);
 	peer_saddr.sin_family = AF_INET;
 
 	if ((_sock = UDT::socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -993,6 +1003,7 @@ int peer_communication::fake_conn_udp(struct level_info_t *level_info_ptr, int c
 
 	_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "sock", _sock, "state =", UDT::getsockstate(_sock));
 	debug_printf("sock = %d  state = %d \n", _sock, UDT::getsockstate(_sock));
+	_log_ptr->write_log_format("s(u) s u s d\n", __FUNCTION__, __LINE__, "connect to pid", pid, inet_ntoa(peer_saddr.sin_addr), ntohs(peer_saddr.sin_port));
 
 	UDT::close(_sock);
 	return RET_OK;
@@ -1235,11 +1246,7 @@ int peer_communication::CheckConnectionExist(int caller, unsigned long pid)
 		map<unsigned long, int>::iterator map_pid_fd_iter;
 		map<unsigned long, struct peer_info_t *>::iterator map_pid_child1_iter;
 
-		map_pid_child1_iter = _pk_mgr_ptr ->map_pid_child2.find(pid);
-		if (_pk_mgr_ptr->map_pid_child2.find(pid) != _pk_mgr_ptr->map_pid_child2.end()) {
-			_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "child pid", pid, "is already in map_pid_child2");
-			return 1;
-		}
+		
 		
 		if(_pk_mgr_ptr->map_pid_child_temp.find(pid) != _pk_mgr_ptr->map_pid_child_temp.end()){
 			if (_pk_mgr_ptr->map_pid_child_temp.count(pid) > 1) {
@@ -1770,10 +1777,11 @@ int peer_communication::SendPeerCon(int sock, unsigned long pid)
 	chunk_request_ptr->header.rsv_1 = REQUEST;
 	chunk_request_ptr->header.length = sizeof(struct request_info_t);
 	chunk_request_ptr->info.pid = pid;
-	chunk_request_ptr->info.channel_id = 0;		// Not used
+	chunk_request_ptr->info.channel_id = 0;			// Not used
 	chunk_request_ptr->info.private_ip = _pk_mgr_ptr->my_private_ip;
-	chunk_request_ptr->info.tcp_port = 0;	// Not used
-	chunk_request_ptr->info.udp_port = 0;	// Not used
+	chunk_request_ptr->info.tcp_port = 5566;			// Not used
+	chunk_request_ptr->info.public_udp_port = 7788;		// Not used
+	chunk_request_ptr->info.private_udp_port = 7788;	// Not used
 
 	Nonblocking_Send_Ctrl_ptr->recv_ctl_info.offset = 0;
 	Nonblocking_Send_Ctrl_ptr->recv_ctl_info.total_len = sizeof(struct role_struct);

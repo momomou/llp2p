@@ -77,7 +77,7 @@
 #define NETWORK_TIMEOUT		5000		// Period of check peer's unnormal disconnection
 #define DATA_TIMEOUT		5000		// Timeout for rescue type 3
 #define BASE_RESYN_TIME		20000
-#define NAT_WAITING_TIME	200			// waiting time for NAT traversal
+#define NAT_WAITING_TIME	500			// waiting time for NAT traversal
 #define BLOCK_RESCUE_TIME	5000		// waiting time for block_rescue
 #define BLOCK_RESCUE_INTERVAL	2000	// Time interval between sending block_rescue
 
@@ -87,9 +87,12 @@
 // BUFF_SIZE sec
 #define BUFF_SIZE		5
 //CHUNK_LOSE sec, mean lose about CHUNK_LOSE sec packet
-#define CHUNK_LOSE		2	//
+#define CHUNK_LOSE		5	//
 
-
+// Child Priority
+#define CHILD_PRIORITY_X1	30		// Average pending packets size
+#define CHILD_PRIORITY_X2	30		// current pending packets size  有 50% 以上的 queue 其 pending packets 超過這個值的話，條件成立
+#define PRIORITY_QUEUE_THRESHOLD	10	// Priority x 的 child 必須等到 priority x-1 的 child 的 queue size 小於 PRIORITY_QUEUE_THRESHOLD 才可以塞給 sending buffer
 
 // Time interval of calculation Xcount
 #define XCOUNT_INTERVAL		20000
@@ -497,7 +500,7 @@ struct peer_info_t {
 	UINT32 NAT_type;					//unsigned long NAT_type;	//from 1 to 4 (4 cannot punch)
 //////////NAT////////////
 	UINT32 manifest;					//unsigned long manifest;
-	UINT32 session_id;
+	UINT32 session_id;					// 同時作為 child priority，值越小權限越高
 	UINT32 state;
 };
 
@@ -509,10 +512,10 @@ struct level_info_t {
 	UINT32 public_ip;					//unsigned long public_ip;
 	UINT32 private_ip;					//unsigned long private_ip;
 	UINT16 tcp_port;					//unsigned short tcp_port;
-	UINT16 udp_port;					//unsigned short udp_port;
+	UINT16 udp_port;					//unsigned short tcp_port;
 	//////////NAT////////////
-	UINT16 public_port;					//unsigned short public_port;
-	UINT16 private_port;				//unsigned short private_port;
+	UINT16 public_port;					// External UDP port
+	UINT16 private_port;				// Internal UDP port
 	UINT32 upnp_acess;					//unsigned long upnp_acess;	//yes1 no0 
 	UINT32 NAT_type;					//unsigned long NAT_type;	//from 1 to 4 (4 cannot punch)
 	//////////NAT////////////
@@ -523,7 +526,8 @@ struct request_info_t {
 	UINT32 channel_id;					//unsigned long channel_id;
 	UINT32 private_ip;					//unsigned long private_ip;
 	UINT16 tcp_port;					//unsigned short tcp_port;
-	UINT16 udp_port;					//unsigned short udp_port;
+	UINT16 public_udp_port;				//unsigned short udp_port;
+	UINT16 private_udp_port;			//unsigned short udp_port;
 };
 
 struct rtsp_int_hdr_t {
@@ -1003,10 +1007,7 @@ struct syn_token_receive {
 struct rescue_peer_capacity_measurement{
 	struct chunk_header_t header;
 	UINT32 rescue_num;							//unsigned int rescue_num;
-	//int rescue_condition;
-	//char NAT_status;
 	INT8 content_integrity;						//char content_integrity;
-	UINT32 *source_delay_measur[0];				//unsigned long *source_delay_measur[0];
 };
 //////////////////////////////////////////////////////////////////////////////////
 struct seed_notify{
@@ -1079,6 +1080,7 @@ struct manifest_timmer_flag{
 	UINT32 firstReplyFlag;						//unsigned long	firstReplyFlag;		// Not used. If get the first reply peer in the session, set flag = 1
 	UINT32 networkTimeOutFlag;					//unsigned long	networkTimeOutFlag; // Not used
 	UINT32 connectTimeOutFlag;					//unsigned long	connectTimeOutFlag; // Not used. If get the fist connected peer(according to CHNK_CMD_PEER_CON, not system socket), set flag = 1
+	UINT32 sentTestFlag;						// 1 if CHNK_CMD_PARENT_TEST_INFO has sent to PK; 0, otherwise
 	UINT32 rescue_manifest;						//unsigned long	rescue_manifest;	//may be rescue peer or candidates
 	INT32 peer_role;							//int peer_role;	// The role of that peer, not mine
 	UINT32 allSkipConnFlag;						// If one of peer is not in parent-table, set flag = 0. Default is 1

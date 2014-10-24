@@ -57,8 +57,7 @@ public:
 	multimap <unsigned long, struct peer_info_t *> map_pid_child_temp;		// My temp child
 	map<unsigned long, struct peer_connect_down_t *> map_pid_parent;		// My real parent-peer (第一個回test reply的peer會塞進去) (life: session start <-----> session stop)
 	map<unsigned long, struct peer_info_t *> map_pid_child;					// My real child-peer (life: session start <-----> session stop)
-	map<unsigned long, struct peer_info_t *> map_pid_child2;				// My real child-peer ????
-
+	
 	// These two tables are to prevent more than 2 connections (upstream + downstream)
 	map<unsigned long, int> parents_table;									// <pid, state> table, to prevent too much connections(no more than 2)
 	map<unsigned long, int> children_table;									// <pid, state> table, to prevent too much connections(no more than 2)
@@ -129,11 +128,10 @@ public:
 	void set_parent_manifest(struct peer_connect_down_t* parent_info, UINT32 manifest);
 
 	int peer_start_delay_count;		// If received first packet of each substream, peer_start_delay_count++
-	void send_capacity_init();
-	void send_capacity_to_pk(int sock);
 	void send_source_delay(int sock);		// Send source-delay info to pk
 	void send_topology_to_log();			// Send topology to log server
 	void SendParentTestToPK(unsigned long session_id);
+	void SendCapacityToPK();
 
 	volatile UINT32 _least_sequence_number;			//收到目前為止最新的seq
 	volatile UINT32 _current_send_sequence_number;	//最後送給player的seq(還沒送)
@@ -143,9 +141,9 @@ public:
 	pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr,  network_udp *net_udp_ptr , logger *log_ptr , configuration *prep , logger_client * logger_client_ptr, stunt_mgr *stunt_mgr);
 	~pk_mgr();
 
-	void init(unsigned short ptop_port, unsigned short ptop_udp_port);
+	void init(unsigned short ptop_port, unsigned short public_udp_port, unsigned short private_udp_port);
 	int build_connection(string ip, string port); 
-	int handle_register(unsigned short ptop_port, unsigned short svc_udp_port);
+	int handle_register(unsigned short ptop_port, unsigned short public_udp_port, unsigned short private_udp_port);
 	void peer_mgr_set(peer_mgr *peer_mgr_ptr);
 	
 	void add_stream(int stream_fd, stream *strm, unsigned strm_type);
@@ -175,6 +173,7 @@ public:
 	void HandleStream(struct chunk_t *chunk_ptr, int sockfd);
 	void handle_kickout(struct chunk_t *chunk_ptr, int sockfd);
 	void handle_error(int exit_code, const char *msg, const char *func, unsigned int line);
+	void HandleRelayStream(struct chunk_t *chunk_ptr);
 
 ///new rescue function
 	//	void handleAppenSelfdPid(struct chunk_t *chunk_ptr );
@@ -235,6 +234,15 @@ public:
 	unsigned short my_private_port;
 
 	int session_id;
+
+	// Priority Queue parameters
+	unsigned long sampling_interval;	// number of pkts per 100ms
+	int capacity_x;						// 目前允許用的量
+	int capacity_n;						// 目前應該用的量 (Children 的 substream number 總和), Delta
+	int priq_cnt;						// Counter for Child Priority
+	int priq_cnt2;
+	double avg_queue;
+	double avg_queue_previous;			// 上一次測出的 avg_queue
 
 private:
 	

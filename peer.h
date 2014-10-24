@@ -42,6 +42,7 @@ public:
 	map<int , Nonblocking_Buff * > map_udpfd_nonblocking_ctl;
 
 	list<int> *fd_list_ptr;
+	list<unsigned long> priority_children;
 
 	peer(list<int> *fd_list);
 	~peer();

@@ -377,6 +377,9 @@ void logger_client::send_bw()
 	log_to_server(LOG_DATA_BANDWIDTH, 0, should_in_bw, real_in_bw,real_out_bw, quality_result, nat_success_ratio);
 	debug_printf("in_bw: %.0lf \n", real_in_bw);
 	debug_printf("out_bw: %.0lf \n", real_out_bw);
+	if (real_in_bw != 0) {
+		debug_printf("Capacity: %.2lf, RescueNum: %d \n", real_out_bw / real_in_bw, _pk_mgr_ptr->rescueNumAccumulate());
+	}
 	debug_printf("quality: %.4lf \n", quality_result);
 	debug_printf("nat_success_ratio: %.3lf \n", nat_success_ratio);
 

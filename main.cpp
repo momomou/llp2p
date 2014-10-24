@@ -632,8 +632,8 @@ int mainFunction(int thread_key){
 int main(int argc, char **argv){
 #endif
 	
-
 	//cout << UDT::stunRandomPort() << endl;
+
 
 	cout << "tst_speed_svr " << version << " (Compiled Time: "__DATE__ << " "__TIME__")" << endl << endl;
 
@@ -1043,7 +1043,7 @@ int main(int argc, char **argv){
 		fd_list.push_back(svc_fd_tcp);
 		udp_fd_list.push_back(svc_fd_udp);
 #endif
-		pk_mgr_ptr->init(tcp_port, udp_port_ext);
+		pk_mgr_ptr->init(tcp_port, udp_port_ext, udp_port_int);
 		logger_client_ptr->log_init();
 
 
@@ -1208,7 +1208,7 @@ int main(int argc, char **argv){
 
 		//srv_shutdown = 1;
 		debug_printf("Client Restart \n");
-		//PAUSE
+		PAUSE
 
 		WSACleanup();
 
