@@ -27,21 +27,22 @@ public:
 	~peer_communication();
 
 	void set_self_info(unsigned long public_ip);
-	void set_candidates_handler(unsigned long rescue_manifest,struct chunk_level_msg_t *testing_info,unsigned int candidates_num, int caller, int session_id);	//parameter candidates_num may be zero 
+	void set_candidates_handler(struct chunk_level_msg_t *testing_info, int candidates_num, int caller, UINT32 my_session, UINT32 peercomm_session);	//parameter candidates_num may be zero 
 	void stop_attempt_connect(unsigned long stop_session_id);
 	void clear_fd_in_peer_com(int sock);
 	void clear_udpfd_in_peer_com(int sock);
 	int non_blocking_build_connection(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, int flag, unsigned long session_id);
-	int non_blocking_build_connection_udp(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, int flag, unsigned long session_id);
-	int non_blocking_build_connection_udp_now(struct build_udp_conn build_udp_conn_temp);
+	int non_blocking_build_connection_udp(struct peer_info_t *candidates_info, INT32 caller, UINT32 manifest, UINT32 peer_pid, INT32 flag, UINT32 my_session, UINT32 peercomm_session);
+	int non_blocking_build_connection_udp_now(struct peer_info_t *candidates_info, INT32 caller, UINT32 manifest, UINT32 peer_pid, INT32 flag, UINT32 my_session, UINT32 peercomm_session);
 	int fake_conn_udp(struct level_info_t *level_info_ptr, int fd_role, unsigned long manifest, unsigned long fd_pid, int flag, unsigned long session_id);
 	int non_blocking_build_connectionNAT_udp(struct level_info_t *level_info_ptr, int fd_role, unsigned long manifest, unsigned long fd_pid, int flag, unsigned long session_id);
 	void WaitForParentConn(unsigned long parent_pid, unsigned long manifest, unsigned long session_id);
 	io_accept * get_io_accept_handler();
 	void accept_check(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, unsigned long session_id);
 	int CheckConnectionExist(int caller, unsigned long pid);
-	int SendPeerCon(int sock, unsigned long pid);
-	void StopSession(unsigned long session_id);
+	int SendPeerCon(UINT32 my_session);
+	void SelectStrategy(UINT32 my_session);
+	void StopSession(UINT32 session_id);
 	void fd_close(int sock);
 	//int tcpPunch_connection(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, int flag, unsigned long session_id);
 
@@ -59,12 +60,12 @@ public:
 	unsigned long session_id_count;
 	struct level_info_t *self_info;
 	list<struct fd_information *> conn_from_parent_list;	// 專門存由 Parent 主動建立連線的 Session 資訊，因為這種反向的建立連線方式(Parent connects to children)無法由 children 透過 session ID 去分析
-	map<unsigned long, struct peer_com_info *> session_id_candidates_set;	// (life: set_candidates_handler <--2s--> stop_attempt_connect)
-	map<unsigned long, struct peer_com_info *>::iterator session_id_candidates_set_iter;
+	map<unsigned long, struct mysession_candidates *> map_mysession_candidates;	// (life: set_candidates_handler <--2s--> stop_attempt_connect)
+	//map<unsigned long, struct peer_com_info *>::iterator session_id_candidates_set_iter;
 
 	map<int, struct fd_information *> map_fd_info;						// TCP fd
 	map<int, struct fd_information *>::iterator map_fd_info_iter;		
-	map<int, struct fd_information *> map_udpfd_info;						// UDP fd
+	//map<int, struct fd_information *> map_udpfd_info;						// UDP fd
 	map<int, struct fd_information *>::iterator map_udpfd_info_iter;
 
 	map<int , struct ioNonBlocking*> map_fd_NonBlockIO;					// 建connection時會塞
@@ -72,7 +73,7 @@ public:
 	map<int ,  struct ioNonBlocking*>::iterator map_fd_NonBlockIO_iter;
 	map<int ,  struct ioNonBlocking*>::iterator map_udpfd_NonBlockIO_iter;
 
-	multimap<int, struct build_udp_conn> mmap_build_udp_conn;
+	list<struct delay_build_connection> list_build_connection;
 	/*map<int, int> map_fd_flag;	//flag 0 rescue peer, flag 1 candidates, and delete in stop
 	map<int, unsigned long> map_fd_session_id;	//must be store before io_connect, and delete in stop
 	map<int, unsigned long> map_peer_com_fd_pid;	//must be store before io_connect, and delete in stop

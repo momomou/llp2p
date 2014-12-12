@@ -42,15 +42,16 @@ public:
 	map<int , Nonblocking_Buff * > map_udpfd_nonblocking_ctl;
 
 	list<int> *fd_list_ptr;
-	list<unsigned long> priority_children;
+	list<unsigned long> priority_children;					// 被 child 真正認定後將此 child 塞入 (收到 CHNK_CMD_PEER_CON)
 
 	peer(list<int> *fd_list);
 	~peer();
 	void peer_set(network *net_ptr, network_udp *net_udp_ptr, logger *log_ptr , configuration *prep, pk_mgr *pk_mgr_ptr, peer_mgr *peer_mgr_ptr, logger_client * logger_client_ptr);
 	void handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_in cin);
 	int handle_connect_request(int sock, struct level_info_t *level_info_ptr, unsigned long pid,Nonblocking_Ctl * Nonblocking_Send_Ctrl_ptr);
-	void handle_connect_udp(int sock, struct chunk_t *chunk_ptr, struct sockaddr_in cin);
-	int handle_connect_request_udp(int sock, struct level_info_t *level_info_ptr, unsigned long pid,Nonblocking_Ctl * Nonblocking_Send_Ctrl_ptr);
+	void HandlePeerCon(int sock, struct chunk_request_peer_t *chunk_ptr);
+	void InitPeerInfo(int sock, UINT32 peer_pid, UINT32 manifest, UINT32 my_role);
+	int SendPeerCon(int sock, UINT32 peer_pid, Nonblocking_Ctl * Nonblocking_Send_Ctrl_ptr, UINT32 peercomm_session, UINT32 peer_role);
 	void clear_map();
 	virtual int handle_pkt_in(int sock);
 	virtual int handle_pkt_in_udp(int sock);
@@ -64,6 +65,20 @@ public:
 
 	void StopSession(unsigned long session_id);
 
+	//////////////////////////////////////////
+	//  CloseParent/CloseChild
+	//             |
+	//             v
+	//  CloseParentUDP/CloseChildUDP
+	//             |  會處理 parent/child table
+	//             v
+	//  CloseSocketUDP/CloseSocketTCP
+	//             |  只處理 socket
+	//             v
+	//  network_udp->close/network->close
+	//
+	//  
+	///////////////////////////////////////////
 	void data_close(int cfd, const char *reason ,int type); 
 	void peer::CloseParent(unsigned long pid, bool care, const char *reason);
 	void peer::CloseParentTCP(unsigned long pid, const char *reason);

@@ -96,11 +96,11 @@ void peer::peer_set(network *net_ptr , network_udp *net_udp_ptr, logger *log_ptr
 //收到一個建立連線的要求(需down stream)
 void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_in cin)
 {
-	struct chunk_request_msg_t *chunk_request_ptr = NULL;
+	struct chunk_request_peer_t *chunk_request_ptr = NULL;
 	struct peer_info_t *rescue_peer = NULL;
 //	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 	map<unsigned long, struct peer_info_t *>::iterator map_pid_child1_iter;
-	chunk_request_ptr = (struct chunk_request_msg_t *)chunk_ptr;
+	chunk_request_ptr = (struct chunk_request_peer_t *)chunk_ptr;
 
 	map_pid_child1_iter = _pk_mgr_ptr->map_pid_child.find(chunk_request_ptr->info.pid);
 	if (map_pid_child1_iter != _pk_mgr_ptr->map_pid_child.end()) {
@@ -188,16 +188,15 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 	}
 }
 
-// Called by parent-peer. Receive CHNK_CMD_PEER_CON
 //new queue    只有收到CHNK_CMD_PEER_CON才會呼叫
 //收到一個建立連線的要求(需down stream)
-void peer::handle_connect_udp(int sock, struct chunk_t *chunk_ptr, struct sockaddr_in cin)
+void peer::HandlePeerCon(int sock, struct chunk_request_peer_t *chunk_ptr)
 {
-	struct chunk_request_msg_t *chunk_request_ptr = NULL;
+	struct chunk_request_peer_t *chunk_request_ptr = NULL;
 	struct peer_info_t *rescue_peer = NULL;
 	//	map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter;
 	map<unsigned long, struct peer_info_t *>::iterator map_pid_child_iter;
-	chunk_request_ptr = (struct chunk_request_msg_t *)chunk_ptr;
+	chunk_request_ptr = (struct chunk_request_peer_t *)chunk_ptr;
 
 	/*
 	map_pid_child_iter = _pk_mgr_ptr->map_pid_child.find(chunk_request_ptr->info.pid);
@@ -279,7 +278,7 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 		map_fd_out_data[sock] = queue_out_data_ptr;
 
 		struct chunk_t *chunk_ptr = NULL;
-		struct chunk_request_msg_t *chunk_request_ptr = NULL;
+		struct chunk_request_peer_t *chunk_request_ptr = NULL;
 		int send_byte;
 		unsigned long channel_id;
 		string svc_tcp_port("");
@@ -289,15 +288,15 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 		_prep->read_key("svc_tcp_port", svc_tcp_port);
 		_prep->read_key("svc_udp_port", svc_udp_port);
 
-		chunk_request_ptr = (struct chunk_request_msg_t *)new unsigned char[sizeof(struct chunk_request_msg_t)];
+		chunk_request_ptr = (struct chunk_request_peer_t *)new unsigned char[sizeof(struct chunk_request_peer_t)];
 		if (!chunk_request_ptr) {
 			_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::chunk_request_ptr  new error", __FUNCTION__, __LINE__);
 		}
-		memset(chunk_request_ptr, 0, sizeof(struct chunk_request_msg_t));
+		memset(chunk_request_ptr, 0, sizeof(struct chunk_request_peer_t));
 
 		chunk_request_ptr->header.cmd = CHNK_CMD_PEER_CON;
 		chunk_request_ptr->header.rsv_1 = REQUEST;
-		chunk_request_ptr->header.length = sizeof(struct chunk_request_msg_t) - sizeof(struct chunk_header_t);
+		chunk_request_ptr->header.length = sizeof(struct chunk_request_peer_t) - sizeof(struct chunk_header_t);
 		chunk_request_ptr->info.pid = pid;
 		chunk_request_ptr->info.channel_id = channel_id;
 		//chunk_request_ptr->info.private_ip = _net_ptr->getLocalIpv4();
@@ -310,8 +309,8 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 
 
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.offset = 0;
-		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.total_len = sizeof(struct chunk_request_msg_t);
-		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.expect_len = sizeof(struct chunk_request_msg_t);
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.total_len = sizeof(struct chunk_request_peer_t);
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.expect_len = sizeof(struct chunk_request_peer_t);
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.buffer = (char *)chunk_request_ptr;
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_request_ptr;
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.serial_num = chunk_request_ptr->header.sequence_number;
@@ -340,17 +339,13 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 
 		}
 		else if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY ) {
-			debug_printf("111 \n");
 			if (chunk_request_ptr) {
-				debug_printf("222 \n");
 				delete chunk_request_ptr;
 			}
-			debug_printf("333 \n");
 			//if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr) {
 			//	debug_printf("444 \n");
 			//	delete Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr;
 			//}
-			debug_printf("555 \n");
 			
 			Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = NULL;
 			return 0;
@@ -380,7 +375,7 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 
 	
 	
-	//send_byte = send(sock, (char *)chunk_request_ptr, sizeof(struct chunk_request_msg_t), 0);
+	//send_byte = send(sock, (char *)chunk_request_ptr, sizeof(struct chunk_request_peer_t), 0);
 	//
 	//if( send_byte <= 0 ) {
 	//	data_close(sock, "send html_buf error",CLOSE_PARENT);
@@ -395,15 +390,162 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 
 }
 
-
-// Called by children-peer. Send CHNK_CMD_PEER_CON
-int peer::handle_connect_request_udp(int sock, struct level_info_t *level_info_ptr, unsigned long my_pid, Nonblocking_Ctl * Nonblocking_Send_Ctrl_ptr)
+// Create the table relating this peer
+void peer::InitPeerInfo(int peer_fd, UINT32 peer_pid, UINT32 manifest, UINT32 my_role)
 {
-	unsigned long parent_pid = level_info_ptr->pid;
+	queue_out_ctrl_ptr = new std::queue<struct chunk_t *>;
+	queue_out_data_ptr = new std::queue<struct chunk_t *>;
+	Nonblocking_Buff * Nonblocking_Buff_ptr = new Nonblocking_Buff;
+	if (!Nonblocking_Buff_ptr || !queue_out_ctrl_ptr || !queue_out_data_ptr) {
+		_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::handle_connect  new error", __FUNCTION__, __LINE__);
+	}
+	memset(Nonblocking_Buff_ptr, 0, sizeof(Nonblocking_Buff));
 
-	debug_printf("sock = %d  parent pid = %d  my pid = %d \n", sock, parent_pid, my_pid);
-	_log_ptr->write_log_format("s(u) d d d \n", __FUNCTION__, __LINE__, sock, parent_pid, my_pid);
+	if (my_role == CHILD_PEER) {
+		if (map_in_pid_udpfd.find(peer_pid) == map_in_pid_udpfd.end()) {
+			map_in_pid_udpfd[peer_pid] = peer_fd;
+		}
+		map_udpfd_nonblocking_ctl[peer_fd] = Nonblocking_Buff_ptr;
+		map_udpfd_pid[peer_fd] = peer_pid;
+		map_udpfd_out_ctrl[peer_fd] = queue_out_ctrl_ptr;
+		map_udpfd_out_data[peer_fd] = queue_out_data_ptr;
+	}
+	else if (my_role == PARENT_PEER){
+		map_udpfd_nonblocking_ctl[peer_fd] = Nonblocking_Buff_ptr;
+		map_out_pid_udpfd[peer_pid] = peer_fd;
+		map_udpfd_pid[peer_fd] = peer_pid;
+		map_udpfd_out_ctrl[peer_fd] = queue_out_ctrl_ptr;
+		map_udpfd_out_data[peer_fd] = queue_out_data_ptr;
+	}
+}
 
+// Send CHNK_CMD_PEER_CON
+int peer::SendPeerCon(int sock, UINT32 peer_pid, Nonblocking_Ctl * Nonblocking_Send_Ctrl_ptr, UINT32 peercomm_session, UINT32 peer_role)
+{
+	/*
+	_log_ptr->write_log_format("s(u) d d \n", __FUNCTION__, __LINE__, sock, peer_pid);
+
+	map<unsigned long, struct mysession_candidates *>::iterator map_mysession_candidates_iter;
+
+	map_mysession_candidates_iter = map_mysession_candidates.find(my_session);
+	if (map_mysession_candidates_iter == map_mysession_candidates.end()){
+		_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] Not found in map_mysession_candidates", __FUNCTION__, __LINE__);
+		return;
+	}
+	
+
+	if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.ctl_state == READY) {
+
+		// Create tables
+		queue_out_ctrl_ptr = new std::queue<struct chunk_t *>;
+		queue_out_data_ptr = new std::queue<struct chunk_t *>;
+		Nonblocking_Buff * Nonblocking_Buff_ptr = new Nonblocking_Buff;
+		if (!Nonblocking_Buff_ptr || !queue_out_ctrl_ptr || !queue_out_data_ptr) {
+			_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::handle_connect  new error", __FUNCTION__, __LINE__);
+		}
+		memset(Nonblocking_Buff_ptr, 0, sizeof(Nonblocking_Buff));
+
+		if (peer_role == PARENT_PEER) {
+			if (map_in_pid_udpfd.find(peer_pid) == map_in_pid_udpfd.end()) {
+				map_in_pid_udpfd[peer_pid] = sock;
+			}
+			map_udpfd_nonblocking_ctl[sock] = Nonblocking_Buff_ptr;
+			map_udpfd_pid[sock] = peer_pid;
+			map_udpfd_out_ctrl[sock] = queue_out_ctrl_ptr;
+			map_udpfd_out_data[sock] = queue_out_data_ptr;
+		}
+		else if (peer_role == CHILD_PEER){
+
+		}
+
+		struct chunk_t *chunk_ptr = NULL;
+		struct chunk_request_peer_t *chunk_request_ptr = NULL;
+		int send_byte;
+		unsigned long channel_id;
+		string svc_tcp_port("");
+		string svc_udp_port("");
+
+		_prep->read_key("channel_id", channel_id);
+		_prep->read_key("svc_tcp_port", svc_tcp_port);
+		_prep->read_key("svc_udp_port", svc_udp_port);
+
+		chunk_request_ptr = (struct chunk_request_peer_t *)new unsigned char[sizeof(struct chunk_request_peer_t)];
+		if (!chunk_request_ptr) {
+			_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::chunk_request_ptr  new error", __FUNCTION__, __LINE__);
+		}
+		memset(chunk_request_ptr, 0, sizeof(struct chunk_request_peer_t));
+
+		chunk_request_ptr->header.cmd = CHNK_CMD_PEER_CON;
+		chunk_request_ptr->header.rsv_1 = REQUEST;
+		chunk_request_ptr->header.length = sizeof(struct chunk_request_peer_t) - sizeof(struct chunk_header_t);
+		chunk_request_ptr->info.pid = _pk_mgr_ptr->my_pid;
+		chunk_request_ptr->info.channel_id = channel_id;
+		chunk_request_ptr->info.private_ip = _pk_mgr_ptr->my_private_ip;
+		chunk_request_ptr->info.tcp_port = (unsigned short)atoi(svc_tcp_port.c_str());
+		chunk_request_ptr->info.public_udp_port = (unsigned short)atoi(svc_udp_port.c_str());		// 先暫時隨便給個值
+		chunk_request_ptr->info.private_udp_port = (unsigned short)atoi(svc_udp_port.c_str());		// 先暫時隨便給個值
+
+		_net_udp_ptr->set_nonblocking(sock);
+
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.offset = 0;
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.total_len = sizeof(struct chunk_request_peer_t);
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.expect_len = sizeof(struct chunk_request_peer_t);
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.buffer = (char *)chunk_request_ptr;
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_request_ptr;
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.serial_num = chunk_request_ptr->header.sequence_number;
+
+		//debug_printf("header.cmd = %d, total_len = %d \n", chunk_request_ptr->header.cmd, chunk_request_ptr->header.length);
+		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "chunk_request_ptr->info.pid =", peer_pid);
+
+		_send_byte = _net_udp_ptr->nonblock_send(sock, &(Nonblocking_Send_Ctrl_ptr->recv_ctl_info));
+		
+		if (_send_byte < 0) {
+			if (chunk_request_ptr) {
+				delete chunk_request_ptr;
+			}
+			Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = NULL;
+			CloseParent(parent_pid, true, "PEER　COM error");
+
+			return RET_SOCK_ERROR;
+		}
+		else if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.ctl_state == READY) {
+			if (chunk_request_ptr) {
+				delete chunk_request_ptr;
+			}
+			Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = NULL;
+			return 0;
+		}
+		
+	}
+	else if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.ctl_state == RUNNING) {
+		_send_byte = _net_udp_ptr->nonblock_send(sock, &(Nonblocking_Send_Ctrl_ptr->recv_ctl_info));
+		
+		if (_send_byte < 0) {
+			if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr) {
+				delete Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr;
+			}
+			Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = NULL;
+			//data_close(sock, "PEER　COM error",CLOSE_PARENT);
+			CloseParent(parent_pid, true, "PEER　COM error");
+			return RET_SOCK_ERROR;
+		}
+		else if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.ctl_state == READY){
+
+			if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr) {
+				delete Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr;
+			}
+			Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = NULL;
+			return 0;
+		}
+		
+	}
+	*/
+
+
+
+
+
+	/*
 	if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY) {
 
 		map<unsigned long, int>::iterator map_pid_udpfd_iter;
@@ -426,7 +568,7 @@ int peer::handle_connect_request_udp(int sock, struct level_info_t *level_info_p
 		map_udpfd_out_data[sock] = queue_out_data_ptr;
 
 		struct chunk_t *chunk_ptr = NULL;
-		struct chunk_request_msg_t *chunk_request_ptr = NULL;
+		struct chunk_request_peer_t *chunk_request_ptr = NULL;
 		int send_byte;
 		unsigned long channel_id;
 		string svc_tcp_port("");
@@ -436,28 +578,29 @@ int peer::handle_connect_request_udp(int sock, struct level_info_t *level_info_p
 		_prep->read_key("svc_tcp_port", svc_tcp_port);
 		_prep->read_key("svc_udp_port", svc_udp_port);
 
-		chunk_request_ptr = (struct chunk_request_msg_t *)new unsigned char[sizeof(struct chunk_request_msg_t)];
+		chunk_request_ptr = (struct chunk_request_peer_t *)new unsigned char[sizeof(struct chunk_request_peer_t)];
 		if (!chunk_request_ptr) {
 			_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::chunk_request_ptr  new error", __FUNCTION__, __LINE__);
 		}
-		memset(chunk_request_ptr, 0, sizeof(struct chunk_request_msg_t));
+		memset(chunk_request_ptr, 0, sizeof(struct chunk_request_peer_t));
 
 		chunk_request_ptr->header.cmd = CHNK_CMD_PEER_CON;
 		chunk_request_ptr->header.rsv_1 = REQUEST;
-		chunk_request_ptr->header.length = sizeof(struct chunk_request_msg_t) - sizeof(struct chunk_header_t);
+		chunk_request_ptr->header.length = sizeof(struct chunk_request_peer_t) - sizeof(struct chunk_header_t);
 		chunk_request_ptr->info.pid = my_pid;
 		chunk_request_ptr->info.channel_id = channel_id;
 		chunk_request_ptr->info.private_ip = _pk_mgr_ptr->my_private_ip;
 		chunk_request_ptr->info.tcp_port = (unsigned short)atoi(svc_tcp_port.c_str());
 		chunk_request_ptr->info.public_udp_port = (unsigned short)atoi(svc_udp_port.c_str());		// 先暫時隨便給個值
 		chunk_request_ptr->info.private_udp_port = (unsigned short)atoi(svc_udp_port.c_str());		// 先暫時隨便給個值
+		chunk_request_ptr->peercomm_session = peercomm_session;
 
 		_net_udp_ptr->set_nonblocking(sock);
 
 
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.offset = 0;
-		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.total_len = sizeof(struct chunk_request_msg_t);
-		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.expect_len = sizeof(struct chunk_request_msg_t);
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.total_len = sizeof(struct chunk_request_peer_t);
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.expect_len = sizeof(struct chunk_request_peer_t);
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.buffer = (char *)chunk_request_ptr;
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_request_ptr;
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.serial_num = chunk_request_ptr->header.sequence_number;
@@ -482,17 +625,13 @@ int peer::handle_connect_request_udp(int sock, struct level_info_t *level_info_p
 			return RET_SOCK_ERROR;
 		}
 		else if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY ) {
-			debug_printf("111 \n");
 			if (chunk_request_ptr) {
-				debug_printf("222 \n");
 				delete chunk_request_ptr;
 			}
-			debug_printf("333 \n");
 			//if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr) {
 			//	debug_printf("444 \n");
 			//	delete Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.chunk_ptr;
 			//}
-			debug_printf("555 \n");
 			
 			Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = NULL;
 			return 0;
@@ -519,22 +658,7 @@ int peer::handle_connect_request_udp(int sock, struct level_info_t *level_info_p
 			return 0;
 		}
 	}
-
-	
-	
-	//send_byte = send(sock, (char *)chunk_request_ptr, sizeof(struct chunk_request_msg_t), 0);
-	//
-	//if( send_byte <= 0 ) {
-	//	data_close(sock, "send html_buf error",CLOSE_PARENT);
-	//	PAUSE
-	//	_log_ptr->exit(0, "send html_buf error");
-	//	return -1;
-	//} else {
-	//	if(chunk_request_ptr)
-	//		delete chunk_request_ptr;
-	//	return 0;
-	//}
-
+	*/
 }
 
 // CHNK_CMD_PEER_DATA
@@ -794,7 +918,7 @@ int peer::handle_pkt_in(int sock)
 						UINT32 temp_manifest = replyManifest;
 						for (unsigned long i = 0; i < _pk_mgr_ptr->sub_stream_num; i++) {
 							if ((1 << i) & temp_manifest) {
-								_pk_mgr_ptr->SetSubstreamState(i, SS_TEST);
+								_pk_mgr_ptr->SetSubstreamState(i, SS_TEST2);
 								struct timerStruct timer;
 								_log_ptr->timerGet(&timer);
 								memcpy(&(_pk_mgr_ptr->ss_table[i]->parent_changed_time), &timer, sizeof(timer));
@@ -803,7 +927,7 @@ int peer::handle_pkt_in(int sock)
 						}
 						
 						
-						_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
+						_peer_mgr_ptr->send_manifest_to_parent(firstReplyPid, peerDownInfoPtr->peerInfo.manifest, TOTAL_OP);
 						_pk_mgr_ptr->reSet_detectionInfo();
 
 						if (replyManifest == _pk_mgr_ptr ->full_manifest) {
@@ -959,7 +1083,7 @@ int peer::handle_pkt_in_udp(int sock)
 	struct chunk_t* chunk_ptr = NULL;
 	unsigned long buf_len = 0;
 	
-	_log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
+	//_log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
 
 	if (map_udpfd_pid.find(sock) != map_udpfd_pid.end()) {
 		isUDP = true;
@@ -1013,10 +1137,10 @@ int peer::handle_pkt_in_udp(int sock)
 			memset(chunk_ptr, 0, buf_len);
 			memcpy(chunk_ptr, Nonblocking_Recv_ptr->recv_ctl_info.buffer, sizeof(chunk_header_t));
 
-			_log_ptr->write_log_format("s =>u s u s u s u \n", __FUNCTION__, __LINE__,
-				"PEER RECV DATA READ_HEADER_OK cmd =", chunk_ptr->header.cmd,
-				"total_len =", Nonblocking_Recv_ptr->recv_ctl_info.total_len,
-				"expect_len", Nonblocking_Recv_ptr->recv_ctl_info.expect_len);
+			//_log_ptr->write_log_format("s =>u s u s u s u \n", __FUNCTION__, __LINE__,
+			//	"PEER RECV DATA READ_HEADER_OK cmd =", chunk_ptr->header.cmd,
+			//	"total_len =", Nonblocking_Recv_ptr->recv_ctl_info.total_len,
+			//	"expect_len", Nonblocking_Recv_ptr->recv_ctl_info.expect_len);
 
 
 			if (Nonblocking_Recv_ptr->recv_ctl_info.buffer) {
@@ -1028,10 +1152,10 @@ int peer::handle_pkt_in_udp(int sock)
 			Nonblocking_Recv_ptr ->recv_ctl_info.expect_len = chunk_ptr->header.length ;
 			Nonblocking_Recv_ptr ->recv_ctl_info.buffer = (char *)chunk_ptr ;
 
-			_log_ptr->write_log_format("s =>u s u s u s u \n", __FUNCTION__, __LINE__,
-															   "PEER RECV DATA READ_HEADER_OK cmd =", chunk_ptr->header.cmd,
-															   "total_len =", Nonblocking_Recv_ptr->recv_ctl_info.total_len,
-															   "expect_len", Nonblocking_Recv_ptr->recv_ctl_info.expect_len);
+			//_log_ptr->write_log_format("s =>u s u s u s u \n", __FUNCTION__, __LINE__,
+			//												   "PEER RECV DATA READ_HEADER_OK cmd =", chunk_ptr->header.cmd,
+			//												   "total_len =", Nonblocking_Recv_ptr->recv_ctl_info.total_len,
+			//												   "expect_len", Nonblocking_Recv_ptr->recv_ctl_info.expect_len);
 
 			Nonblocking_Recv_ptr->recv_packet_state = READ_PAYLOAD_READY ;
 		}
@@ -1043,12 +1167,12 @@ int peer::handle_pkt_in_udp(int sock)
 			//_log_ptr->write_log_format("s =>u s u s u s u\n", __FUNCTION__,__LINE__,"PEER RECV DATA READ_PAYLOAD_RUNNING cmd= ",((chunk_t *)Nonblocking_Recv_ptr ->recv_ctl_info.buffer)->header.cmd,"total_len =",((chunk_t *)Nonblocking_Recv_ptr ->recv_ctl_info.buffer)->header.length,"expect_len",Nonblocking_Recv_ptr ->recv_ctl_info.expect_len);
 		}
 		else if (Nonblocking_Recv_ptr->recv_packet_state == READ_PAYLOAD_OK) {
-			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "break");
+			//_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "break");
 			break;
 		}
 
 		recv_byte =_net_udp_ptr->nonblock_recv(sock,Nonblocking_Recv_ptr);
-		_log_ptr->write_log_format("s(u) s d s d(d)\n", __FUNCTION__, __LINE__, "recv", recv_byte, "bytes from", sock, UDT::getsockstate(sock));
+		//_log_ptr->write_log_format("s(u) s d s d(d)\n", __FUNCTION__, __LINE__, "recv", recv_byte, "bytes from", sock, UDT::getsockstate(sock));
 		if (recv_byte < 0) {
 			// 如果對方不正常斷線，一樣會在過一段時間後 recv 的時發現錯誤
 			CloseParent(pid, false, "[DEBUG] error occured in peer recv ");
@@ -1068,7 +1192,7 @@ int peer::handle_pkt_in_udp(int sock)
 	}
 	/*Recieve done*/  
 	
-	_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "PEER RECV OK. cmd =", chunk_ptr->header.cmd, "total_len =", chunk_ptr->header.length);
+	_log_ptr->write_log_format("s(u) s u s u s u \n", __FUNCTION__, __LINE__, "Recv cmd", chunk_ptr->header.cmd, "from sock", sock, "total_len", chunk_ptr->header.length);
 
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_DATA) {
 		//the main handle
@@ -1130,7 +1254,7 @@ int peer::handle_pkt_in_udp(int sock)
 				}
 			}
 
-			_pk_mgr_ptr->map_pid_child.find(pid)->second->state = PEER_CONNECTED_CHILD;
+			_pk_mgr_ptr->map_pid_child.find(pid)->second->connection_state = PEER_CONNECTED_CHILD;
 			
 			return RET_OK;
 		}
@@ -1174,7 +1298,7 @@ int peer::handle_pkt_in_udp(int sock)
 				
 			substream_first_reply_peer_iter->second->selected_pid = firstReplyPid;
 			if (_pk_mgr_ptr->map_pid_parent.find(firstReplyPid) != _pk_mgr_ptr->map_pid_parent.end()) {
-				_pk_mgr_ptr->map_pid_parent[firstReplyPid]->peerInfo.state = PEER_CONNECTED_PARENT;
+				_pk_mgr_ptr->map_pid_parent[firstReplyPid]->peerInfo.connection_state = PEER_CONNECTED_PARENT;
 			}
 			else {
 				// 曾經發生 20140815
@@ -1198,7 +1322,7 @@ int peer::handle_pkt_in_udp(int sock)
 			UINT32 temp_manifest = replyManifest;
 			for (unsigned long i = 0; i < _pk_mgr_ptr->sub_stream_num; i++) {
 				if ((1 << i) & temp_manifest) {
-					_pk_mgr_ptr->SetSubstreamState(i, SS_TEST);
+					//_pk_mgr_ptr->SetSubstreamState(i, SS_TEST2);
 					struct timerStruct timer;
 					_log_ptr->timerGet(&timer);
 					memcpy(&(_pk_mgr_ptr->ss_table[i]->parent_changed_time), &timer, sizeof(timer));
@@ -1210,7 +1334,7 @@ int peer::handle_pkt_in_udp(int sock)
 				_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] Not found in map_pid_parent", __FUNCTION__, __LINE__);
 			}
 			peerDownInfoPtr = _pk_mgr_ptr->map_pid_parent[firstReplyPid];
-			_peer_mgr_ptr -> send_manifest_to_parent(peerDownInfoPtr ->peerInfo.manifest ,firstReplyPid);
+			_peer_mgr_ptr->send_manifest_to_parent(firstReplyPid, peerDownInfoPtr->peerInfo.manifest, TOTAL_OP);
 			//_pk_mgr_ptr->reSet_detectionInfo();
 			_pk_mgr_ptr->ResetDetection();
 
@@ -1248,8 +1372,7 @@ int peer::handle_pkt_in_udp(int sock)
 	}
 	else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SET_MANIFEST) {
 		unsigned long manifest = ((struct chunk_manifest_set_t *)chunk_ptr)->manifest;
-		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_PEER_SET_MANIFEST");
-		_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "pid", pid, "manifest", manifest);
+		_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "Recv CHNK_CMD_PEER_SET_MANIFEST pid", pid, "manifest", manifest);
 		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u)\ts\tu\ts\tu\tu \n", __FUNCTION__, __LINE__, "[CHNK_CMD_PEER_SET_MANIFEST] RECV mypid", _pk_mgr_ptr->my_pid, "child", pid, manifest);
 
 		_peer_mgr_ptr ->handle_manifestSet((struct chunk_manifest_set_t *)chunk_ptr); 
@@ -1264,15 +1387,18 @@ int peer::handle_pkt_in_udp(int sock)
 		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_PEER_BLOCK_RESCUE");
 		_peer_mgr_ptr->HandleBlockRescue((struct chunk_block_rescue_t *)chunk_ptr);
 	}
+	else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_CON) {
+		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_PEER_CON");
+		// 會發生這情況: child 已經有向 parent 拿 substream，過一段時間後收到 peer-list 又再次選中此 parent
+		// 此時情況是 child::peer_communication 發送 CHNK_CMD_PEER_CON 給 parent::peer 
+	}
 	else {
-		debug_printf("chunk_ptr->header.cmd = 0x%02x  len = %d \n", chunk_ptr->header.cmd, chunk_ptr->header.length);
+		debug_printf("sock %d chunk_ptr->header.cmd = 0x%02x  len = %d \n", sock, chunk_ptr->header.cmd, chunk_ptr->header.length);
 		_pk_mgr_ptr->handle_error(UNKNOWN, "[ERROR] Unknown header.cmd", __FUNCTION__, __LINE__);
 	}
-	_log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
 	if (chunk_ptr) {
 		delete [] (unsigned char*)chunk_ptr;
 	}
-	_log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
 	return RET_OK;
 }
 
@@ -1949,9 +2075,19 @@ int peer::handle_pkt_out_udp(int sock)
 		queue_out_ctrl_ptr = map_udpfd_out_ctrl.find(sock)->second;
 	}
 	else{
-		//debug_printf("queue_out_ctrl_ptr NOT FIND \n");
-		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "queue_out_ctrl_ptr NOT FIND", sock);
-		CloseSocketUDP(sock, false, "Not found in queue_out_ctrl_ptr");
+		// 刪除 socket 和 tables
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Not Found in map_udpfd_out_ctrl", sock);
+		CloseSocketUDP(sock, false, "Not Found in map_udpfd_out_ctrl");
+		for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = _pk_mgr_ptr->map_pid_parent.begin(); iter != _pk_mgr_ptr->map_pid_parent.end(); iter++) {
+			if (iter->second->peerInfo.sock == sock) {
+				CloseParent(iter->second->peerInfo.pid, false, "Not Found in map_udpfd_out_ctrl");
+			}
+		}
+		for (map<unsigned long, struct peer_info_t *>::iterator iter = _pk_mgr_ptr->map_pid_child.begin(); iter != _pk_mgr_ptr->map_pid_child.end(); iter++) {
+			if (iter->second->sock == sock) {
+				CloseChild(iter->second->pid, false, "Not Found in map_udpfd_out_ctrl");
+			}
+		}
 		return RET_SOCK_ERROR;
 	}
 	
@@ -1959,9 +2095,19 @@ int peer::handle_pkt_out_udp(int sock)
 		queue_out_data_ptr = map_udpfd_out_data.find(sock)->second;
 	}
 	else {
-		debug_printf("queue_out_data_ptr NOT FIND \n");
-		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__,__LINE__,"queue_out_data_ptr NOT FIND");
+		// 刪除 socket 和 tables
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__,__LINE__,"Not Found in map_udpfd_out_data", sock);
 		CloseSocketUDP(sock, false, "Not found in queue_out_ctrl_ptr");
+		for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = _pk_mgr_ptr->map_pid_parent.begin(); iter != _pk_mgr_ptr->map_pid_parent.end(); iter++) {
+			if (iter->second->peerInfo.sock == sock) {
+				CloseParent(iter->second->peerInfo.pid, false, "Not Found map_udpfd_out_data");
+			}
+		}
+		for (map<unsigned long, struct peer_info_t *>::iterator iter = _pk_mgr_ptr->map_pid_child.begin(); iter != _pk_mgr_ptr->map_pid_child.end(); iter++) {
+			if (iter->second->sock == sock) {
+				CloseChild(iter->second->pid, false, "Not Found map_udpfd_out_data");
+			}
+		}
 		return RET_SOCK_ERROR;
 	}
 
@@ -1969,10 +2115,20 @@ int peer::handle_pkt_out_udp(int sock)
 		Nonblocking_Send_Data_ptr = &map_udpfd_nonblocking_ctl.find(sock)->second->nonBlockingSendData;
 		Nonblocking_Send_Ctrl_ptr = &map_udpfd_nonblocking_ctl.find(sock)->second->nonBlockingSendCtrl;
 	}
-	else{
-		debug_printf("Nonblocking_Buff_ptr NOT FIND \n");
-		_log_ptr->write_log_format("s(u) s\n", __FUNCTION__,__LINE__,"Nonblocking_Buff_ptr NOT FIND");
-		CloseSocketUDP(sock, false, "Not found in queue_out_ctrl_ptr");
+	else {
+		// 刪除 socket 和 tables
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Not Found in map_udpfd_nonblocking_ctl", sock);
+		CloseSocketUDP(sock, false, "Not found in map_udpfd_nonblocking_ctl");
+		for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = _pk_mgr_ptr->map_pid_parent.begin(); iter != _pk_mgr_ptr->map_pid_parent.end(); iter++) {
+			if (iter->second->peerInfo.sock == sock) {
+				CloseParent(iter->second->peerInfo.pid, false, "Not Found map_udpfd_nonblocking_ctl");
+			}
+		}
+		for (map<unsigned long, struct peer_info_t *>::iterator iter = _pk_mgr_ptr->map_pid_child.begin(); iter != _pk_mgr_ptr->map_pid_child.end(); iter++) {
+			if (iter->second->sock == sock) {
+				CloseChild(iter->second->pid, false, "Not Found map_udpfd_nonblocking_ctl");
+			}
+		}
 		return RET_SOCK_ERROR;
 	}
 
@@ -1989,22 +2145,11 @@ int peer::handle_pkt_out_udp(int sock)
 		_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] map_fd_pid NOT FIND", __FUNCTION__, __LINE__);
 		return RET_SOCK_ERROR;
 	}
-	//////////////////////////////////////////////////////////////
-	int32_t pendingpkt_size = 0;
-	int len = sizeof(pendingpkt_size);
-	UDT::getsockopt(sock, 0, UDT_SNDDATA, &pendingpkt_size, &len);
-	if (pendingpkt_size > 0 || queue_out_ctrl_ptr->size() != 0 || queue_out_data_ptr->size() != 0) {
-		_log_ptr->write_log_format("s(u) s u s d\td\td\n", __FUNCTION__, __LINE__, "sock", sock, "pending", pendingpkt_size, queue_out_ctrl_ptr->size(), queue_out_data_ptr->size());
-	}
-	if (queue_out_data_ptr->size() > _pk_mgr_ptr->pkt_rate*10) {
-		debug_printf("child %d data size %d \n", pid, queue_out_data_ptr->size());
-		CloseSocketUDP(sock, false, "data size too much");
-		return RET_OK;
-	}
+	
 
 
 //	while(queue_out_ctrl_ptr->size() != 0  ||  queue_out_data_ptr->size() != 0){
-
+	for (int i = 0; i < 5; i++) {
 		if (queue_out_ctrl_ptr->size() != 0 && chunk_ptr == NULL) {
 			// 優先將 Ctrl message 送出去
 			while (queue_out_ctrl_ptr->size() != 0) {
@@ -2044,8 +2189,19 @@ int peer::handle_pkt_out_udp(int sock)
 					}
 
 					if (_send_byte < 0) {
-						//data_close(sock, "error occured in send  READY queue_out_ctrl",DONT_CARE);
-						CloseSocketUDP(sock, false, "error occured in send  READY queue_out_ctrl");
+						// 刪除 socket 和 tables
+						_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "sock", sock, "Send bytes < 0", _send_byte);
+						CloseSocketUDP(sock, false, "Send bytes < 0");
+						for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = _pk_mgr_ptr->map_pid_parent.begin(); iter != _pk_mgr_ptr->map_pid_parent.end(); iter++) {
+							if (iter->second->peerInfo.sock == sock) {
+								CloseParent(iter->second->peerInfo.pid, false, "Send bytes < 0");
+							}
+						}
+						for (map<unsigned long, struct peer_info_t *>::iterator iter = _pk_mgr_ptr->map_pid_child.begin(); iter != _pk_mgr_ptr->map_pid_child.end(); iter++) {
+							if (iter->second->sock == sock) {
+								CloseChild(iter->second->pid, false, "Send bytes < 0");
+							}
+						}
 						return RET_SOCK_ERROR;
 					}
 					else if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.ctl_state == READY) {
@@ -2104,14 +2260,14 @@ int peer::handle_pkt_out_udp(int sock)
 					}
 				}
 			}
-		} 
+		}
 		// DATA
 		else if (queue_out_data_ptr->size() != 0) {
 
 
 			//_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "queue_out_data_ptr->size() =", queue_out_data_ptr->size());
 			//debug_printf("queue_out_data_ptr->size() = %d \n", queue_out_data_ptr->size());
-		
+
 			///////////// TEST for Scheduling//////////
 			bool can_send_data = true;
 			int32_t pendingpkt_size = 0;
@@ -2120,7 +2276,7 @@ int peer::handle_pkt_out_udp(int sock)
 			if (pendingpkt_size > 10) {
 				return RET_OK;
 			}
-			
+
 			for (list<unsigned long>::iterator iter = priority_children.begin(); iter != priority_children.end(); iter++) {
 				// iterator 只向這次的 sock，可能是因為自己的最高 priority 或是 前面的 child 的 queue 都已經空了
 				if (*iter == pid) {
@@ -2129,35 +2285,42 @@ int peer::handle_pkt_out_udp(int sock)
 
 				// 檢查那些更高 priority 的 child 的 queue 是否為空
 				int other_child_sock = -1;
-				queue<struct chunk_t *> *other_child_queue_out_ctrl_ptr;
-				queue<struct chunk_t *> *other_child_queue_out_data_ptr;
+				queue<struct chunk_t *> *other_child_queue_out_ctrl_ptr = NULL;
+				queue<struct chunk_t *> *other_child_queue_out_data_ptr = NULL;
 
 				if (_pk_mgr_ptr->map_pid_child.find(*iter) != _pk_mgr_ptr->map_pid_child.end()) {
-					if (_pk_mgr_ptr->map_pid_child.find(*iter)->second->state == PEER_CONNECTED_CHILD) {
-						if (map_out_pid_udpfd.find(*iter) != map_out_pid_udpfd.end()) {
-							other_child_sock = map_out_pid_udpfd.find(*iter)->second;
-							if (map_udpfd_out_data.find(other_child_sock) != map_udpfd_out_data.end()) {
-								other_child_queue_out_data_ptr = map_udpfd_out_data[other_child_sock];	// Get queue_out_data_ptr
-							}
-							else {
-								_pk_mgr_ptr->handle_error(UNKNOWN, "[DEBUG] Found child-peer in map_out_pid_udpfd but not found in map_udpfd_out_data", __FUNCTION__, __LINE__);
-							}
+					if (_pk_mgr_ptr->map_pid_child.find(*iter)->second->connection_state == PEER_SELECTED) {
+						//if (map_out_pid_udpfd.find(*iter) != map_out_pid_udpfd.end()) {
+						//other_child_sock = map_out_pid_udpfd.find(*iter)->second;
+						other_child_sock = _pk_mgr_ptr->map_pid_child.find(*iter)->second->sock;
+						if (map_udpfd_out_data.find(other_child_sock) != map_udpfd_out_data.end()) {
+							other_child_queue_out_data_ptr = map_udpfd_out_data[other_child_sock];	// Get queue_out_data_ptr
+						}
+						else {
+							//_pk_mgr_ptr->handle_error(UNKNOWN, "[DEBUG] Found child-peer in map_out_pid_udpfd but not found in map_udpfd_out_data", __FUNCTION__, __LINE__);
+						}
 
-							if (map_udpfd_out_ctrl.find(other_child_sock) != map_udpfd_out_ctrl.end()) {
-								other_child_queue_out_ctrl_ptr = map_udpfd_out_ctrl[other_child_sock];	// Get queue_out_data_ptr
-							}
-							else {
-								_pk_mgr_ptr->handle_error(UNKNOWN, "[DEBUG] Found child-peer in map_out_pid_udpfd but not found in map_udpfd_out_data", __FUNCTION__, __LINE__);
-							}
+						if (map_udpfd_out_ctrl.find(other_child_sock) != map_udpfd_out_ctrl.end()) {
+							other_child_queue_out_ctrl_ptr = map_udpfd_out_ctrl[other_child_sock];	// Get queue_out_data_ptr
+						}
+						else {
+							//_pk_mgr_ptr->handle_error(UNKNOWN, "[DEBUG] Found child-peer in map_out_pid_udpfd but not found in map_udpfd_out_data", __FUNCTION__, __LINE__);
+						}
 
-							// 找到更高 priority 的 child，檢查它 ctrl queue 和 data queue 是否都為空
-							if (other_child_queue_out_ctrl_ptr->size() != 0 || other_child_queue_out_data_ptr->size() != 0) {
+						// 找到更高 priority 的 child，檢查它 ctrl queue 和 data queue 是否都為空
+						if (other_child_queue_out_ctrl_ptr != NULL && other_child_queue_out_data_ptr != NULL) {
+							if (other_child_queue_out_ctrl_ptr->size() + other_child_queue_out_data_ptr->size() > 10) {
 								can_send_data = false;
 							}
 						}
+
+						//}
 					}
 				}
 			}
+
+			//_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "pid", pid, can_send_data);
+
 			if (can_send_data == false) {
 				return RET_OK;
 			}
@@ -2167,8 +2330,8 @@ int peer::handle_pkt_out_udp(int sock)
 				//debug_printf("queue_out_data_ptr->size() = %d \n", queue_out_data_ptr->size());
 				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "queue_out_data_ptr->size() =", queue_out_data_ptr->size());
 			}
-			
-			if (Nonblocking_Send_Data_ptr ->recv_ctl_info.ctl_state == READY ) {
+
+			if (Nonblocking_Send_Data_ptr->recv_ctl_info.ctl_state == READY) {
 
 				chunk_ptr = queue_out_data_ptr->front();
 
@@ -2176,21 +2339,21 @@ int peer::handle_pkt_out_udp(int sock)
 				//測試性功能
 				//////////////////////////////////////////////////////////////////////////////
 				if (peerInfoPtr) {
-					while (1) {
-						//如果現在manifest 的值已經沒有要送了  則略過這個
-						if (!(peerInfoPtr ->manifest & (_pk_mgr_ptr ->SubstreamIDToManifest ( (chunk_ptr->header.sequence_number % _pk_mgr_ptr ->sub_stream_num)) ) )){
-							if(queue_out_data_ptr->size() >=2){
-								queue_out_data_ptr ->pop() ;
-								chunk_ptr = queue_out_data_ptr->front();
-								continue ;
-							}else{
-								return RET_OK;
-							}
-							//有要送
-						}else{
-							break;
-						}
-					}
+				while (1) {
+				//如果現在manifest 的值已經沒有要送了  則略過這個
+				if (!(peerInfoPtr ->manifest & (_pk_mgr_ptr ->SubstreamIDToManifest ( (chunk_ptr->header.sequence_number % _pk_mgr_ptr ->sub_stream_num)) ) )){
+				if(queue_out_data_ptr->size() >=2){
+				queue_out_data_ptr ->pop() ;
+				chunk_ptr = queue_out_data_ptr->front();
+				continue ;
+				}else{
+				return RET_OK;
+				}
+				//有要送
+				}else{
+				break;
+				}
+				}
 				}
 				//////////////////////////////////////////////////////////////////////////////
 				*/
@@ -2202,19 +2365,13 @@ int peer::handle_pkt_out_udp(int sock)
 				Nonblocking_Send_Data_ptr->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_ptr;
 				Nonblocking_Send_Data_ptr->recv_ctl_info.serial_num = chunk_ptr->header.sequence_number;
 
-				//_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__,
-				//												"PEER SEND DATA READY. cmd =", Nonblocking_Send_Data_ptr->recv_ctl_info.chunk_ptr->header.cmd,
-				//												"total_len =", Nonblocking_Send_Data_ptr->recv_ctl_info.total_len,
-				//												"expect_len =", Nonblocking_Send_Data_ptr->recv_ctl_info.expect_len);
-				//debug_printf("[DEBUG] \n");
+				_send_byte = _net_udp_ptr->nonblock_send(sock, &(Nonblocking_Send_Data_ptr->recv_ctl_info));
 
-				_send_byte = _net_udp_ptr->nonblock_send(sock, & (Nonblocking_Send_Data_ptr->recv_ctl_info ));
-				//debug_printf("[DEBUG] \n");
-				_log_ptr->write_log_format("s(u) s d s d s d s d s u \n", __FUNCTION__, __LINE__, 
-																	"sent data", _send_byte, "bytes to", sock,
-																	"queue_out_data_ptr->size() =", queue_out_data_ptr->size(),
-																	"header.cmd =", chunk_ptr->header.cmd,
-																	"pid", pid);
+				_log_ptr->write_log_format("s(u) s d s d s d s d s u \n", __FUNCTION__, __LINE__,
+					"sent data", _send_byte, "bytes to", sock,
+					"queue_out_data_ptr->size() =", queue_out_data_ptr->size(),
+					"header.cmd =", chunk_ptr->header.cmd,
+					"pid", pid);
 
 				if (_send_byte < 0) {
 					//data_close(sock, "error occured in send queue_out_data", DONT_CARE);
@@ -2223,7 +2380,7 @@ int peer::handle_pkt_out_udp(int sock)
 					//PAUSE
 					return RET_SOCK_ERROR;
 				}
-				else if (Nonblocking_Send_Data_ptr ->recv_ctl_info.ctl_state == READY ) {
+				else if (Nonblocking_Send_Data_ptr->recv_ctl_info.ctl_state == READY) {
 					if (!_logger_client_ptr->log_bw_out_init_flag) {
 						_logger_client_ptr->log_bw_out_init_flag = 1;
 						_logger_client_ptr->bw_out_struct_init(_send_byte);
@@ -2235,14 +2392,14 @@ int peer::handle_pkt_out_udp(int sock)
 					chunk_ptr = NULL;
 				}
 			}
-			else if (Nonblocking_Send_Data_ptr ->recv_ctl_info.ctl_state == RUNNING){
-				
-				_send_byte = _net_udp_ptr->nonblock_send(sock, & (Nonblocking_Send_Data_ptr->recv_ctl_info ));
-				
+			else if (Nonblocking_Send_Data_ptr->recv_ctl_info.ctl_state == RUNNING){
+
+				_send_byte = _net_udp_ptr->nonblock_send(sock, &(Nonblocking_Send_Data_ptr->recv_ctl_info));
+
 				_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__,
-																"PEER SEND DATA READY cmd =", Nonblocking_Send_Data_ptr->recv_ctl_info.chunk_ptr->header.cmd,
-																"total_len =", Nonblocking_Send_Data_ptr->recv_ctl_info.total_len,
-																"expect_len =", Nonblocking_Send_Data_ptr->recv_ctl_info.expect_len);
+					"PEER SEND DATA READY cmd =", Nonblocking_Send_Data_ptr->recv_ctl_info.chunk_ptr->header.cmd,
+					"total_len =", Nonblocking_Send_Data_ptr->recv_ctl_info.total_len,
+					"expect_len =", Nonblocking_Send_Data_ptr->recv_ctl_info.expect_len);
 
 
 				//if(!(_logger_client_ptr->log_bw_out_init_flag)){
@@ -2260,7 +2417,7 @@ int peer::handle_pkt_out_udp(int sock)
 					//PAUSE
 					return RET_SOCK_ERROR;
 				}
-				else if (Nonblocking_Send_Data_ptr ->recv_ctl_info.ctl_state == READY) {
+				else if (Nonblocking_Send_Data_ptr->recv_ctl_info.ctl_state == READY) {
 					if (!_logger_client_ptr->log_bw_out_init_flag) {
 						_logger_client_ptr->log_bw_out_init_flag = 1;
 						_logger_client_ptr->bw_out_struct_init(_send_byte);
@@ -2272,14 +2429,14 @@ int peer::handle_pkt_out_udp(int sock)
 					chunk_ptr = NULL;
 				}
 			}
-		} 
+		}
 		else {
-		
+
 			//_net_udp_ptr->epoll_control(sock, EPOLL_CTL_DEL, EPOLLIN);
 			//_net_udp_ptr->epoll_control(sock, EPOLL_CTL_ADD, EPOLLIN);
-			
+
 		}
-		
+	}
 	//debug_printf("peer::handle_pkt_out end \n");
 	return RET_OK;
 }
@@ -2328,7 +2485,7 @@ void peer::StopSession(unsigned long session_id)
 		}
 		else if (substream_first_reply_peer_iter->second->peer_role == CHILD_PEER) {
 			for (multimap <unsigned long, struct peer_info_t *>::iterator iter = _pk_mgr_ptr->map_pid_parent_temp.begin(); iter != _pk_mgr_ptr->map_pid_parent_temp.end(); iter++) {
-				if (iter->second->session_id == session_id && _pk_mgr_ptr->parents_table[iter->second->pid] != PEER_CONNECTED) {
+				if (iter->second->priority == session_id && _pk_mgr_ptr->parents_table[iter->second->pid] != PEER_CONNECTED) {
 					// Clear other peers in this session, except the selected peer
 					CloseParent(peerInfoPtr->pid, false, "Close by session stop");
 				}
@@ -2398,7 +2555,7 @@ void peer::data_close(int cfd, const char *reason ,int type)
 	for(unsigned long i =0  ; i < _pk_mgr_ptr ->sub_stream_num;i++){
 		//if(  ((_pk_mgr_ptr->ssDetect_ptr) + i) ->isTesting ){
 		//if(!(_pk_mgr_ptr ->check_rescue_state(i,0))){
-		if (_pk_mgr_ptr->ss_table[i]->state.state == SS_TEST) {
+		if (_pk_mgr_ptr->ss_table[i]->state.state == SS_TEST2) {
 			testingManifest |= _pk_mgr_ptr ->SubstreamIDToManifest(i);
 		}
 	}
@@ -2511,6 +2668,8 @@ void peer::data_close(int cfd, const char *reason ,int type)
 						}
 					}
 				}
+
+				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[ERASE CHILD]", map_pid_child1_iter->first);
 				delete peerInfoPtr;
 				_pk_mgr_ptr ->map_pid_child.erase(map_pid_child1_iter);
 				priority_children.remove(pid);
@@ -2581,6 +2740,7 @@ void peer::data_close(int cfd, const char *reason ,int type)
 
 				_log_ptr->write_log_format("s =>u s s u s u\n", __FUNCTION__,__LINE__,"CLOSE PARENT","PID=",pid_peerDown_info_iter->first,"manifest",peerDownInfoPtr->peerInfo.manifest);
 
+				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[ERASE PARENT]", pid_peerDown_info_iter->first);
 				delete peerDownInfoPtr;
 				_pk_mgr_ptr ->map_pid_parent.erase(pid_peerDown_info_iter);
 			}
@@ -2708,7 +2868,7 @@ void peer::CloseParentTCP(unsigned long pid, const char *reason)
 
 	unsigned long  testingManifest=0;
 	for(unsigned long i =0  ; i < _pk_mgr_ptr ->sub_stream_num;i++){
-		if (_pk_mgr_ptr->ss_table[i]->state.state == SS_TEST) {
+		if (_pk_mgr_ptr->ss_table[i]->state.state == SS_TEST2) {
 			testingManifest |= _pk_mgr_ptr ->SubstreamIDToManifest(i);
 		}
 	}
@@ -2777,6 +2937,7 @@ void peer::CloseParentTCP(unsigned long pid, const char *reason)
 		//_pk_mgr_ptr ->reSet_detectionInfo();
 		_pk_mgr_ptr->ResetDetection();
 
+		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[ERASE PARENT]", pid_peerDown_info_iter->first);
 		delete peerDownInfoPtr;
 		_pk_mgr_ptr ->map_pid_parent.erase(pid_peerDown_info_iter);
 	}
@@ -2827,20 +2988,16 @@ void peer::CloseParentUDP(unsigned long pid, const char *reason)
 	map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 	struct peer_connect_down_t *peerDownInfoPtr = NULL;
 	
-	unsigned long  peerTestingManifest=0;
-
-	if (map_in_pid_udpfd.find(pid) != map_in_pid_udpfd.end()) {
-		fd = map_in_pid_udpfd.find(pid)->second;
+	if (_pk_mgr_ptr->map_pid_parent.find(pid) != _pk_mgr_ptr->map_pid_parent.end()) {
+		fd = _pk_mgr_ptr->map_pid_parent.find(pid)->second->peerInfo.sock;
 	}
 	else {
-		// 有 BUG
-		debug_printf("[DEBUG] Not found parent %d in map_in_pid_udpfd  %s \n", pid, reason);
-		_log_ptr->write_log_format("s(u) s u s s \n", __FUNCTION__, __LINE__, "[DEBUG] Not found parent", pid, "in map_in_pid_udpfd", reason);
-		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s u s s \n", __FUNCTION__, __LINE__, "[DEBUG] Not found parent", pid, "in map_in_pid_udpfd", reason);
+		debug_printf("[DEBUG] Not found parent %d in map_pid_parent  %s \n", pid, reason);
+		_log_ptr->write_log_format("s(u) s u s s \n", __FUNCTION__, __LINE__, "[DEBUG] Not found parent", pid, "in map_pid_parent", reason);
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s u s s \n", __FUNCTION__, __LINE__, "[DEBUG] Not found parent", pid, "in map_pid_parent", reason);
 	}
-	
+
 	_log_ptr->write_log_format("s(u) s d s d s \n", __FUNCTION__, __LINE__, "Close parent", pid, "fd", fd, reason);
-	debug_printf("PEER DATA CLOSE  colse fd = %d  %s \n", fd, reason);
 	
 	debug_printf("Before close parent %d. Table information: \n", pid);
 	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Before close parent", pid);
@@ -2851,14 +3008,6 @@ void peer::CloseParentUDP(unsigned long pid, const char *reason)
 	for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = _pk_mgr_ptr->map_pid_parent.begin(); iter != _pk_mgr_ptr->map_pid_parent.end(); iter++) {
 		debug_printf("map_pid_parent  pid : %d manifest :%d\n", iter->first, iter->second->peerInfo.manifest);
 		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__, __LINE__, "map_pid_parent  pid", iter->first, " manifest", iter->second->peerInfo.manifest);
-	}
-	for (map<unsigned long, int>::iterator iter = map_out_pid_fd.begin(); iter != map_out_pid_fd.end(); iter++) {
-		debug_printf("map_out_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
-		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_fd  pid : ", iter->first," fd :", iter->second);
-	}
-	for (map<unsigned long, int>::iterator iter = map_in_pid_fd.begin(); iter != map_in_pid_fd.end(); iter++) {
-		debug_printf("map_in_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
-		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_fd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_out_pid_udpfd.begin(); iter != map_out_pid_udpfd.end(); iter++) {
 		debug_printf("map_out_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
@@ -2876,18 +3025,20 @@ void peer::CloseParentUDP(unsigned long pid, const char *reason)
 		debug_printf("map_udpfd_out_data  fd : %d \n", iter->first);
 		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "map_udpfd_out_data  fd : ", iter->first);
 	}
+	for (map<int, Nonblocking_Buff *>::iterator iter = map_udpfd_nonblocking_ctl.begin(); iter != map_udpfd_nonblocking_ctl.end(); iter++) {
+		debug_printf("map_udpfd_nonblocking_ctl  fd : %d \n", iter->first);
+		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "map_udpfd_nonblocking_ctl  fd : ", iter->first);
+	}
+	for (map<int, unsigned long>::iterator iter = map_udpfd_pid.begin(); iter != map_udpfd_pid.end(); iter++) {
+		debug_printf("map_udpfd_pid  fd : %d  pid : %d \n", iter->first, iter->second);
+		_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "map_udpfd_pid  fd :", iter->first, "pid :", iter->second);
+	}
+
 	
 	//_net_ptr->epoll_control(cfd, EPOLL_CTL_DEL, 0);
 	
 	// Close socket in _map_fd_bc_tbl
 	_net_udp_ptr->close(fd);
-
-	unsigned long  testingManifest=0;
-	for(unsigned long i =0  ; i < _pk_mgr_ptr ->sub_stream_num;i++){
-		if (_pk_mgr_ptr->ss_table[i]->state.state == SS_TEST) {
-			testingManifest |= _pk_mgr_ptr ->SubstreamIDToManifest(i);
-		}
-	}
 	
 	//clean all fd table in _peer_communication_ptr OBJ
 	//_peer_mgr_ptr->_peer_communication_ptr->clear_udpfd_in_peer_com(fd);
@@ -2917,73 +3068,22 @@ void peer::CloseParentUDP(unsigned long pid, const char *reason)
 		_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "Delete pid", pid, "in map_in_pid_udpfd");
 		map_in_pid_udpfd.erase(map_in_pid_udpfd.find(pid));
 	}
+
+	////  parent_temp 和 child_temp 由 session stop 的時候清除 ////
 	
-	
-	// Temp parent-peer
-	/*
-	for (pid_peer_info_iter = _pk_mgr_ptr->map_pid_parent_temp.begin(); pid_peer_info_iter != _pk_mgr_ptr->map_pid_parent_temp.end(); pid_peer_info_iter++) {
-		if (pid_peer_info_iter->first == pid) {
-			delete pid_peer_info_iter->second;
-			_pk_mgr_ptr->map_pid_parent_temp.erase(pid_peer_info_iter);
-			pid_peer_info_iter =_pk_mgr_ptr->map_pid_parent_temp.begin();
-			if (pid_peer_info_iter == _pk_mgr_ptr->map_pid_parent_temp.end()) {
-				break;
-			}
-		}
-	}
-	*/
 	// Real parent-peer
 	pid_peerDown_info_iter = _pk_mgr_ptr->map_pid_parent.find(pid);
 	if (pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_parent.end()) {
-	
-		peerDownInfoPtr = pid_peerDown_info_iter->second ;
-
-		//防止peer離開 狀態卡在testing
-		if(peerDownInfoPtr->peerInfo.manifest & testingManifest){
-			peerTestingManifest = peerDownInfoPtr->peerInfo.manifest & testingManifest;
-			_pk_mgr_ptr->set_parent_manifest(peerDownInfoPtr, 0);
-		}
-		//_pk_mgr_ptr ->reSet_detectionInfo();
-		_pk_mgr_ptr->ResetDetection();
-
-		_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "Delete pid", pid_peerDown_info_iter->first, "in map_pid_parent");
-		delete peerDownInfoPtr;
+		//_pk_mgr_ptr->ResetDetection();
+		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[ERASE PARENT]", pid_peerDown_info_iter->first);
+		delete pid_peerDown_info_iter->second;
 		_pk_mgr_ptr ->map_pid_parent.erase(pid_peerDown_info_iter);
 	}
-	/*
-	// parents table
-	if (_pk_mgr_ptr->parents_table.find(pid) != _pk_mgr_ptr->parents_table.end()) {
-		_pk_mgr_ptr->parents_table.erase(_pk_mgr_ptr->parents_table.find(pid));
-	}
-	else {
-		_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] Not found in parents_table", __FUNCTION__, __LINE__);
-	}
-	*/
+	
 	if (map_udpfd_pid.find(fd) != map_udpfd_pid.end()) {
 		_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "Delete fd", fd, "in map_udpfd_pid");
 		map_udpfd_pid.erase(map_udpfd_pid.find(fd));
 	}
-	
-	/*
-	debug_printf("After close parent %d. Table information: \n", pid);
-	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "After close parent", pid);
-	for (map<unsigned long, int>::iterator iter = map_out_pid_fd.begin(); iter != map_out_pid_fd.end(); iter++) {
-		debug_printf("map_out_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
-		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_fd  pid : ", iter->first," fd :", iter->second);
-	}
-	for (map<unsigned long, int>::iterator iter = map_in_pid_fd.begin(); iter != map_in_pid_fd.end(); iter++) {
-		debug_printf("map_in_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
-		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_fd  pid : ", iter->first," fd :", iter->second);
-	}
-	for (map<unsigned long, int>::iterator iter = map_out_pid_udpfd.begin(); iter != map_out_pid_udpfd.end(); iter++) {
-		debug_printf("map_out_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
-		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_udpfd  pid : ", iter->first," fd :", iter->second);
-	}
-	for (map<unsigned long, int>::iterator iter = map_in_pid_udpfd.begin(); iter != map_in_pid_udpfd.end(); iter++) {
-		debug_printf("map_in_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
-		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_udpfd  pid : ", iter->first," fd :", iter->second);
-	}
-	*/
 }
 
 // care: take care if the pid doesn't exist in the table
@@ -3064,7 +3164,7 @@ void peer::CloseChildTCP(unsigned long pid, const char *reason)
 
 	unsigned long  testingManifest=0;
 	for(unsigned long i =0  ; i < _pk_mgr_ptr ->sub_stream_num;i++){
-		if (_pk_mgr_ptr->ss_table[i]->state.state == SS_TEST) {
+		if (_pk_mgr_ptr->ss_table[i]->state.state == SS_TEST2) {
 			testingManifest |= _pk_mgr_ptr ->SubstreamIDToManifest(i);
 		}
 	}
@@ -3150,6 +3250,8 @@ void peer::CloseChildTCP(unsigned long pid, const char *reason)
 				}
 			}
 		}
+
+		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[ERASE CHILD]", map_pid_child1_iter->first);
 		delete peerInfoPtr;
 		_pk_mgr_ptr ->map_pid_child.erase(map_pid_child1_iter);
 		priority_children.remove(pid);
@@ -3216,22 +3318,18 @@ void peer::CloseChildUDP(unsigned long pid, const char *reason)
 	map<unsigned long, manifest_timmer_flag *>::iterator temp_substream_first_reply_peer_iter;
 	unsigned long  peerTestingManifest=0;
 
-	
-	
-	if (map_out_pid_udpfd.find(pid) != map_out_pid_udpfd.end()) {
-		fd = map_out_pid_udpfd.find(pid)->second;
+	if (_pk_mgr_ptr->map_pid_child.find(pid) != _pk_mgr_ptr->map_pid_child.end()) {
+		fd = _pk_mgr_ptr->map_pid_child.find(pid)->second->sock;
 	}
 	else {
-		// 有 BUG
-		debug_printf("[DEBUG] Not found parent %d in map_out_pid_udpfd  %s \n", pid, reason);
-		_log_ptr->write_log_format("s(u) s u s s \n", __FUNCTION__, __LINE__, "[DEBUG] Not found child", pid, "in map_out_pid_udpfd", reason);
-		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s u s s \n", __FUNCTION__, __LINE__, "[DEBUG] Not found child", pid, "in map_out_pid_udpfd", reason);
+		debug_printf("[DEBUG] Not found parent %d in map_pid_child  %s \n", pid, reason);
+		_log_ptr->write_log_format("s(u) s u s s \n", __FUNCTION__, __LINE__, "[DEBUG] Not found child", pid, "in map_pid_child", reason);
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s(u) s u s s \n", __FUNCTION__, __LINE__, "[DEBUG] Not found child", pid, "in map_pid_child", reason);
 	}
-
-	_log_ptr->write_log_format("s =>u s \n", __FUNCTION__, __LINE__, reason);
-	debug_printf("PEER DATA CLOSE  colse fd = %d  %s \n", fd, reason);
 	
-	debug_printf("Before close parent %d. Table information: \n", pid);
+	_log_ptr->write_log_format("s(u) s d s d s \n", __FUNCTION__, __LINE__, "Close child", pid, "fd", fd, reason);
+
+	debug_printf("Before close child %d. Table information: \n", pid);
 	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Before close child", pid);
 	map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
 	map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
@@ -3240,14 +3338,6 @@ void peer::CloseChildUDP(unsigned long pid, const char *reason)
 	for (map<unsigned long, struct peer_info_t *>::iterator iter = _pk_mgr_ptr->map_pid_child.begin(); iter != _pk_mgr_ptr->map_pid_child.end(); iter++) {
 		debug_printf("map_pid_child  pid : %d manifest :%d\n", iter->first, iter->second->manifest);
 		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__, __LINE__, "map_pid_child  pid", iter->first, " manifest", iter->second->manifest);
-	}
-	for (map<unsigned long, int>::iterator iter = map_out_pid_fd.begin(); iter != map_out_pid_fd.end(); iter++) {
-		debug_printf("map_out_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
-		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_fd  pid : ", iter->first," fd :", iter->second);
-	}
-	for (map<unsigned long, int>::iterator iter = map_in_pid_fd.begin(); iter != map_in_pid_fd.end(); iter++) {
-		debug_printf("map_in_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
-		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_fd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_out_pid_udpfd.begin(); iter != map_out_pid_udpfd.end(); iter++) {
 		debug_printf("map_out_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
@@ -3265,17 +3355,23 @@ void peer::CloseChildUDP(unsigned long pid, const char *reason)
 		debug_printf("map_udpfd_out_data  fd : %d \n", iter->first);
 		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "map_udpfd_out_data  fd : ", iter->first);
 	}
-	
+	for (map<int, Nonblocking_Buff *>::iterator iter = map_udpfd_nonblocking_ctl.begin(); iter != map_udpfd_nonblocking_ctl.end(); iter++) {
+		debug_printf("map_udpfd_nonblocking_ctl  fd : %d \n", iter->first);
+		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "map_udpfd_nonblocking_ctl  fd : ", iter->first);
+	}
+	for (map<int, unsigned long>::iterator iter = map_udpfd_pid.begin(); iter != map_udpfd_pid.end(); iter++) {
+		debug_printf("map_udpfd_pid  fd : %d  pid : %d \n", iter->first, iter->second);
+		_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "map_udpfd_pid  fd :", iter->first, "pid :", iter->second);
+	}
+
 	//_net_ptr->epoll_control(cfd, EPOLL_CTL_DEL, 0);
 	
 	// Close socket in _map_fd_bc_tbl
-	_log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
 	_net_udp_ptr->close(fd);
-	_log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
 
 	unsigned long  testingManifest=0;
 	for(unsigned long i =0  ; i < _pk_mgr_ptr ->sub_stream_num;i++){
-		if (_pk_mgr_ptr->ss_table[i]->state.state == SS_TEST) {
+		if (_pk_mgr_ptr->ss_table[i]->state.state == SS_TEST2) {
 			testingManifest |= _pk_mgr_ptr ->SubstreamIDToManifest(i);
 		}
 	}
@@ -3309,52 +3405,17 @@ void peer::CloseChildUDP(unsigned long pid, const char *reason)
 		map_out_pid_udpfd.erase(map_out_pid_udpfd.find(pid));
 	}
 	
-	/*  parent_temp 和 child_temp 由 session stop 的時候清除
-	// Temp child-peer
-	for (pid_child_peer_info_iter = _pk_mgr_ptr->map_pid_child_temp.begin(); pid_child_peer_info_iter != _pk_mgr_ptr->map_pid_child_temp.end(); ) {
-		if (pid_child_peer_info_iter->first == pid) {
-			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "before delete map_pid_child_temp, size() =", _pk_mgr_ptr->map_pid_child_temp.size());
-			delete pid_child_peer_info_iter->second;
-			pid_child_peer_info_iter = _pk_mgr_ptr->map_pid_child_temp.erase(pid_child_peer_info_iter);
-		}
-		else {
-			pid_child_peer_info_iter++;
-		}
-	}
-	*/
+	////  parent_temp 和 child_temp 由 session stop 的時候清除 ////
+	
 
 	// Real child-peer
 	map_pid_child_iter =_pk_mgr_ptr ->map_pid_child.find(pid);
 	if (map_pid_child_iter != _pk_mgr_ptr ->map_pid_child.end()) {
-		peerInfoPtr = map_pid_child_iter->second;
-		
-		_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "Delete pid", pid, "in map_pid_child");
-		delete peerInfoPtr;
+		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[ERASE CHILD]", map_pid_child_iter->first);
+		delete map_pid_child_iter->second;
 		_pk_mgr_ptr ->map_pid_child.erase(map_pid_child_iter);
 		priority_children.remove(pid);
 	}
-	/*
-	// The peer in the session
-	for (substream_first_reply_peer_iter = substream_first_reply_peer.begin(); substream_first_reply_peer_iter != substream_first_reply_peer.end();) {
-		if (substream_first_reply_peer_iter->second->pid == pid && substream_first_reply_peer_iter->second->peer_role == CHILD_PEER) {
-			//_peer_mgr_ptr->_peer_communication_ptr->stop_attempt_connect(substream_first_reply_peer_iter->first);
-			temp_substream_first_reply_peer_iter = substream_first_reply_peer_iter;
-			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "before delete substream_first_reply_peer, size() =", substream_first_reply_peer.size());
-			delete[](unsigned char*)substream_first_reply_peer_iter->second;
-			substream_first_reply_peer_iter = substream_first_reply_peer.erase(substream_first_reply_peer_iter);
-		}
-		else {
-			substream_first_reply_peer_iter++;
-		}
-	}
-	*/
-	
-	// children table
-	if (_pk_mgr_ptr->children_table.find(pid) != _pk_mgr_ptr->children_table.end()) {
-		_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "Delete pid", pid, "in children_table");
-		_pk_mgr_ptr->children_table.erase(_pk_mgr_ptr->children_table.find(pid));
-	}
-	
 	
 	if (map_udpfd_pid.find(fd) != map_udpfd_pid.end()) {
 		_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "Delete fd", fd, "in map_udpfd_pid");
@@ -3363,27 +3424,6 @@ void peer::CloseChildUDP(unsigned long pid, const char *reason)
 	
 	// Send capacity to PK
 	_pk_mgr_ptr->SendCapacityToPK();
-
-	/*
-	debug_printf("After close parent %d. Table information: \n", pid);
-	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "After close parent", pid);
-	for (map<unsigned long, int>::iterator iter = map_out_pid_fd.begin(); iter != map_out_pid_fd.end(); iter++) {
-		debug_printf("map_out_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
-		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_fd  pid : ", iter->first," fd :", iter->second);
-	}
-	for (map<unsigned long, int>::iterator iter = map_in_pid_fd.begin(); iter != map_in_pid_fd.end(); iter++) {
-		debug_printf("map_in_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
-		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_fd  pid : ", iter->first," fd :", iter->second);
-	}
-	for (map<unsigned long, int>::iterator iter = map_out_pid_udpfd.begin(); iter != map_out_pid_udpfd.end(); iter++) {
-		debug_printf("map_out_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
-		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_udpfd  pid : ", iter->first," fd :", iter->second);
-	}
-	for (map<unsigned long, int>::iterator iter = map_in_pid_udpfd.begin(); iter != map_in_pid_udpfd.end(); iter++) {
-		debug_printf("map_in_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
-		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_udpfd  pid : ", iter->first," fd :", iter->second);
-	}
-	*/
 }
 
 void peer::CloseSocketTCP(int sock, bool care, const char *reason)
@@ -3395,6 +3435,13 @@ void peer::CloseSocketTCP(int sock, bool care, const char *reason)
 // care: take care if the pid doesn't exist in the table
 void peer::CloseSocketUDP(int sock, bool care, const char *reason)
 {
+	if (sock == 0) {
+		return;
+	}
+	_log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "close sock", sock, reason);
+	_net_udp_ptr->close(sock);
+
+	/*
 	unsigned long pid;
 	if (map_udpfd_pid.find(sock) == map_udpfd_pid.end()) {
 		for (map<unsigned long, int>::iterator iter = map_in_pid_udpfd.begin(); iter != map_in_pid_udpfd.end(); iter++) {
@@ -3420,4 +3467,5 @@ void peer::CloseSocketUDP(int sock, bool care, const char *reason)
 	if (map_out_pid_udpfd.find(pid) != map_out_pid_udpfd.end()) {
 		CloseChildUDP(pid, reason);
 	}
+	*/
 }

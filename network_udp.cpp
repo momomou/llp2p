@@ -90,19 +90,13 @@ unsigned long network_udp::getLocalIpv4()
 
 void network_udp::set_fd_bcptr_map(int sock, basic_class *bcptr)
 {
-	for (map<int, basic_class *>::iterator iter = _map_fd_bc_tbl.begin(); iter != _map_fd_bc_tbl.end(); iter++) {
-		//debug_printf("size:%d  _map_fd_bc_tbl[%d] \n", _map_fd_bc_tbl.size(), iter->first);
-	}
-	debug_printf("_map_fd_bc_tbl size : %d \n", _map_fd_bc_tbl.size());
+	_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[INSERT _map_fd_bc_tbl]", sock, bcptr);
 	_map_fd_bc_tbl[sock] = bcptr;
 }
 
-void network_udp::fd_bcptr_map_set(int sock, basic_class *bcptr)
+void network_udp::delete_fd_bcptr_map(int sock)
 {
-	_map_fd_bc_tbl[sock] = bcptr;
-}
-void network_udp::fd_bcptr_map_delete(int sock)
-{
+	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[ERASE _map_fd_bc_tbl]", sock);
 	_map_fd_bc_tbl.erase(sock);
 }
 
@@ -325,7 +319,7 @@ void network_udp::epoll_dispatcher(void)
 
 void network_udp::epoll_control(int sock, int op, unsigned int events) 
 {
-	debug_printf("sock = %d event = %d \n", sock, events);
+	//debug_printf("sock = %d event = %d \n", sock, events);
 	if (op == EPOLL_CTL_ADD) {
 		int eventss = events;
 		if (UDT::epoll_add_usock(epfd, sock, &eventss) == UDT::ERROR) {
@@ -502,35 +496,19 @@ int network_udp::close(int sock)
 		PAUSE
 	}
 
+	delete_fd_bcptr_map(sock);
+
 	sock_state = UDT::getsockstate(sock);
 	len = sizeof(pendingpkt_size);
 	UDT::getsockopt(sock, 0, UDT_SNDDATA, &pendingpkt_size, &len);
-	debug_printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! pending packets: %d \n", pendingpkt_size);
-	debug_printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Closing UDP socket %d, state: %d \n", sock, sock_state);
-	_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "sock", sock, "is closing, state", sock_state);
+	_log_ptr->write_log_format("s(u) s d s d s d \n", __FUNCTION__, __LINE__, "sock", sock, "is closing, state", sock_state, "pending packet", pendingpkt_size);
 
 	if ((ret = UDT::close(sock)) == UDT::ERROR) {
-		debug_printf("ErrCode: %d  ErrMsg: %s \n", UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
-		//PAUSE
+		_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "[DEBUG] ErrCode", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
 	}
 
-	pendingpkt_size = 0;
+	delete_fd_bcptr_map(sock);
 
-	sock_state = UDT::getsockstate(sock);
-	len = sizeof(pendingpkt_size);
-	UDT::getsockopt(sock, 0, UDT_SNDDATA, &pendingpkt_size, &len);
-	debug_printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! pending packets: %d \n", pendingpkt_size);
-	debug_printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Closing UDP socket %d, state: %d \n", sock, sock_state);
-	_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "sock", sock, "is closing, state", sock_state);
-
-	if (_map_fd_bc_tbl.find(sock) != _map_fd_bc_tbl.end()) {
-		_map_fd_bc_tbl.erase(_map_fd_bc_tbl.find(sock));
-	}
-	else {
-		debug_printf("[ERROR] Not found sock %d in _map_fd_bc_tbl \n", sock);
-		_log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "[ERROR] Not found sock", sock, "in _map_fd_bc_tbl");
-	}
-	
 	return 0;
 }
 
@@ -543,6 +521,8 @@ int network_udp::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 	recv_rt_val = recv(sock, send_info->recv_ctl_info.buffer + send_info->recv_ctl_info.offset, send_info->recv_ctl_info.expect_len, 0);
 	//debug_printf("recv %d byte from sock: %d, expected len = %d \n", recv_rt_val, sock, send_info->recv_ctl_info.expect_len);
 
+	//_log_ptr->write_log_format("s(u) s d s d s d \n", __FUNCTION__, __LINE__, "Recv", recv_rt_val, "bytes from sock", sock, "expected len", send_info->recv_ctl_info.expect_len);
+	
 	if (recv_rt_val < 0) {
 		int sock_state = UDT::getsockstate(sock);
 		switch (sock_state) {
@@ -616,9 +596,18 @@ int network_udp::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 	// The connection has been gracefully closed
 	else if (recv_rt_val == 0) {
 		int sock_state = UDT::getsockstate(sock);
+		
+		
+		if (sock_state == UDTSTATUS::CONNECTED) {
+			// UDT 有可能發生
+			return RET_OK;
+		}
+		
 		debug_printf("recv %d byte from sock: %d, expected len = %d \n", recv_rt_val, sock, send_info->recv_ctl_info.expect_len);
 		debug_printf("state: %d, ErrCode: %d, ErrMsg: %s \n", sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
+
 		PAUSE
+
 		if (send_info->recv_ctl_info.expect_len == 0) {
 
 			if(send_info ->recv_packet_state == READ_HEADER_READY){
@@ -766,7 +755,7 @@ int network_udp::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 					PAUSE
 					break;
 				case UDTSTATUS::CONNECTED:
-					debug_printf("Send %d(expected:%d) bytes to sock %d, state: %d, ErrCode: %d, ErrMsg: %s \n", send_rt_val, send_info->expect_len, sock, sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
+					_log_ptr->write_log_format("s(u) s u(u) s u s u s u s u \n", __FUNCTION__, __LINE__, "Send", send_rt_val, send_info->expect_len, "bytes to", sock, "state", sock_state, "ErrCode", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
 					if (UDT::getlasterror().getErrorCode() == CUDTException::EASYNCRCV) {
 						send_info->ctl_state = RUNNING;
 						return RET_OK;
@@ -776,7 +765,7 @@ int network_udp::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 					}
 					break;
 				case UDTSTATUS::BROKEN:
-					debug_printf("Send %d(expected:%d) bytes to sock %d, state: %d, ErrCode: %d, ErrMsg: %s \n", send_rt_val, send_info->expect_len, sock, sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
+					_log_ptr->write_log_format("s(u) s u(u) s u s u s u s u \n", __FUNCTION__, __LINE__, "Send", send_rt_val, send_info->expect_len, "bytes to", sock, "state", sock_state, "ErrCode", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
 					//close(sock);
 					//_peer_ptr->CloseSocketUDP(sock, false, "Connection broken");
 					return RET_SOCK_ERROR;
@@ -789,7 +778,7 @@ int network_udp::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 					//PAUSE
 					break;
 				case UDTSTATUS::NONEXIST:
-					debug_printf("Send %d(expected:%d) bytes to sock %d, state: %d, ErrCode: %d, ErrMsg: %s \n", send_rt_val, send_info->expect_len, sock, sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
+					_log_ptr->write_log_format("s(u) s u(u) s u s u s u s u \n", __FUNCTION__, __LINE__, "Send", send_rt_val, send_info->expect_len, "bytes to", sock, "state", sock_state, "ErrCode", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
 					//PAUSE
 					return RET_SOCK_ERROR;
 					break;
@@ -800,8 +789,8 @@ int network_udp::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 		}
 		else if (send_rt_val == 0) {
 			int sock_state = UDT::getsockstate(sock);
-			debug_printf("Send %d(expected:%d) bytes to sock %d, state: %d, ErrCode: %d, ErrMsg: %s \n", send_rt_val, send_info->expect_len, sock, sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
-			if(send_info->expect_len == 0){
+			_log_ptr->write_log_format("s(u) s u(u) s u s u s u s u \n", __FUNCTION__, __LINE__, "Send", send_rt_val, send_info->expect_len, "bytes to", sock, "state", sock_state, "ErrCode", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
+			if (send_info->expect_len == 0){
 				send_info->ctl_state = READY;
 				return RET_OK;
 			}else{
@@ -841,9 +830,7 @@ int network_udp::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 		int len2 = sizeof(udp_sndbuf);
 		UDT::getsockopt(sock, 0, UDT_SNDBUF, &udt_sndbuf, &len1);
 		UDT::getsockopt(sock, 0, UDP_SNDBUF, &udp_sndbuf, &len2);
-		debug_printf("Send %d(expected:%d) bytes to sock %d, state: %d, ErrCode: %d, ErrMsg: %s, buf size: %d(%d) \n", send_rt_val, send_info->expect_len, sock, UDT::getsockstate(sock), UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage(), udt_sndbuf, udp_sndbuf);
-
-
+		_log_ptr->write_log_format("s(u) s u(u) s u s u s u s u d d \n", __FUNCTION__, __LINE__, "Send", send_rt_val, send_info->expect_len, "bytes to", sock, "state", UDT::getsockstate(sock), "ErrCode", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage(), udt_sndbuf, udp_sndbuf);
 
 
 		if (send_rt_val < 0) {
@@ -876,7 +863,7 @@ int network_udp::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 				}
 				break;
 			case UDTSTATUS::BROKEN:
-				debug_printf("Send %d(expected:%d) bytes to sock %d, state: %d, ErrCode: %d, ErrMsg: %s \n", send_rt_val, send_info->expect_len, sock, sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
+				_log_ptr->write_log_format("s(u) s u(u) s u s u s u s u \n", __FUNCTION__, __LINE__, "Send", send_rt_val, send_info->expect_len, "bytes to", sock, "state", sock_state, "ErrCode", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
 				close(sock);
 				return RET_SOCK_ERROR;
 				break;
@@ -904,6 +891,7 @@ int network_udp::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 				return RET_OK;
 			}
 			else{
+				_log_ptr->write_log_format("s(u) s u(u) s u s u s u s u \n", __FUNCTION__, __LINE__, "Send", send_rt_val, send_info->expect_len, "bytes to", sock, "state", UDT::getsockstate(sock), "ErrCode", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
 				send_info->ctl_state = RUNNING;
 				return RET_SOCK_ERROR;
 			}

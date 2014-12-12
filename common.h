@@ -45,10 +45,20 @@
 
 // Substream states
 #define SS_INIT			0	// The substream is in join state when not receive the first data
-#define SS_STABLE		1	// The substream is in normal state
-#define SS_RESCUE		2	// The substream is in rescue state
-#define SS_TEST			3	// The substream is in test state
+#define SS_STABLE2		1	// The substream is in normal state
+#define SS_CONNECTING2	2
+#define SS_RESCUE2		3	// The substream is in rescue state
+#define SS_TEST2		4	// The substream is in test state
 
+// Type of peer-list
+#define RESCUE_OP		0
+#define MERGE_OP		1
+#define MOVE_OP			2
+
+// manifest operation
+#define TOTAL_OP		0x10
+#define ADD_OP			0x11
+#define MINUS_OP		0x12
 
 #define FD_SETSIZE		2048
 
@@ -65,7 +75,7 @@
 #define PARAMETER_N		10		// 5
 #define PARAMETER_P		6		// 3
 
-#define TEST_DELAY_TIME	6				// Test delay 的時間不能少於或接近一個 session 存活的時間(2s)，否則在 test delay 成功的那一刻可能會誤判 parnet，
+#define TEST_DELAY_TIME	6				// Test delay 的時間不能少於或接近一個 session 存活的時間(2s)，否則在 test delay 成功的那一刻可能會誤判 parent，
 										// 因為 parent 收到 PARENT_PEER 時會直接更新 child_table
 
 // LOG SERVER
@@ -73,25 +83,24 @@
 #define LOGIP		"140.114.90.154"
 
 //ms
-#define CONNECT_TIME_OUT	2000		// Session timer
-#define NETWORK_TIMEOUT		5000		// Period of check peer's unnormal disconnection
-#define DATA_TIMEOUT		5000		// Timeout for rescue type 3
-#define BASE_RESYN_TIME		20000
-#define NAT_WAITING_TIME	500			// waiting time for NAT traversal
-#define BLOCK_RESCUE_TIME	5000		// waiting time for block_rescue
-#define BLOCK_RESCUE_INTERVAL	2000	// Time interval between sending block_rescue
+#define CONNECT_TIME_OUT		2000		// Session timer
+#define NETWORK_TIMEOUT			5000		// Period of check peer's unnormal disconnection
+#define DATA_TIMEOUT			5000		// Timeout for rescue type 3
+#define BASE_RESYN_TIME			20000
+#define NAT_WAITING_TIME		1000			// waiting time for NAT traversal
+#define DELAY_BUILD_CONN_TIME	500			// 給一個時間緩衝，確保 child 和 parent 都收有到 list
+#define BLOCK_RESCUE_TIME		5000		// waiting time for block_rescue
+#define BLOCK_RESCUE_INTERVAL	2000		// Time interval between sending block_rescue
 
-#define NEEDSOURCE_THRESHOLD	0.96	// substream在stable或有duplicate source狀態的數目 / 全部substream數目, 超過這個threshold可以不必向pk要source
+#define NEEDSOURCE_THRESHOLD	0.96		// substream在stable或有duplicate source狀態的數目 / 全部substream數目, 超過這個threshold可以不必向pk要source
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
 // BUFF_SIZE sec
-#define BUFF_SIZE		5
+#define BUFF_SIZE		10
 //CHUNK_LOSE sec, mean lose about CHUNK_LOSE sec packet
-#define CHUNK_LOSE		5	//
+#define CHUNK_LOSE		5
 
 // Child Priority
-#define CHILD_PRIORITY_X1	30		// Average pending packets size
-#define CHILD_PRIORITY_X2	30		// current pending packets size  有 50% 以上的 queue 其 pending packets 超過這個值的話，條件成立
 #define PRIORITY_QUEUE_THRESHOLD	10	// Priority x 的 child 必須等到 priority x-1 的 child 的 queue size 小於 PRIORITY_QUEUE_THRESHOLD 才可以塞給 sending buffer
 
 // Time interval of calculation Xcount
@@ -117,7 +126,7 @@
 #define TIME_PERIOD 2500		//500
 #define MAX_STORED_NUM	20					// If log_buffer.size() more than this value, send log messages to log server
 #define LOG_DELAY_SEND_PERIOD 5000
-#define LOG_BW_SEND_PERIOD 6000
+#define LOG_BW_SEND_PERIOD 10000
 
 /* LOG part: peer state (for debug CHNK_CMD_LOG_DEBUG) */
 #define LOG_REGISTER							0x01	// send register info to get register back
@@ -308,9 +317,17 @@ using std::bitset;
 #define PEER_CONNECTED_CHILD		0x07		// The peer is REAL child
 #define PEER_BROKEN					0x08
 #define PEER_CLOSING				0x09
-#define PEER_CLOSED					0x10
-#define PEER_NONEXIST				0x11
+#define PEER_CLOSED					0x0A
+#define PEER_NONEXIST				0x0B
 
+// Parent Select Strategy
+#define PEER_SELECTED				0x10
+
+// Session state
+#define SESSION_INIT				0x20
+#define SESSION_CONNECTING			0x21
+#define SESSION_SELECTING			0x22
+#define SESSION_END					0x23
 
 #define CHNK_CMD_PEER_REG				0x01	// register
 //#define CHNK_CMD_RESCUE_LIST			0x02	// recv rescue list
@@ -499,9 +516,11 @@ struct peer_info_t {
 	UINT32 upnp_acess;					//unsigned long upnp_acess;	//yes1 no0 
 	UINT32 NAT_type;					//unsigned long NAT_type;	//from 1 to 4 (4 cannot punch)
 //////////NAT////////////
+	INT32 sock;							// 連線成功的時候會更新，同時 connection_state 變成 PEER_CONNECTED
 	UINT32 manifest;					//unsigned long manifest;
-	UINT32 session_id;					// 同時作為 child priority，值越小權限越高
-	UINT32 state;
+	UINT32 peercomm_session;
+	UINT32 priority;					// 值越低權重越高，等於 my_session
+	UINT32 connection_state;
 };
 
 
@@ -638,7 +657,13 @@ struct chunk_bitstream_t{
 struct chunk_request_msg_t{
 	struct chunk_header_t header;
 	struct request_info_t info;
-	UINT8 buf[0];								//unsigned char buf[0];
+	UINT8 buf[0];
+};
+
+struct chunk_request_peer_t{
+	struct chunk_header_t header;
+	struct request_info_t info;
+	UINT8 buf[0];
 };
 
 struct chunk_request_pkt_t{
@@ -677,8 +702,9 @@ struct chunk_period_source_delay_struct{
 
 struct chunk_manifest_set_t{
 	struct chunk_header_t header;
-	UINT32 pid;									//unsigned long pid;
-	UINT32 manifest;							//unsigned long manifest;
+	UINT32 pid;
+	UINT32 manifest;
+	UINT32 manifest_op;
 };
 
 struct chunk_rescue_t {
@@ -693,6 +719,7 @@ struct rescue_pkt_from_server{
 	struct chunk_header_t header;
 	UINT32 pid;									//unsigned long pid;
 	UINT32 manifest;							//unsigned long manifest;
+	UINT32 operation;							// 0:rescue, 1:merge, 2:move
 	UINT32 rescue_seq_start;					//unsigned int rescue_seq_start;
 	UINT32 need_source;	
 };
@@ -720,6 +747,7 @@ struct chunk_register_reply_t {
 	UINT32 inside_lane_rescue_num;				//unsigned long inside_lane_rescue_num;
 	UINT32 is_seed;
 	UINT32 pkt_rate;
+	UINT32 session;
 	struct level_info_t *level_info[0];
 };
 
@@ -884,6 +912,7 @@ struct update_test_info {
 	UINT32 pid;
 	UINT32 substream_id;
 	UINT32 sub_num;
+	UINT32 operation;							// 0:rescue, 1:merge, 2:move
 	UINT32 choose_parent_pid;
 	UINT32 test_success_parent_num;
 	UINT32 success_parent[0];
@@ -947,11 +976,14 @@ struct substream_state {
 	bool is_testing;					// Set true when receive the packet from a parent in SS_RESCUE, and set false when test-delay success
 	bool dup_src;						// A flag whether the peer needs source from pk when in SS_RESCUE and SS_TEST state
 	bool connecting_peer;				// A flag if this substream is finding parent. 避免因為收到 CHNK_CMD_PEER_SEED 斷掉 rescue
+	bool rescue_after_fail;				// 若沒有成功轉移到新的 parent ，是否需要發 rescue. set true if RESCUE/MERGE, set false if MOVE
 };
 
 struct substream_timer {
 	struct timerStruct timer;			// timer refresh if this data packet of this substream has received
 	bool timeout_flag;
+	struct timerStruct inTest_timer;	// timer start when substream starts in SS_TEST state
+	bool inTest_flag;					// if inTest_timer timeout, flag = true; otherwise false. 如果完成6秒的測試，flag = true，任何測試中途失敗就不會設
 };
 
 struct substream_info {
@@ -976,13 +1008,14 @@ struct substream_info {
 	struct timerStruct block_rescue_interval;	// Time interval between sending block_rescue (for time-based rescue detection)
 };
 
-struct build_udp_conn {
-	struct sockaddr_in peer_saddr;
-	int caller;
-	unsigned long manifest;
-	unsigned long pid;
-	int flag;
-	unsigned long session_id; 
+struct delay_build_connection {
+	struct peer_info_t *candidates_info;
+	INT32 caller;
+	UINT32 manifest;
+	UINT32 peer_pid;
+	INT32 flag;
+	UINT32 my_session;
+	UINT32 peercomm_session;
 	struct timerStruct timer;
 };
 
@@ -1013,13 +1046,16 @@ struct rescue_peer_capacity_measurement{
 struct seed_notify{
 	struct chunk_header_t header;
 	UINT32 manifest;							//unsigned int manifest;
+
 };
 
 struct chunk_rescue_list {
 	struct chunk_header_t header;
 	UINT32 pid;									//unsigned long pid;
 	UINT32 manifest;							//unsigned long manifest;
-	struct rescue_peer_info *rescue_peer_info[MAX_PEER_LIST];	
+	UINT32 operation;							// 0:rescue, 1:merge, 2:move
+	UINT32 session;
+	struct level_info_t *rescue_peer_info[MAX_PEER_LIST];
 };
 
 // header | pid | pid |
@@ -1048,6 +1084,7 @@ struct rescue_update_from_server{
 struct update_topology_info{
 	struct chunk_header_t header;
 	UINT32 manifest;							//unsigned int manifest;
+	UINT32 operation;							// 0:rescue, 1:merge, 2:move
 	UINT32 parent_num;							//unsigned long parent_num;
 	UINT32 parent_pid[0];						//unsigned long parent_pid[0];
 };
@@ -1059,10 +1096,11 @@ struct update_stream_header{
 
 struct role_struct{
 	struct chunk_header_t header;
-	INT32 flag;									//int flag;	//flag 0 another is rescue peer, flag 1 another is candidate
-	UINT32 manifest;							//unsigned long manifest;
-	UINT32 send_pid;							//unsigned long send_pid;
-	UINT32 recv_pid;							//unsigned long recv_pid;
+	INT32 flag;									// flag 0 another is rescue peer, flag 1 another is candidate
+	UINT32 manifest;
+	UINT32 send_pid;
+	UINT32 recv_pid;
+	UINT32 peercomm_session;
 };
 
 struct peer_com_info{
@@ -1071,6 +1109,18 @@ struct peer_com_info{
 	UINT32 manifest;							//unsigned long manifest;	//caller's manifest
 	UINT32 all_behind_nat;
 	struct chunk_level_msg_t *list_info;
+};
+
+struct mysession_candidates{
+	UINT32 mypid;
+	UINT32 myrole;
+	UINT32 manifest;
+	INT32 candidates_num;
+	UINT32 session_state;
+	UINT32 all_behind_nat;
+	struct timerStruct timer;
+	struct peer_info_t *p_candidates_info;	// 由內而外的建立連線方向
+	struct peer_info_t *n_candidates_info;	// 由外而內的建立連線方向
 };
 
 struct manifest_timmer_flag{
@@ -1094,6 +1144,7 @@ struct chunk_child_info {
 	struct chunk_header_t header;
 	UINT32 pid;									//unsigned long pid;
 	UINT32 manifest;							//unsigned long manifest;	//rescue peer
+	UINT32 session;
 	struct level_info_t child_level_info;	
 };
 
@@ -1102,6 +1153,7 @@ struct fd_information {
 	UINT32 manifest;							// must be store before io_connect, and delete in stop
 	UINT32 pid;									// must be store before io_connect, and delete in stop
 	UINT32 session_id;							// must be store before io_connect, and delete in stop, used for child role
+	UINT32 peercomm_session;
 };
 
 typedef struct _XconnInfo {
@@ -1410,6 +1462,7 @@ typedef struct {
 #define LOG_BUFFER_ERROR	0x3D	// The buffer stores messages sent to log-server is error
 #define PK_TIMEOUT			0x3E	// no streams received from pk, it may happen when peer's network doesn't work 
 #define SOCKET_ERROR		0x3F
+#define LOGICAL_ERROR		0x50	// Logical error, which imply mechanisms or algorithms are wrong
 #define	UNKNOWN				0xFF	// Others not defined
 
 

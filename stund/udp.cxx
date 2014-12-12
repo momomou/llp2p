@@ -211,14 +211,14 @@ getMessage( Socket fd, char* buf, int* len,
    
    struct sockaddr_in from;
    int fromLen = sizeof(from);
-	
+   clog << __LINE__ << endl;
    *len = recvfrom(fd,
                    buf,
                    originalSize,
                    0,
                    (struct sockaddr *)&from,
                    (socklen_t*)&fromLen);
-	
+   clog << __LINE__ << endl;
    if ( *len == SOCKET_ERROR )
    {
       int err = getErrno();

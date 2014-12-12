@@ -1047,6 +1047,15 @@ int main(int argc, char **argv){
 		logger_client_ptr->log_init();
 
 
+		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "bit_stream_server", *bit_stream_server_ptr);
+		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "io_accept_udp", *io_accept_udp_ptr);
+		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "io_connect_udp", peer_communication_ptr->_io_connect_udp_ptr);
+		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "io_nonblocking_udp", peer_communication_ptr->_io_nonblocking_udp_ptr);
+		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "peer_communication", *peer_communication_ptr);
+		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "peer", peer_communication_ptr->_peer_ptr);
+		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "logger_client", *logger_client_ptr);
+		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "pk_mgr", *pk_mgr_ptr);
+
 #ifdef _FIRE_BREATH_MOD_
 
 		// Invoke jwplayer in javascript
@@ -1077,33 +1086,32 @@ int main(int argc, char **argv){
 #endif
 
 #ifdef _WIN32
-
+			for (int i = 0; i < 1; i++) {
 #ifdef _FIRE_BREATH_MOD_
-			net_ptr->epoll_waiter(1000, map_channelID_globalVar[thread_key]->fd_list);
+				net_ptr->epoll_waiter(1000, map_channelID_globalVar[thread_key]->fd_list);
 #else
-			net_ptr->epoll_waiter(1000, &fd_list);
+				net_ptr->epoll_waiter(1000, &fd_list);
 #endif
 
 #else
-			net_ptr->epoll_waiter(1000);
+				net_ptr->epoll_waiter(1000);
 #endif
-			net_ptr->epoll_dispatcher();
-
+				net_ptr->epoll_dispatcher();
+			}
 			pk_mgr_ptr->time_handle();
 #ifdef _FIRE_BREATH_MOD_
-			net_udp_ptr->epoll_waiter(10, map_channelID_globalVar[thread_key]->udp_fd_list);
+			net_udp_ptr->epoll_waiter(5, map_channelID_globalVar[thread_key]->udp_fd_list);
 #else
-			net_udp_ptr->epoll_waiter(10, &udp_fd_list);
+			net_udp_ptr->epoll_waiter(5, &udp_fd_list);
 #endif
 
 			net_udp_ptr->epoll_dispatcher();
-			//peer_mgr_ptr->ArrangeResource();
 
 			if (*(net_ptr->_errorRestartFlag) == RESTART) {
 				log_ptr->write_log_format("s(u) s \n\n\n", __FUNCTION__, __LINE__, "Program Restart");
 				break;
 			}
-			//log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "----- A cycle -----");
+
 		}
 
 		pk_exit_code = pk_mgr_ptr->exit_code;

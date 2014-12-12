@@ -31,10 +31,7 @@ public:
 	void garbage_collection();
 	unsigned long getLocalIpv4(); 
 	void set_fd_bcptr_map(int sock, basic_class *bcptr);
-	void fd_bcptr_map_set(int sock, basic_class *bcptr);
-	void fd_bcptr_map_delete(int sock);
-//	void fd_del_hdl_map_set(int sock, basic_class *bcptr);
-//	void fd_del_hdl_map_delete(int sock);
+	void delete_fd_bcptr_map(int sock);
 
 	// epoll trigger function
 	void epoll_creater(void);

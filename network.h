@@ -74,6 +74,8 @@ public:
 	network& operator=(const network&);
 	void eraseFdList(int sock) ;
 
+	int nin = 0;
+
 private:
 	
 	// class variable

@@ -38,7 +38,7 @@ int io_accept_udp::handle_pkt_in_udp(int sock)
 	accept new peer fd, recv protocol to identify candidate or not.
 	save its role(candidate or rescue peer) and bind to peer_com~ for handle_pkt_in/out.
 	*/
-
+	
 	socklen_t sin_len = sizeof(struct sockaddr_in);
 	struct chunk_header_t *chunk_header_ptr = NULL;
 	int expect_len;
@@ -51,13 +51,9 @@ int io_accept_udp::handle_pkt_in_udp(int sock)
 	
 
 	offset = 0;
-	debug_printf("before accept \n");
 	int new_fd = UDT::accept(sock, (struct sockaddr *)&_cin, &sin_len);
-	debug_printf("after accept \n");
 	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Accept fd", new_fd);
-	//PAUSE
-
-
+	
 	if (new_fd < 0) {
 		return RET_SOCK_ERROR;
 	}
@@ -67,9 +63,10 @@ int io_accept_udp::handle_pkt_in_udp(int sock)
 		if (_peer_communication_ptr->map_udpfd_NonBlockIO.find(new_fd) ==_peer_communication_ptr->map_udpfd_NonBlockIO.end()) {
 			struct ioNonBlocking* ioNonBlocking_ptr = new struct ioNonBlocking;
 			if (!ioNonBlocking_ptr) {
-				debug_printf("ioNonBlocking_ptr new error \n");
-				_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "ioNonBlocking_ptr new error");
-				PAUSE
+				_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[ERROR] ioNonBlocking_ptr new error", sock, new_fd);
+				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s d d \n", "[ERROR] ioNonBlocking_ptr new error", sock, new_fd);
+				debug_printf("[ERROR] ioNonBlocking_ptr new error %d %d \n", sock, new_fd);
+				return RET_OK;
 			}
 			
 			_log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "Add fd", new_fd, "into map_udpfd_NonBlockIO");
@@ -79,9 +76,10 @@ int io_accept_udp::handle_pkt_in_udp(int sock)
 			_peer_communication_ptr->map_udpfd_NonBlockIO[new_fd] = ioNonBlocking_ptr;
 		}
 		else {
-			debug_printf("fd=%d dup in _peer_communication_ptr->map_udpfd_NonBlockIO_iter  error\n",new_fd);
-			_log_ptr->write_log_format("s =>u s d s \n", __FUNCTION__, __LINE__, "fd=", new_fd, "dup in _peer_communication_ptr->map_udpfd_NonBlockIO_iter  error");
+			debug_printf("[ERROR] new sock %d duplicate \n", new_fd);
+			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[ERROR] new sock %d duplicate", new_fd);
 			PAUSE
+			return RET_OK;
 		}
 
 		//_net_ptr->set_blocking(new_fd);

@@ -62,8 +62,7 @@ public:
 	void send_test_delay(int _sock,unsigned long manifest, UINT32 session_id);
 	void send_test_delay_udp(int _sock,unsigned long manifest, UINT32 session_id);
 	int handle_test_delay(int session_id);
-	void send_manifest_to_parent(unsigned long manifestValue,unsigned long parentPid);
-	void send_manifest_to_parent_udp(unsigned long manifestValue,unsigned long parentPid);
+	void send_manifest_to_parent(UINT32 parent_pid, UINT32 manifest, UINT32 operation);
 	void handle_manifestSet(struct chunk_manifest_set_t *chunk_ptr);
 	void SendBlockRescue(int ss_id, int type);
 	void HandleBlockRescue(struct chunk_block_rescue_t *chunk_ptr);

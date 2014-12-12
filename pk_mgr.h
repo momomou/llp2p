@@ -53,10 +53,10 @@ public:
 //	LARGE_INTEGER syn_round_start;
 	
 	// The main table storing peer state
-	multimap <unsigned long, struct peer_info_t *> map_pid_parent_temp;		// My temp parent (life: session start <-----> session stop)
-	multimap <unsigned long, struct peer_info_t *> map_pid_child_temp;		// My temp child
-	map<unsigned long, struct peer_connect_down_t *> map_pid_parent;		// My real parent-peer (第一個回test reply的peer會塞進去) (life: session start <-----> session stop)
-	map<unsigned long, struct peer_info_t *> map_pid_child;					// My real child-peer (life: session start <-----> session stop)
+	multimap <unsigned long, struct peer_info_t *> map_pid_parent_temp;		// My temp parent (life: session start <-----> session stop) // 記錄每一次 session 的 candiates info
+	multimap <unsigned long, struct peer_info_t *> map_pid_child_temp;		// My temp child // 記錄每一次 session 的 candiates info
+	map<unsigned long, struct peer_connect_down_t *> map_pid_parent;		// My real parent-peer (第一個回test reply的peer會塞進去) (life: session start <-----> session stop) // parents table (包含即將成為的)，根據這個 table 避免和同一個 peer 建重複連線 (life: session start <-----> manifest = 0)
+	map<unsigned long, struct peer_info_t *> map_pid_child;					// My real child-peer (life: session start <-----> session stop) // children table (包含即將成為的)，根據這個 table 避免和同一個 peer 建重複連線 (life: session start <-----> manifest = 0)
 	
 	// These two tables are to prevent more than 2 connections (upstream + downstream)
 	map<unsigned long, int> parents_table;									// <pid, state> table, to prevent too much connections(no more than 2)
@@ -130,7 +130,7 @@ public:
 	int peer_start_delay_count;		// If received first packet of each substream, peer_start_delay_count++
 	void send_source_delay(int sock);		// Send source-delay info to pk
 	void send_topology_to_log();			// Send topology to log server
-	void SendParentTestToPK(unsigned long session_id);
+	int SendParentTestToPK(UINT32 my_session);
 	void SendCapacityToPK();
 
 	volatile UINT32 _least_sequence_number;			//收到目前為止最新的seq
@@ -233,7 +233,7 @@ public:
 	unsigned long my_private_ip;
 	unsigned short my_private_port;
 
-	int session_id;
+	UINT32 my_session;
 
 	// Priority Queue parameters
 	unsigned long sampling_interval;	// number of pkts per 100ms

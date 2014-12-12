@@ -69,4 +69,16 @@ logger_client裡的log_buffer, pop出來後沒有free?
 
 /* 2014.08.20 */
 1. WSAStartUp 和 WSACleanUp 必須成雙成對，否則 FireBreath 會因此掛掉
+
+/* 2014.11.03 */
+:1,$s/\s\+/\t/g  全部空白取代成\t
+
+/* 2014.11.12 */
+Windows防火牆不會擋連外的連線
+
+/* 2014.11.24 */
+OBS 的 FPS 會影響 RTMP 封包大小的變動率，FPS越高，變動率越小
 	
+/* 2014.12.07 */
+UDT 的 epoll_waiter 太耗時，導致 pkt_rate 最好不要超過60
+會有 substream 卡在 CONNECTING 狀態

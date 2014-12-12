@@ -192,6 +192,7 @@ void network::epoll_dispatcher(void)
 			aa=getpeername(cfd, (struct sockaddr *)&addr, (socklen_t *)&addrLen);
 			//printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d  ", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 			
+
 			if (events[i].events & (EPOLLRDHUP | EPOLLERR)) {
 				if (cfd == pk_fd) {
 					// TODO: handle pk socket
@@ -227,6 +228,14 @@ void network::epoll_dispatcher(void)
 			}
 			
 			if(events[i].events & EPOLLIN) {
+				if (ntohs(addr.sin_port) == 8856) {
+					u_long n = -1;
+					ioctlsocket(cfd, FIONREAD, &n);
+					//if (n > 8000) {
+						//debug_printf("fd = %d  %d  %d \n", cfd, n, ++nin);
+					//}
+				}
+				
 				if (bc_ptr->handle_pkt_in(cfd) == RET_SOCK_ERROR) {
 					if (cfd == pk_fd) {
 						// TODO: handle pk socket
@@ -250,6 +259,7 @@ void network::epoll_dispatcher(void)
                 }
 			}
 			if(events[i].events & EPOLLOUT) {
+				
 				if (bc_ptr->handle_pkt_out(cfd) == RET_SOCK_ERROR) {
 					if (cfd == pk_fd) {
 						// TODO: handle pk socket 

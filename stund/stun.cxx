@@ -1779,16 +1779,18 @@ stunSendTest( Socket myFd, StunAddress4& dest,
 	
    if ( verbose )
    {
-      clog << "About to send msg of len " << len << " to " << dest << endl;
+	   clog << __LINE__ << "\tAbout to send msg of len " << len << " to " << dest << endl;
    }
-	
+   
    sendMessage( myFd, buf, len, dest.addr, dest.port, verbose );
-	
+   
    // add some delay so the packets don't get sent too quickly 
 #ifdef WIN32 // !cj! TODO - should fix this up in windows
 		 clock_t now = clock();
 		 assert( CLOCKS_PER_SEC == 1000 );
+		 
 		 while ( clock() <= now+10 ) { };
+		 
 #else
 		 usleep(10*1000);
 #endif
@@ -1845,7 +1847,7 @@ int testNum, bool verbose)
 
 	if (verbose)
 	{
-		clog << "About to send msg of len " << len << " to " << dest << endl;
+		clog << __FUNCTION__ << "\tAbout to send msg of len " << len << " to " << dest << endl;
 	}
 
 	sendMessage(myFd, buf, len, dest->addr, dest->port, verbose);
@@ -1908,7 +1910,7 @@ stunTest(StunAddress4& dest, int testNum, bool verbose, unsigned short *port_int
  
    stunSendTest(myFd, dest, username, password, testNum, verbose);
    //myStunSendTest( myFd, *dest, username, password, testNum, verbose );
-    
+  
    char msg[STUN_MAX_MESSAGE_SIZE];
    int msgLen = STUN_MAX_MESSAGE_SIZE;
 	

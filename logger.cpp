@@ -4,8 +4,6 @@
 #include <string.h>
 
 
-
-
 static const char *levels[] = {
   "CRIT", "ERROR", "WARNING", "INFO", "DEBUG", "DEBUG2"
 };
@@ -40,9 +38,14 @@ char *logger::get_now_time()
 {
 	time_t T;
 	time(&T);
-	char *ct = ctime(&T);
+	char *ct = ctime(&T);		// Www Mmm dd hh:mm:ss yyyy
 	ct[strlen(ct)-1] = 0x0;
-	return ct;
+	
+	char *ct2 = ct+4;
+	ct2[strlen(ct2) - 5] = 0;
+	return ct2;					// Mmm dd hh:mm:ss
+
+	//return ct;
 }
 
 void logger::start_log_record(int time) 
