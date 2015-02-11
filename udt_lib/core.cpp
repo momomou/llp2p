@@ -1647,6 +1647,46 @@ void CUDT::sample(CPerfMon* perf, bool clear)
       m_llSndDuration = 0;
       m_LastSampleTime = currtime;
    }
+
+   /*
+   printf("sizeof(int) = %d \n", sizeof(int));
+   printf("sizeof(int64_t) = %d \n", sizeof(int64_t));
+   printf("sizeof(double) = %d \n", sizeof(double));
+   printf("sizeof(UDT::TRACEINFO) = %d \n", sizeof(UDT::TRACEINFO));
+   printf("sizeof(CPerfMon) = %d \n", sizeof(CPerfMon));
+   printf("&(perf->msTimeStamp) = %d  size = %d \n", &(perf->msTimeStamp), sizeof(perf->msTimeStamp));
+   printf("&(perf->pktSentTotal) = %d  size = %d \n", &(perf->pktSentTotal), sizeof(perf->pktSentTotal));
+   printf("&(perf->pktRecvTotal) = %d  size = %d \n", &(perf->pktRecvTotal), sizeof(perf->pktRecvTotal));
+   printf("&(perf->pktSndLossTotal) = %d  size = %d \n", &(perf->pktSndLossTotal), sizeof(perf->pktSndLossTotal));
+   printf("&(perf->pktRcvLossTotal) = %d  size = %d \n", &(perf->pktRcvLossTotal), sizeof(perf->pktRcvLossTotal));
+   printf("&(perf->pktRetransTotal) = %d  size = %d \n", &(perf->pktRetransTotal), sizeof(perf->pktRetransTotal));
+   printf("&(perf->pktSentACKTotal) = %d  size = %d \n", &(perf->pktSentACKTotal), sizeof(perf->pktSentACKTotal));
+   printf("&(perf->pktRecvACKTotal) = %d  size = %d \n", &(perf->pktRecvACKTotal), sizeof(perf->pktRecvACKTotal));
+   printf("&(perf->pktSentNAKTotal) = %d  size = %d \n", &(perf->pktSentNAKTotal), sizeof(perf->pktSentNAKTotal));
+   printf("&(perf->pktRecvNAKTotal) = %d  size = %d \n", &(perf->pktRecvNAKTotal), sizeof(perf->pktRecvNAKTotal));
+   printf("&(perf->usSndDurationTotal) = %d  size = %d \n", &(perf->usSndDurationTotal), sizeof(perf->usSndDurationTotal));
+   printf("&(perf->pktSent) = %d  size = %d \n", &(perf->pktSent), sizeof(perf->pktSent));
+   printf("&(perf->pktRecv) = %d  size = %d \n", &(perf->pktRecv), sizeof(perf->pktRecv));
+   printf("&(perf->pktSndLoss) = %d size = %d  \n", &(perf->pktSndLoss), sizeof(perf->pktSndLoss));
+   printf("&(perf->pktRcvLoss) = %d size = %d  \n", &(perf->pktRcvLoss), sizeof(perf->pktRcvLoss));
+   printf("&(perf->pktRetrans) = %d size = %d  \n", &(perf->pktRetrans), sizeof(perf->pktRetrans));
+   printf("&(perf->pktSentACK) = %d size = %d  \n", &(perf->pktSentACK), sizeof(perf->pktSentACK));
+   printf("&(perf->pktRecvACK) = %d size = %d  \n", &(perf->pktRecvACK), sizeof(perf->pktRecvACK));
+   printf("&(perf->pktSentNAK) = %d size = %d  \n", &(perf->pktSentNAK), sizeof(perf->pktSentNAK));
+   printf("&(perf->pktRecvNAK) = %d size = %d  \n", &(perf->pktRecvNAK), sizeof(perf->pktRecvNAK));
+   printf("&(perf->mbpsSendRate) = %d size = %d  \n", &(perf->mbpsSendRate), sizeof(perf->mbpsSendRate));
+   printf("&(perf->mbpsRecvRate) = %d size = %d  \n", &(perf->mbpsRecvRate), sizeof(perf->mbpsRecvRate));
+   printf("&(perf->usSndDuration) = %d size = %d  \n", &(perf->usSndDuration), sizeof(perf->usSndDuration));
+   printf("&(perf->usPktSndPeriod) = %d size = %d  \n", &(perf->usPktSndPeriod), sizeof(perf->usPktSndPeriod));
+   printf("&(perf->pktFlowWindow) = %d size = %d  \n", &(perf->pktFlowWindow), sizeof(perf->pktFlowWindow));
+   printf("&(perf->pktCongestionWindow) = %d size = %d  \n", &(perf->pktCongestionWindow), sizeof(perf->pktCongestionWindow));
+   printf("&(perf->pktFlightSize) = %d  size = %d \n", &(perf->pktFlightSize), sizeof(perf->pktFlightSize));
+   printf("&(perf->msRTT) = %d  size = %d \n", &(perf->msRTT), sizeof(perf->msRTT));
+   printf("&(perf->mbpsBandwidth) = %d  size = %d \n", &(perf->mbpsBandwidth), sizeof(perf->mbpsBandwidth));
+   printf("&(perf->byteAvailSndBuf) = %d  size = %d \n", &(perf->byteAvailSndBuf), sizeof(perf->byteAvailSndBuf));
+   printf("&(perf->byteAvailRcvBuf) = %d  size = %d \n", &(perf->byteAvailRcvBuf), sizeof(perf->byteAvailRcvBuf));
+   */
+   //printf("Srate: %f  Rrate: %f  Erate: %f  RTT: %f  Flight: %d  PktPeriod: %f  SndBuf: %d  RcvBuf: %d  CW: %d  FW: %d \n", perf->mbpsSendRate, perf->mbpsRecvRate, perf->mbpsBandwidth, perf->msRTT, perf->pktFlightSize, perf->usPktSndPeriod, perf->byteAvailSndBuf, perf->byteAvailRcvBuf, perf->pktCongestionWindow, perf->pktFlowWindow);
 }
 
 void CUDT::CCUpdate()

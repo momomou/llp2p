@@ -2,7 +2,7 @@
 #define __LOG_RECORD_H__
 
 #include "common.h"
-#include "network.h"
+//#include "network.h"
 #ifdef _WIN32
 #else
 #include<sys/time.h>
@@ -45,7 +45,7 @@ public:
 	bool check_arch_compatible();
 	bool handleAlarm();
 	int set_resource_limit(int maxfds);
-	void logger_set(network *net_ptr);
+	//void logger_set(network *net_ptr);
 	void LogPrintf(const char *format, ...);
 	void LogStatus(const char *format, ...);
 	void Log(int level, const char *format, ...);
@@ -85,7 +85,7 @@ private:
 	FILE *_fp;
 //	FILE *_binary_fp;
 	int _systime;
-	network *_net_ptr;
+	//network *_net_ptr;
 	time_t last_alarm;
 	AMF_LogLevel _debuglevel;
 	int _neednl, is_diff_timmer_set;

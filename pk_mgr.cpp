@@ -68,6 +68,7 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr, ne
 	_log_ptr->timerGet(&start);
 	_log_ptr->timerGet(&reconnect_timer);
 	_log_ptr->timerGet(&XcountTimer);
+	_log_ptr->timerGet(&base_timer);
 	first_timestamp = 0;
 	firstIn =true;
 	pkt_count = 0;
@@ -85,12 +86,15 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr, ne
 	priq_cnt2 = 0;
 	avg_queue = 0;
 	avg_queue_previous = 100;		// 初始值故意設很高，用意讓第一次計算得到的 avg_queue < avg_queue_previous
+	previous_ss_num = 0;
 
 	syn_table.first_sync_done = false;
 	syn_table.state = SYNC_UNINIT;
 	syn_table.client_abs_start_time = 0;
 	syn_table.start_seq = 0;
 	
+	memset(&my_queue_history, 0, sizeof(struct queue_history));
+
 	// Record file
 	record_file_fp = NULL;
 	first_pkt = true;
@@ -113,6 +117,10 @@ pk_mgr::pk_mgr(unsigned long html_size, list<int> *fd_list, network *net_ptr, ne
 		}
 		memset(chunk_t_ptr, 0, sizeof(struct chunk_t));
 		*(buf_chunk_t + i) = chunk_t_ptr ;
+	}
+
+	for (int i = 0; i < 100; i++) {
+		map_uploadssnum_state[i] = PS_STABLE;
 	}
 }
 
@@ -141,7 +149,7 @@ pk_mgr::~pk_mgr()
 	clear_map_streamID_header();
 	clear_map_pid_child_temp();
 
-	debug_printf("==============deldet pk_mgr success==========\n");
+	debug_printf("Have deleted pk_mgr \n");
 }
 
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
@@ -197,6 +205,9 @@ void pk_mgr::SubstreamTableInit()
 		substream_info_ptr->block_rescue = FALSE;
 		substream_info_ptr->can_send_block_rescue = TRUE;
 		substream_info_ptr->data.testing_count = 0;
+		substream_info_ptr->inTest.pkt_count = 0;
+		substream_info_ptr->inTest.overdelay_count = 0;
+		substream_info_ptr->inTest.inTest_success = TRUE;
 		struct timerStruct timer; 
 		_log_ptr->timerGet(&timer);
 		substream_info_ptr->timer.timer = timer;
@@ -230,6 +241,7 @@ void pk_mgr::send_source_delay(int pk_sock)
 			_log_ptr->write_log_format("s(u) s d s d s \n", __FUNCTION__, __LINE__, "substream id", i, "has received nothing for", LOG_DELAY_SEND_PERIOD, "milliseconds");
 		}
 		max_delay = max_delay < average_delay[i] ? average_delay[i] : max_delay;
+		ss_table[i]->data.avg_src_delay = static_cast<UINT32>(average_delay[i]);
 	}
 	
 	chunk_period_source_delay_ptr->header.cmd = CHNK_CMD_SRC_DELAY;
@@ -301,12 +313,12 @@ int pk_mgr::SendParentTestToPK(UINT32 my_session)
 {
 	map<unsigned long, struct manifest_timmer_flag *>::iterator substream_first_reply_peer_iter;
 	int packetlen = 0;
-	int parent_num = 1;
+	int parent_num = 0;
 	int ret_val = 0;
 	struct update_test_info *update_test_info_ptr = NULL;
 	map<unsigned long, struct mysession_candidates *>::iterator map_mysession_candidates_iter;
-	struct peer_info_t *peer_info = NULL;		// 指向被選中的 parent
-
+	struct peer_connect_down_t *parent_info = NULL;		// 指向被選中的 parent
+	UINT32 test_success_parent[MAX_PEER_LIST] = { 0 };
 
 	map_mysession_candidates_iter = _peer_mgr_ptr->_peer_communication_ptr->map_mysession_candidates.find(my_session);
 	if (map_mysession_candidates_iter == _peer_mgr_ptr->_peer_communication_ptr->map_mysession_candidates.end()){
@@ -314,59 +326,82 @@ int pk_mgr::SendParentTestToPK(UINT32 my_session)
 		return 0;
 	}
 
-	// 找出被選中的 parent
+	// 找出被選中的 parent 與 有連成功但沒被選中的 parent
 	for (int i = 0; i < map_mysession_candidates_iter->second->candidates_num; i++) {
 		if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_SELECTED) {
-			UINT32 peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
-			if (map_pid_parent.find(peer_pid) != map_pid_parent.end()) {
-				peer_info = &(map_pid_parent.find(peer_pid)->second->peerInfo);
-			}
-			break;
+			parent_info = GetParentFromPid(map_mysession_candidates_iter->second->p_candidates_info[i].pid);
+			test_success_parent[parent_num++] = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
+			//break;
 		}
 		else if (map_mysession_candidates_iter->second->n_candidates_info[i].connection_state == PEER_SELECTED) {
-			UINT32 peer_pid = map_mysession_candidates_iter->second->n_candidates_info[i].pid;
-			if (map_pid_parent.find(peer_pid) != map_pid_parent.end()) {
-				peer_info = &(map_pid_parent.find(peer_pid)->second->peerInfo);
-			}
-			break;
+			parent_info = GetParentFromPid(map_mysession_candidates_iter->second->n_candidates_info[i].pid);
+			test_success_parent[parent_num++] = map_mysession_candidates_iter->second->n_candidates_info[i].pid;
+			//break;
+		}
+		else if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED) {
+			test_success_parent[parent_num++] = map_mysession_candidates_iter->second->n_candidates_info[i].pid;
+			//break;
+		}
+		else if (map_mysession_candidates_iter->second->n_candidates_info[i].connection_state == PEER_CONNECTED) {
+			test_success_parent[parent_num++] = map_mysession_candidates_iter->second->n_candidates_info[i].pid;
+			//break;
 		}
 	}
-	
-	packetlen = parent_num * sizeof (UINT32)+sizeof(struct update_test_info);
-	update_test_info_ptr = (struct update_test_info *)new char[packetlen];
-	if (!update_test_info_ptr) {
-		handle_error(MALLOC_ERROR, "[ERROR] update_test_info_ptr new error", __FUNCTION__, __LINE__);
+
+	for (unsigned long ss_id = 0; ss_id < sub_stream_num; ss_id++) {
+
+		// 針對 JOIN 的情況設計
+		UINT32 manifest = SubstreamIDToManifest(ss_id);
+		if ((manifest & map_mysession_candidates_iter->second->manifest) == 0) {
+			continue;
+		}
+
+		packetlen = parent_num * sizeof (UINT32)+sizeof(struct update_test_info);
+		update_test_info_ptr = (struct update_test_info *)new char[packetlen];
+		if (!update_test_info_ptr) {
+			handle_error(MALLOC_ERROR, "[ERROR] update_test_info_ptr new error", __FUNCTION__, __LINE__);
+		}
+		memset(update_test_info_ptr, 0, packetlen);
+
+		update_test_info_ptr->header.cmd = CHNK_CMD_PARENT_TEST_INFO;
+		update_test_info_ptr->header.length = (packetlen - sizeof(struct chunk_header_t));	//pkt_buf = payload length
+		update_test_info_ptr->header.rsv_1 = REQUEST;
+		update_test_info_ptr->pid = my_pid;
+		update_test_info_ptr->substream_id = ss_id;
+		update_test_info_ptr->sub_num = sub_stream_num;
+		if (parent_info != NULL) {
+			update_test_info_ptr->choose_parent_pid = parent_info->peerInfo.pid;
+			update_test_info_ptr->test_success_parent_num = parent_num;
+			//update_test_info_ptr->success_parent[0] = parent_info->peerInfo.pid;
+			memcpy(update_test_info_ptr->success_parent, test_success_parent, parent_num*sizeof(UINT32));
+			SetSubstreamState(ss_id, SS_TEST2);
+			ss_table[ss_id]->inTest.inTest_success = TRUE;		// Set to default
+			ss_table[ss_id]->inTest.pkt_count = 0;					// Set to default
+			ss_table[ss_id]->inTest.overdelay_count = 0;					// Set to default
+			ss_table[ss_id]->testing_parent_pid = parent_info->peerInfo.pid;
+			_log_ptr->timerGet(&(ss_table[ss_id]->inTest.timer));
+		}
+		else {
+			update_test_info_ptr->choose_parent_pid = PK_PID;
+			update_test_info_ptr->test_success_parent_num = 0;
+			update_test_info_ptr->success_parent[0] = PK_PID;
+		}
+		ret_val = update_test_info_ptr->test_success_parent_num;
+
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s u s u \n", "my_pid", my_pid, "CHNK_CMD_PARENT_TEST_INFO  parent", update_test_info_ptr->choose_parent_pid, "manifest", SubstreamIDToManifest(ss_id), "num", update_test_info_ptr->test_success_parent_num);
+		_log_ptr->write_log_format("s(u) s u s u s u \n", __FUNCTION__, __LINE__, "CHNK_CMD_PARENT_TEST_INFO  parent", update_test_info_ptr->choose_parent_pid, "ssid", ss_id, "my_session", my_session);
+
+		for (int i = 0; i < update_test_info_ptr->test_success_parent_num; i++) {
+			_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "num", parent_num, "success parent", update_test_info_ptr->success_parent[i]);
+		}
+
+		_net_ptr->set_blocking(_sock);
+		_net_ptr->send(_sock, (char*)update_test_info_ptr, packetlen, 0);
+		_net_ptr->set_nonblocking(_sock);
+
+		delete[] update_test_info_ptr;
+
 	}
-	memset(update_test_info_ptr, 0, packetlen);
-
-	update_test_info_ptr->header.cmd = CHNK_CMD_PARENT_TEST_INFO;
-	update_test_info_ptr->header.length = (packetlen - sizeof(struct chunk_header_t));	//pkt_buf = payload length
-	update_test_info_ptr->header.rsv_1 = REQUEST;
-	update_test_info_ptr->pid = my_pid;
-	update_test_info_ptr->substream_id = manifestToSubstreamID(map_mysession_candidates_iter->second->manifest);
-	update_test_info_ptr->sub_num = sub_stream_num;
-	if (peer_info != NULL) {
-		update_test_info_ptr->choose_parent_pid = peer_info->pid;
-		update_test_info_ptr->test_success_parent_num = parent_num;
-		update_test_info_ptr->success_parent[0] = peer_info->pid;
-	}
-	else {
-		update_test_info_ptr->choose_parent_pid = PK_PID;
-		update_test_info_ptr->test_success_parent_num = 0;
-		update_test_info_ptr->success_parent[0] = PK_PID;
-	}
-	ret_val = update_test_info_ptr->test_success_parent_num;
-
-	_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u u u \n", "pid", my_pid, "PARENT_TEST_INFO session", my_session, update_test_info_ptr->choose_parent_pid, update_test_info_ptr->substream_id);
-	debug_printf("Send parent test to PK, parent %d \n", update_test_info_ptr->choose_parent_pid);
-	_log_ptr->write_log_format("s(u) s u s u s u \n", __FUNCTION__, __LINE__, "Send parent test to PK. parent", update_test_info_ptr->choose_parent_pid, "ssid", update_test_info_ptr->substream_id, "my_session", my_session);
-
-
-	_net_ptr->set_blocking(_sock);
-	_net_ptr->send(_sock, (char*)update_test_info_ptr, packetlen, 0);
-	_net_ptr->set_nonblocking(_sock);
-
-	delete[] update_test_info_ptr;
 
 	return ret_val;
 
@@ -422,7 +457,60 @@ int pk_mgr::SendParentTestToPK(UINT32 my_session)
 	*/
 }
 
-void pk_mgr::quality_source_delay_count(int sock, unsigned long ss_id, unsigned int seq_now)
+void pk_mgr::SendRTTToPK(struct peer_info_t peer_info)
+{
+	INT32 rtt;
+	int packetlen = 0;
+	struct chunk_rtt_response *chunk_rtt_response_ptr = NULL;
+
+	rtt = _log_ptr->diff_TimerGet_ms(&peer_info.time_start, &peer_info.time_end);
+	if (rtt > RTT_CMD_TIMEOUT) {
+		rtt = -1;		// 代表 rtt 計算有誤, 直接告訴 PK 這個 peer 的 rtt 是無效的
+	}
+
+	packetlen = sizeof(struct chunk_rtt_response);
+	chunk_rtt_response_ptr = (struct chunk_rtt_response *)new char[packetlen];
+	if (!chunk_rtt_response_ptr) {
+		handle_error(MALLOC_ERROR, "[ERROR] update_test_info_ptr new error", __FUNCTION__, __LINE__);
+	}
+	memset(chunk_rtt_response_ptr, 0, packetlen);
+
+	chunk_rtt_response_ptr->header.cmd = CHNK_CMD_RTT_TEST_RESPONSE;
+	chunk_rtt_response_ptr->header.length = (packetlen - sizeof(struct chunk_header_t));	//pkt_buf = payload length
+	chunk_rtt_response_ptr->header.rsv_1 = REPLY;
+	chunk_rtt_response_ptr->pid = my_pid;
+	chunk_rtt_response_ptr->targetPid = peer_info.pid;
+	chunk_rtt_response_ptr->rtt = peer_info.rtt;
+	
+	_net_ptr->set_blocking(_sock);
+	_net_ptr->send(_sock, (char*)chunk_rtt_response_ptr, packetlen, 0);
+	_net_ptr->set_nonblocking(_sock);
+
+	_log_ptr->write_log_format("s(u) s d(d) s d \n", __FUNCTION__, __LINE__, "peer_pid", peer_info.pid, peer_info.sock, "rtt", peer_info.rtt);
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s d \n", "my_pid", my_pid, "[RTT] peer", peer_info.pid, "rtt", peer_info.rtt);
+	
+
+	delete[] chunk_rtt_response_ptr;
+}
+
+// Return the source delay of this chunk
+INT32 pk_mgr::GetChunkSourceDelay(struct chunk_t *chunk_ptr)
+{
+	UINT32 time_client;		
+	UINT32 time_server;
+	INT32 source_delay;
+	struct timerStruct timer_temp;
+	_log_ptr->timerGet(&timer_temp);
+
+	time_client = _log_ptr->diff_TimerGet_ms(&syn_table.start_clock, &timer_temp);		// T3-T0
+	time_server = chunk_ptr->header.timestamp - syn_table.client_abs_start_time;			// T2-T1
+	source_delay = time_client - time_server > 0 ? time_client - time_server : 1;
+	//_log_ptr->write_log_format("s(u) s d s d s d s u s u \n", __FUNCTION__, __LINE__, "Set substream id", ss_id,"seq", seq_now, "source delay", source_delay,"T3-T0", time_client, "T2-T1", time_server);
+
+	return source_delay;
+}
+
+void pk_mgr::quality_source_delay_count(int sock, struct chunk_t *chunk_ptr)
 {
 	//_log_ptr->write_log_format("s(u) d d d \n", __FUNCTION__, __LINE__, seq_now, _current_send_sequence_number, syn_table.start_seq);
 	//if skip packet or before sync  we will not calculate
@@ -431,14 +519,16 @@ void pk_mgr::quality_source_delay_count(int sock, unsigned long ss_id, unsigned 
 		UINT32 temp;
 		INT32 source_delay;
 		double delay_quality;
-		
+		UINT32 ss_id = chunk_ptr->header.sequence_number % sub_stream_num;
+
 		_logger_client_ptr->quality_struct_ptr->total_chunk += 1;
 
 		// Calculate source-delay value
 		detect_source_delay_time = _log_ptr->diff_TimerGet_ms(&(syn_table.start_clock), &ss_table[ss_id]->latest_pkt_client_time);
 		temp = ss_table[ss_id]->latest_pkt_timestamp - syn_table.client_abs_start_time;
-		source_delay = detect_source_delay_time - temp;
-		
+		//source_delay = detect_source_delay_time - temp;
+		source_delay = GetChunkSourceDelay(chunk_ptr);
+
 		if (source_delay < 1) {
 			source_delay = 1;
 		}
@@ -457,20 +547,16 @@ void pk_mgr::quality_source_delay_count(int sock, unsigned long ss_id, unsigned 
 			}
 		}
 		_logger_client_ptr->quality_struct_ptr->accumulated_quality += delay_quality;
-		//_log_ptr->write_log_format("s(u) s d s d s d s f s u s u \n", __FUNCTION__, __LINE__, 
-		//												"Set substream id", ss_id,
-		//												"seq =", seq_now, 
-		//												"source delay =", source_delay,
-		//												"delay quality =", delay_quality,
-		//												"T3-T0 =", detect_source_delay_time,
-		//												"T2-T1 =", temp);
+		//_log_ptr->write_log_format("s(u) s d s d s d s f s u s u \n", __FUNCTION__, __LINE__, "ss_id", ss_id, "seq", chunk_ptr->header.sequence_number, "source delay", source_delay, "quality", delay_quality, "T3-T0", detect_source_delay_time, "T2-T1", temp);
 	//}
 }
 
 // Detect each chunk
 // It must check the first sync is exactly done, then call this function
-void pk_mgr::SourceDelayDetection(int sock, unsigned long ss_id, unsigned int seq_now)
+void pk_mgr::SourceDelayDetection(int sock, struct chunk_t *chunk_ptr)
 {
+	UINT32 ss_id = chunk_ptr->header.sequence_number % sub_stream_num;
+	
 	// Filtering
 	if (ss_table.find(ss_id) == ss_table.end()) {
 		handle_error(MACCESS_ERROR, "[ERROR] not found substreamID in delay_table", __FUNCTION__, __LINE__);
@@ -481,10 +567,6 @@ void pk_mgr::SourceDelayDetection(int sock, unsigned long ss_id, unsigned int se
 	}
 	*/
 	
-	ss_table[ss_id]->latest_pkt_seq = seq_now ;
-	
-	UINT32 detect_source_delay_time;
-	UINT32 temp;
 	INT32 source_delay;		// This is source delay time
 	//map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 	//map<int, unsigned long>::iterator map_fd_pid_iter;
@@ -494,60 +576,19 @@ void pk_mgr::SourceDelayDetection(int sock, unsigned long ss_id, unsigned int se
 	unsigned long testingManifest = 0;
 	unsigned long tempManifest = 0;
 	unsigned long peerTestingManifest = 0;
+	UINT32 manifest = SubstreamIDToManifest(ss_id);		// The manifest of this substream ID
 
-	for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = map_pid_parent.begin(); iter != map_pid_parent.end(); iter++) {
-		if (sock == iter->second->peerInfo.sock) {
-			//pid_peerDown_info_iter = iter;
-			parent_info = iter->second;
-		}
-	}
+	parent_info = GetParentFromSock(sock);
 	if (parent_info == NULL) {
-		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[DEBUG] can not find map_pid_parent", sock);
-		handle_error(MACCESS_ERROR, "[ERROR] not found socket in map_pid_parent", __FUNCTION__, __LINE__);
+		_log_ptr->write_log_format("s(u) s d(d) \n", __FUNCTION__, __LINE__, "[DEBUG] Not Found parent sock", sock, ss_id);
+		handle_error(MACCESS_ERROR, "[ERROR] Not Found parent sock", __FUNCTION__, __LINE__);
 		return;
 	}
 
-	/*
-	if (_peer_ptr->map_fd_pid.find(sock) != _peer_ptr->map_fd_pid.end()) {
-		if (map_pid_parent.find(_peer_ptr->map_fd_pid[sock]) == map_pid_parent.end()) {
-			handle_error(MACCESS_ERROR, "[ERROR] not found pid in map_pid_parent", __FUNCTION__, __LINE__);
-		}
-		parent_info = map_pid_parent[_peer_ptr->map_fd_pid[sock]];
-	}
-	else if (_peer_ptr->map_udpfd_pid.find(sock) != _peer_ptr->map_udpfd_pid.end()) {
-		if (map_pid_parent.find(_peer_ptr->map_udpfd_pid[sock]) == map_pid_parent.end()) {
-			handle_error(MACCESS_ERROR, "[ERROR] not found pid in map_pid_parent", __FUNCTION__, __LINE__);
-		}
-		parent_info = map_pid_parent[_peer_ptr->map_udpfd_pid[sock]];
-	}
-	else {
-		handle_error(MACCESS_ERROR, "[ERROR] not found socket in map_fd_pid", __FUNCTION__, __LINE__);
-	}
-	*/
-
-	/*
-	map_fd_pid_iter = _peer_ptr->map_fd_pid.find(sock);
-	if (map_fd_pid_iter == _peer_ptr->map_fd_pid.end()) {
-		handle_error(MACCESS_ERROR, "[ERROR] not found socket in map_fd_pid", __FUNCTION__, __LINE__);
-	}
-
-	pid_peerDown_info_iter = map_pid_parent.find(map_fd_pid_iter->second);
-	if (pid_peerDown_info_iter == map_pid_parent.end()) {
-		handle_error(MACCESS_ERROR, "[ERROR] not found pid in map_pid_parent", __FUNCTION__, __LINE__);
-	}
-	parent_info = pid_peerDown_info_iter->second;
-	*/
-	detect_source_delay_time = _log_ptr->diff_TimerGet_ms(&syn_table.start_clock, &ss_table[ss_id]->latest_pkt_client_time);
-	temp = ss_table[ss_id]->latest_pkt_timestamp - syn_table.client_abs_start_time;
-	source_delay = detect_source_delay_time - temp;
-	ss_table[ss_id]->source_delay_table.source_delay_time = source_delay < 1 ? 1 : source_delay;
+	source_delay = GetChunkSourceDelay(chunk_ptr);
+	//ss_table[ss_id]->source_delay_table.source_delay_time = source_delay;
 	
-	//_log_ptr->write_log_format("s(u) s d s d s d s u s u \n", __FUNCTION__, __LINE__, 
-	//													"Set substream id", ss_id,
-	//													"seq", seq_now, 
-	//													"source delay", source_delay,
-	//													"T3-T0", detect_source_delay_time,
-	//													"T2-T1", temp);
+	//_log_ptr->write_log_format("s(u) s d s d s d s u s u \n", __FUNCTION__, __LINE__, "Set substream id", ss_id,"seq", seq_now, "source delay", source_delay,"T3-T0", detect_source_delay_time, "T2-T1", temp);
 	
 	if (source_delay < 1) {
 		if ((int)totalMod >= syn_round_time) {
@@ -586,13 +627,14 @@ void pk_mgr::SourceDelayDetection(int sock, unsigned long ss_id, unsigned int se
 		
 	}
 	else if (source_delay > MAX_DELAY) {
+
 		ss_table[ss_id]->source_delay_table.delay_beyond_count++;
-		
+
 		//觸發條件(source_delay > MAX_DELAY 的次數上限)
 		int source_delay_max_times = (SOURCE_DELAY_CONTINUOUS*Xcount) / sub_stream_num;		// SOURCE_DELAY_CONTINUOUS*一秒中收到的封包數/sub-stream數目
-		
+
 		// 在觸發 rescue 的前一秒送 blocl_rescue 給相關的 child-peers
-		int threshold = (SOURCE_DELAY_CONTINUOUS - 1) > 0 ? ((SOURCE_DELAY_CONTINUOUS-1)*Xcount) / sub_stream_num : 1;
+		int threshold = (SOURCE_DELAY_CONTINUOUS - 1) > 0 ? ((SOURCE_DELAY_CONTINUOUS - 1)*Xcount) / sub_stream_num : 1;
 		if (ss_table[ss_id]->source_delay_table.delay_beyond_count > threshold && ss_table[ss_id]->can_send_block_rescue == TRUE) {
 			if (ss_table[ss_id]->block_rescue == FALSE) {
 				_peer_mgr_ptr->SendBlockRescue(ss_id, 4);
@@ -602,176 +644,104 @@ void pk_mgr::SourceDelayDetection(int sock, unsigned long ss_id, unsigned int se
 		}
 
 		if (ss_table[ss_id]->source_delay_table.delay_beyond_count > source_delay_max_times) {
-		
-			//ss_table[ss_id]->source_delay_table.delay_beyond_count = 0;
-			
-			// If this substream is from PK, we have no idea to rescue it. Otherwise, find this substream's
-			// parent, and cut the testing substream from it(if have testing substream from it). If cannot find 
-			// testing substream, cut other normal substream
-			if (parent_info->peerInfo.pid == PK_PID) {
-				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s \n", "pid", my_pid, "[RESCUE_TYPE] 4 Parent is PK. Cannot rescue");
-				debug_printf("[RESCUE_TYPE] 4. Parent is PK. Cannot rescue \n");
-				_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[RESCUE_TYPE] 4. Parent is PK. Cannot rescue");
-				// Parent 是 PK 的情況下不重置，避免 Timeout Detection 無法偵測，只重置這次相關的變數
-				//ResetDetection(ss_id);
-				ss_table[ss_id]->source_delay_table.delay_beyond_count = 0;
-			}
-			else {
-				if (ss_table[ss_id]->block_rescue == FALSE) {
-					if (ss_table[ss_id]->state.state == SS_STABLE2) {
-						if (ss_table[ss_id]->state.rescue_after_fail == true) {
-							// RESCUE or MERGE
-							UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-							unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
-							unsigned long parent_old_manifest = parent_info->peerInfo.manifest;
-							unsigned long pk_new_manifest = pk_old_manifest | manifest;
-							unsigned long parent_new_manifest = parent_old_manifest & ~manifest;
-							bool need_source = true;
 
-							SetSubstreamState(ss_id, SS_RESCUE2);
-							debug_printf("[RESCUE_TYPE] 4. Source delay %d > %d \n", source_delay, MAX_DELAY);
-
-							// Log the messages
-							_logger_client_ptr->log_to_server(LOG_DELAY_RESCUE_TRIGGER, SubstreamIDToManifest(ss_id));
-							_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d s d \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 4 ", ss_table[ss_id]->source_delay_table.delay_beyond_count,
-								">", source_delay_max_times);
-							_log_ptr->write_log_format("s(u) s u s u s d s d \n", __FUNCTION__, __LINE__,
-								"[RESCUE_TYPE] 4. Rescue in STABLE state. substreamID =", ss_id,
-								"parentID=", parent_info->peerInfo.pid,
-								"delay_beyond_count", ss_table[ss_id]->source_delay_table.delay_beyond_count,
-								">", source_delay_max_times);
-
-							ss_table[ss_id]->data.previousParentPID = parent_info->peerInfo.pid;
-							ss_table[ss_id]->state.is_testing = false;
-
-							// Update manifest
-							set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
-							set_parent_manifest(parent_info, parent_new_manifest);
-							SetSubstreamParent(manifest, PK_PID);
-							_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, parent_new_manifest, TOTAL_OP);
-							if (parent_info->peerInfo.manifest == 0) {
-								_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[REASON] manifest = 0 parent", parent_info->peerInfo.pid);
-								_peer_ptr->CloseParent(parent_info->peerInfo.pid, false, "[REASON] manifest = 0");
-								_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[CHECK POINT] map_pid_parent.size()", map_pid_parent.size());
-							}
-
-							//send_parentToPK(manifest, PK_PID+1);
-							NeedSourceDecision(&need_source);
-							//send_rescueManifestToPK(pk_new_manifest, need_source);
-							send_rescueManifestToPK(manifest, need_source);
-							ss_table[ss_id]->state.dup_src = need_source;
-
-							// Reset source delay parameters of testing substream of this parent
-							ResetDetection(ss_id);
-						}
-						else {
-							// MOVE
-							UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-							
-							SetSubstreamState(ss_id, SS_STABLE2);
-							debug_printf("[RESCUE_TYPE] 4M. Source delay %d > %d \n", source_delay, MAX_DELAY);
-
-							// Log the messages
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d s d \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 4M.", ss_table[ss_id]->source_delay_table.delay_beyond_count,
-								">", source_delay_max_times);
-							_log_ptr->write_log_format("s(u) s u s u s d s d \n", __FUNCTION__, __LINE__,
-								"[RESCUE_TYPE] 4M. Rescue in STABLE state. substreamID =", ss_id,
-								"parentID=", parent_info->peerInfo.pid,
-								"delay_beyond_count", ss_table[ss_id]->source_delay_table.delay_beyond_count,
-								">", source_delay_max_times);
-							ss_table[ss_id]->state.rescue_after_fail = true;
-						}
-					}
-					else if (ss_table[ss_id]->state.state == SS_CONNECTING2) {
-						// No more trigger rescue again
-						debug_printf("Should not happen \n");
-					}
-					else if (ss_table[ss_id]->state.state == SS_RESCUE2) {
-						// No more trigger rescue again
-						debug_printf("Should not happen \n");
-					}
-					else if (ss_table[ss_id]->state.state == SS_TEST2) {
-						if (ss_table[ss_id]->state.rescue_after_fail == true) {
-							// RESCUE or MERGE
-							UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-							unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
-							unsigned long parent_old_manifest = parent_info->peerInfo.manifest;
-							unsigned long pk_new_manifest = pk_old_manifest | manifest;
-							unsigned long parent_new_manifest = parent_old_manifest & ~manifest;
-							bool need_source = true;
-
-							SetSubstreamState(ss_id, SS_RESCUE2);
-							debug_printf("[RESCUE_TYPE] 4. Source delay %d > %d \n", source_delay, MAX_DELAY);
-
-							// Log the messages
-							_logger_client_ptr->log_to_server(LOG_TEST_DETECTION_FAIL, SubstreamIDToManifest(ss_id), PK_PID);
-							_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d s d \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 4 ", ss_table[ss_id]->source_delay_table.delay_beyond_count,
-								">", source_delay_max_times);
-							_log_ptr->write_log_format("s(u) s u s u s d s d \n", __FUNCTION__, __LINE__,
-								"[RESCUE_TYPE] 4. Rescue in TEST state. substreamID =", ss_id,
-								"parent =", parent_info->peerInfo.pid,
-								"delay_beyond_count", ss_table[ss_id]->source_delay_table.delay_beyond_count,
-								">", source_delay_max_times);
-
-							ss_table[ss_id]->state.is_testing = false;
-
-							// Update manifest
-							set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
-							set_parent_manifest(parent_info, parent_new_manifest);
-							SetSubstreamParent(manifest, PK_PID);
-							_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, parent_new_manifest, TOTAL_OP);
-							if (parent_info->peerInfo.manifest == 0) {
-								_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[REASON] manifest = 0 parent", parent_info->peerInfo.pid);
-								_peer_ptr->CloseParent(parent_info->peerInfo.pid, false, "[REASON] manifest = 0");
-								_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[CHECK POINT] map_pid_parent.size()", map_pid_parent.size());
-							}
-
-							//send_parentToPK(manifest, PK_PID+1);
-							NeedSourceDecision(&need_source);
-							//send_rescueManifestToPK(pk_new_manifest, need_source);
-							send_rescueManifestToPK(manifest, need_source);
-							ss_table[ss_id]->state.dup_src = need_source;
-
-							// Reset source delay parameters of testing substream of this parent
-							ResetDetection(ss_id);
-						}
-						else {
-							// MOVE
-							UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-
-							SetSubstreamState(ss_id, SS_TEST2);
-							debug_printf("[RESCUE_TYPE] 4M. Source delay %d > %d \n", source_delay, MAX_DELAY);
-
-							// Log the messages
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d s d \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 4M.", ss_table[ss_id]->source_delay_table.delay_beyond_count,
-								">", source_delay_max_times);
-							_log_ptr->write_log_format("s(u) s u s u s d s d \n", __FUNCTION__, __LINE__,
-								"[RESCUE_TYPE] 4M. Rescue in TEST state. substreamID =", ss_id,
-								"parent =", parent_info->peerInfo.pid,
-								"delay_beyond_count", ss_table[ss_id]->source_delay_table.delay_beyond_count,
-								">", source_delay_max_times);
-							ss_table[ss_id]->state.rescue_after_fail = true;
-						}
+			if (ss_table[ss_id]->block_rescue == FALSE) {
+				if (ss_table[ss_id]->state.state == SS_STABLE2) {
+					if (parent_info->peerInfo.pid == PK_PID) {
+						// 單純是 peer 的下載頻寬不夠
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s \n", "my_pid", my_pid, "[RESCUE_TYPE] 4 Parent is PK. Cannot rescue");
+						debug_printf("[RESCUE_TYPE] 4. Parent is PK. Cannot rescue \n");
+						_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[RESCUE_TYPE] 4. Parent is PK. Cannot rescue");
+						// Parent 是 PK 的情況下不重置，避免 Timeout Detection 無法偵測，只重置這次相關的變數
+						//ResetDetection(ss_id);
+						ss_table[ss_id]->source_delay_table.delay_beyond_count = 0;
 					}
 					else {
-						// Unexpected state
+						unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
+						unsigned long parent_old_manifest = parent_info->peerInfo.manifest;
+						unsigned long pk_new_manifest = pk_old_manifest | manifest;
+						unsigned long parent_new_manifest = parent_old_manifest & ~manifest;
+						bool need_source = true;
+
+						SetSubstreamState(ss_id, SS_RESCUE2);
+						debug_printf("[RESCUE_TYPE] 4. Source delay %d > %d \n", source_delay, MAX_DELAY);
+
+						// Log the messages
+						//_logger_client_ptr->log_to_server(LOG_DELAY_RESCUE_TRIGGER, SubstreamIDToManifest(ss_id));
+						//_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d d s d \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 4 parent", parent_info->peerInfo.pid, ss_table[ss_id]->source_delay_table.delay_beyond_count, ">", source_delay_max_times);
+						_log_ptr->write_log_format("s(u) s u(u) s u s d s d \n", __FUNCTION__, __LINE__,
+							"[RESCUE_TYPE] 4. my_pid", my_pid, manifest,
+							"parent", parent_info->peerInfo.pid,
+							"delay_beyond_count", ss_table[ss_id]->source_delay_table.delay_beyond_count,
+							">", source_delay_max_times);
+
+						
+						//ss_table[ss_id]->state.is_testing = false;
+
+						// Update manifest
+						SetParentManifest(pkDownInfoPtr, pk_new_manifest);
+						SetParentManifest(parent_info, parent_new_manifest);
+						ss_table[ss_id]->previous_parent_pid = parent_info->peerInfo.pid;
+						SetSubstreamParent(manifest, PK_PID);
+						_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, manifest, MINUS_OP);
+						if (parent_info->peerInfo.manifest == 0) {
+							_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[REASON] manifest = 0 parent", parent_info->peerInfo.pid);
+							_peer_ptr->CloseParent(parent_info->peerInfo.pid, parent_info->peerInfo.sock, false, "[REASON] manifest = 0");
+						}
+
+						//send_parentToPK(manifest, PK_PID+1);
+						NeedSourceDecision(&need_source);
+						//send_rescueManifestToPK(pk_new_manifest, need_source);
+						send_rescueManifestToPK(manifest, need_source);
+						ss_table[ss_id]->state.dup_src = need_source;
+
+						// Reset source delay parameters of testing substream of this parent
+						ResetDetection(ss_id);
 					}
 				}
-				else {
-					UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-					debug_printf("Block Rescue [RESCUE_TYPE] 4. Source delay %d > %d \n", source_delay, MAX_DELAY);
-					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d s d \n", "pid", my_pid, manifest, "Block Rescue [RESCUE_TYPE] 4 ", ss_table[ss_id]->source_delay_table.delay_beyond_count,
-						">", source_delay_max_times);
-					_log_ptr->write_log_format("s(u) s u s u s d s d \n", __FUNCTION__, __LINE__,
-						"Block Rescue [RESCUE_TYPE] 4. Rescue in TEST state. substreamID =", ss_id,
-						"parent =", parent_info->peerInfo.pid,
-						"delay_beyond_count", ss_table[ss_id]->source_delay_table.delay_beyond_count,
-						">", source_delay_max_times);
-					ResetDetection(ss_id);
-					ss_table[ss_id]->state.rescue_after_fail = true;
+				else if (ss_table[ss_id]->state.state == SS_CONNECTING2) {
+					// 不在此狀態處發 RESCUE
+					_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "ss_id", ss_id, "rescue triggerred");
 				}
+				else if (ss_table[ss_id]->state.state == SS_RESCUE2) {
+					// 不在此狀態處發 RESCUE
+					_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "ss_id", ss_id, "rescue triggerred");
+				}
+				else if (ss_table[ss_id]->state.state == SS_TEST2) {
+					// 在 SS_TEST 狀態下不觸發 RESCUE，只記錄測試失敗的 flag
+
+					if (ss_table[ss_id]->inTest.inTest_success == TRUE) {
+						// 只偵測一次，避免連續處發 RESCUE
+						ss_table[ss_id]->inTest.inTest_success = FALSE;
+
+						// Log the messages
+						/*
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d d s d \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 4 parent", parent_info->peerInfo.pid, ss_table[ss_id]->source_delay_table.delay_beyond_count, ">", source_delay_max_times);
+						_log_ptr->write_log_format("s(u) s u(u) s u s d s d \n", __FUNCTION__, __LINE__,
+							"[RESCUE_TYPE] 4. my_pid", my_pid, manifest,
+							"parent", parent_info->peerInfo.pid,
+							"delay_beyond_count", ss_table[ss_id]->source_delay_table.delay_beyond_count,
+							">", source_delay_max_times);
+						*/
+					}
+				}
+
+			}
+			else {
+				// 因為不是頭，不觸發 RESCUE
+				//UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
+				//debug_printf("Block Rescue [RESCUE_TYPE] 4. Source delay %d > %d \n", source_delay, MAX_DELAY);
+				
+				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d d s d \n", "my_pid", my_pid, manifest, "Block Rescue [RESCUE_TYPE] 4 parent", parent_info->peerInfo.pid, ss_table[ss_id]->source_delay_table.delay_beyond_count, ">", source_delay_max_times);
+				_log_ptr->write_log_format("s(u) s u(u) s u s d s d \n", __FUNCTION__, __LINE__,
+					"Block Rescue [RESCUE_TYPE] 4. my_pid", my_pid, manifest,
+					"parent", parent_info->peerInfo.pid,
+					"delay_beyond_count", ss_table[ss_id]->source_delay_table.delay_beyond_count,
+					">", source_delay_max_times);
+
+				ResetDetection(ss_id);
+				ss_table[ss_id]->state.rescue_after_fail = true;		// 回到預設值
 			}
 		}
 	}
@@ -779,6 +749,152 @@ void pk_mgr::SourceDelayDetection(int sock, unsigned long ss_id, unsigned int se
 		//_logger_client_ptr->set_source_delay(sub_id,source_delay);
 		ss_table[ss_id]->source_delay_table.delay_beyond_count = 0;
 	}
+}
+
+void pk_mgr::SourceDelayDetectionForTesting(int sock, struct chunk_t *chunk_ptr)
+{
+	UINT32 ss_id = chunk_ptr->header.sequence_number % sub_stream_num;
+	
+	if (GetChunkSourceDelay(chunk_ptr) > MAX_DELAY) {
+		ss_table[ss_id]->inTest.overdelay_count++;
+	}
+}
+
+void pk_mgr::PacketLostDetection(int sock, struct chunk_t *chunk_ptr)
+{
+	UINT32 ss_id = chunk_ptr->header.sequence_number % sub_stream_num;
+	UINT32 seq = chunk_ptr->header.sequence_number;
+	UINT32 manifest = SubstreamIDToManifest(ss_id);
+	struct peer_connect_down_t *parent_info = NULL;
+
+	parent_info = GetParentFromSock(sock);
+	if (parent_info == NULL) {
+		_log_ptr->write_log_format("s(u) s d(d) \n", __FUNCTION__, __LINE__, "[DEBUG] Not Found parent sock", sock, ss_id);
+		//handle_error(MACCESS_ERROR, "[ERROR] Not Found parent sock", __FUNCTION__, __LINE__);
+		return;
+	}
+
+	if (seq < ss_table[ss_id]->latest_pkt_seq) {
+		_log_ptr->write_log_format("s(u) s u s u s u s u \n", __FUNCTION__, __LINE__, "sock", sock, "ss_id", ss_id, "seq", seq, "latest_seq", ss_table[ss_id]->latest_pkt_seq);
+		return ;
+	}
+	
+	if (seq != ss_table[ss_id]->latest_pkt_seq + sub_stream_num) {
+		ss_table[ss_id]->lost_packet_count += ((seq - ss_table[ss_id]->latest_pkt_seq) / sub_stream_num) - 1;		// 中間漏幾個封包就加幾次
+		_log_ptr->write_log_format("s(u) s d s d s d u u \n", __FUNCTION__, __LINE__, "ss_id", ss_id, "parent", parent_info->peerInfo.pid, "packet lost count", ss_table[ss_id]->lost_packet_count, seq, ss_table[ss_id]->latest_pkt_seq);
+
+		//觸發條件(source_delay > MAX_DELAY 的次數上限)
+		int packet_lost_max_times = (CHUNK_LOSE*Xcount) / sub_stream_num;		// CHUNK_LOSE*一秒中收到的封包數/sub-stream數目
+
+		// 在觸發 rescue 的前一秒送 blocl_rescue 給相關的 child-peers
+		int threshold = (CHUNK_LOSE - 1) > 0 ? ((CHUNK_LOSE - 1)*Xcount) / sub_stream_num : 1;
+		if (ss_table[ss_id]->source_delay_table.delay_beyond_count > threshold && ss_table[ss_id]->can_send_block_rescue == TRUE) {
+			if (ss_table[ss_id]->block_rescue == FALSE) {
+				_peer_mgr_ptr->SendBlockRescue(ss_id, 4);
+				_log_ptr->timerGet(&ss_table[ss_id]->block_rescue_interval);
+				ss_table[ss_id]->can_send_block_rescue = FALSE;
+			}
+		}
+
+		if (ss_table[ss_id]->lost_packet_count > packet_lost_max_times) {
+
+			if (ss_table[ss_id]->block_rescue == FALSE) {
+				if (ss_table[ss_id]->state.state == SS_STABLE2) {
+					if (parent_info->peerInfo.pid == PK_PID) {
+						
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 1. packet lost parent", parent_info->peerInfo.pid);
+						debug_printf("[RESCUE_TYPE] 1. packet lost  Parent is PK \n");
+						_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+							"[RESCUE_TYPE] 1. my_pid", my_pid, manifest,
+							"parent", parent_info->peerInfo.pid);
+						// Parent 是 PK 的情況下不重置，避免 Timeout Detection 無法偵測，只重置這次相關的變數
+						//ResetDetection(ss_id);
+						ss_table[ss_id]->source_delay_table.delay_beyond_count = 0;
+					}
+					else {
+						unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
+						unsigned long parent_old_manifest = parent_info->peerInfo.manifest;
+						unsigned long pk_new_manifest = pk_old_manifest | manifest;
+						unsigned long parent_new_manifest = parent_old_manifest & ~manifest;
+						bool need_source = true;
+
+						SetSubstreamState(ss_id, SS_RESCUE2);
+						
+						// Log the messages
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 1. packet lost parent", parent_info->peerInfo.pid);
+						_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+							"[RESCUE_TYPE] 1. my_pid", my_pid, manifest,
+							"parent", parent_info->peerInfo.pid);
+
+						//ss_table[ss_id]->state.is_testing = false;
+
+						// Update manifest
+						SetParentManifest(pkDownInfoPtr, pk_new_manifest);
+						SetParentManifest(parent_info, parent_new_manifest);
+						ss_table[ss_id]->previous_parent_pid = parent_info->peerInfo.pid;
+						SetSubstreamParent(manifest, PK_PID);
+						_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, manifest, MINUS_OP);
+						if (parent_info->peerInfo.manifest == 0) {
+							_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[REASON] manifest = 0 parent", parent_info->peerInfo.pid);
+							_peer_ptr->CloseParent(parent_info->peerInfo.pid, parent_info->peerInfo.sock, false, "[REASON] manifest = 0");
+						}
+
+						//send_parentToPK(manifest, PK_PID+1);
+						NeedSourceDecision(&need_source);
+						//send_rescueManifestToPK(pk_new_manifest, need_source);
+						send_rescueManifestToPK(manifest, need_source);
+						ss_table[ss_id]->state.dup_src = need_source;
+
+						// Reset source delay parameters of testing substream of this parent
+						ResetDetection(ss_id);
+					}
+				}
+				else if (ss_table[ss_id]->state.state == SS_CONNECTING2) {
+					// 不在此狀態處發 RESCUE
+					_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "ss_id", ss_id, "rescue triggerred");
+				}
+				else if (ss_table[ss_id]->state.state == SS_RESCUE2) {
+					// 不在此狀態處發 RESCUE
+					_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "ss_id", ss_id, "rescue triggerred");
+				}
+				else if (ss_table[ss_id]->state.state == SS_TEST2) {
+					// 在 SS_TEST 狀態下不觸發 RESCUE，只記錄測試失敗的 flag
+
+					if (ss_table[ss_id]->inTest.inTest_success == TRUE) {
+						// 只偵測一次，避免連續處發 RESCUE
+						ss_table[ss_id]->inTest.inTest_success = FALSE;
+
+						// Log the messages
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 1. packet lost parent", parent_info->peerInfo.pid);
+						_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+							"[RESCUE_TYPE] 1. my_pid", my_pid, manifest,
+							"parent", parent_info->peerInfo.pid);
+
+					}
+				}
+			}
+			else {
+				// 因為不是頭，不觸發 RESCUE
+				//UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
+				//debug_printf("Block Rescue [RESCUE_TYPE] 4. Source delay %d > %d \n", source_delay, MAX_DELAY);
+
+				// Log the messages
+				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", my_pid, manifest, "Block Rescue [RESCUE_TYPE] 1. packet lost parent", parent_info->peerInfo.pid);
+				_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+					"Block Rescue [RESCUE_TYPE] 1. my_pid", my_pid, manifest,
+					"parent", parent_info->peerInfo.pid);
+
+				ResetDetection(ss_id);
+				ss_table[ss_id]->state.rescue_after_fail = true;		// 回到預設值
+			}
+		}
+	}
+	else {
+		if (ss_table[ss_id]->lost_packet_count > 0) {
+			//ss_table[ss_id]->lost_packet_count--;
+		}
+	}
+	ss_table[ss_id]->latest_pkt_seq = seq;
 }
 
 // 以下情況會送 Capacity
@@ -803,7 +919,7 @@ void pk_mgr::SendCapacityToPK(void)
 	chunk_capacity_ptr->rescue_num = rescueNumAccumulate();
 	chunk_capacity_ptr->content_integrity = 1;
 
-	_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u u  \n", "pid", my_pid, "capacity", chunk_capacity_ptr->rescue_num, map_pid_child.size());
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u u  \n", "my_pid", my_pid, "capacity", chunk_capacity_ptr->rescue_num, map_pid_child.size());
 	_log_ptr->write_log_format("s(u) s u u \n", __FUNCTION__, __LINE__, "Send capacity to PK", chunk_capacity_ptr->rescue_num, map_pid_child.size());
 	debug_printf("Send capacity to PK %d %d \n", chunk_capacity_ptr->rescue_num, children_table.size());
 
@@ -1188,7 +1304,7 @@ int pk_mgr::handle_pkt_in(int sock)
 	//ligh |  pid |  level |   bit_rate|   sub_stream_num |  public_ip |  inside_lane_rescue_num | n*struct level_info_t
 	//這邊應該包含整條lane 的peer_info 包含自己
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_REG) {
-		debug_printf("===================CHNK_CMD_PEER_REG=================\n");
+		debug_printf("===== CHNK_CMD_PEER_REG ===== \n");
 		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_PEER_REG");
 
 		unsigned long level_msg_size;
@@ -1263,7 +1379,7 @@ int pk_mgr::handle_pkt_in(int sock)
 
 
 		// Set PK's manifest
-		chunk_register_reply->is_seed == 1 ? set_parent_manifest(pkDownInfoPtr, full_manifest) : set_parent_manifest(pkDownInfoPtr, 0);
+		chunk_register_reply->is_seed == 1 ? SetParentManifest(pkDownInfoPtr, full_manifest) : SetParentManifest(pkDownInfoPtr, 0);
 		
 		_logger_client_ptr->set_self_ip_port(my_public_ip, my_public_port, my_private_ip, my_private_port);
 		_logger_client_ptr->set_self_pid_channel(my_pid, _channel_id);
@@ -1384,12 +1500,12 @@ int pk_mgr::handle_pkt_in(int sock)
 		if (level_msg_ptr) {
 			delete level_msg_ptr;
 		}
-		debug_printf("===================CHNK_CMD_PEER_REG DONE=================\n");
+		debug_printf("===== CHNK_CMD_PEER_REG DONE ===== \n");
 		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_PEER_REG DONE");
 	}
 	else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SYN) {
 		// measure start delay
-		debug_printf("===================CHNK_CMD_PEER_SYN=================\n");
+		debug_printf("===== CHNK_CMD_PEER_SYN ===== \n");
 		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_PEER_SYN");
 		
 		
@@ -1410,8 +1526,7 @@ int pk_mgr::handle_pkt_in(int sock)
 	}
 	// light | pid | level   | n*struct rescue_peer_info
 	else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_RESCUE_LIST) {
-		debug_printf("===================CHNK_CMD_PEER_RESCUE_LIST=================\n");
-		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_PEER_RESCUE_LIST");
+		debug_printf("===== CHNK_CMD_PEER_RESCUE_LIST ===== \n");
 
 		struct chunk_rescue_list *chunk_rescue_list_ptr = NULL;
 		int lane_member = 0;
@@ -1453,6 +1568,8 @@ int pk_mgr::handle_pkt_in(int sock)
 		else {
 			handle_error(UNKNOWN, "[ERROR] peer-list type error", __FUNCTION__, __LINE__);
 		}
+
+		_log_ptr->write_log_format("s(u) s s d s d s d \n", __FUNCTION__, __LINE__, "CHNK_CMD_PEER_RESCUE_LIST", "ss_id", ss_id, "my_session", my_session, "num", lane_member);
 
 		for (int i = 0; i < lane_member; i++) {
 			level_msg_ptr->level_info[i] = new struct level_info_t;
@@ -1539,89 +1656,15 @@ int pk_mgr::handle_pkt_in(int sock)
 		return RET_OK;
 	}
 	else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SEED) {
-		debug_printf("===================CHNK_CMD_PEER_SEED=================\n");
+		debug_printf("===== CHNK_CMD_PEER_SEED ===== \n");
 		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_PEER_SEED");
-	
-		struct seed_notify *chunk_seed_notify = (struct seed_notify *)chunk_ptr;
-		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "chunk manifest", chunk_seed_notify->manifest);
-
-		// 將 PK 送來的 manifest 分成 substream 為單位處理
-		for (unsigned int ss_id = 0; ss_id < sub_stream_num; ss_id++) {
-			UINT32 manifest = SubstreamIDToManifest(ss_id) & chunk_seed_notify->manifest;
-			
-			// Peer 向 PK 發 rescue，一定會讓 substream 進入 SS_RESCUE 狀態，非此狀態的 substream 就不受此次 SEED CMD 影響 
-			// 但還需考慮因為 parent 離開系統而收到的 SEED CMD
-			if (ss_table[ss_id]->state.state != SS_RESCUE2) {
-				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "Skip manifest", manifest);
-				continue;
-			}
-			
-			unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
-			unsigned long pk_new_manifest = pk_old_manifest | manifest;
-
-			_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "received manifest =", manifest);
-
-			// If all substreams are not in INIT state, send log message
-			if (sentStartDelay == true && pk_old_manifest != pk_new_manifest) {
-				_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, pk_new_manifest, PK_PID);
-			}
-
-			//Maybe clear previous parent info from map_pid_parent and close socket
-			// Update manifest, and clear parent socket if manifest = 0
-			set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
-			SetSubstreamParent(manifest, PK_PID);
-
-			ss_table[ss_id]->state.is_testing = false;
-			SetSubstreamState(ss_id, SS_STABLE2);
-			
-			/*
-			for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = map_pid_parent.begin(); iter != map_pid_parent.end(); iter++) {
-				struct peer_connect_down_t *parent_info = iter->second;
-				unsigned long parent_old_manifest = parent_info->peerInfo.manifest;
-				unsigned long parent_new_manifest = parent_old_manifest & ~manifest;
-
-				_log_ptr->write_log_format("s(u) s d (d) \n", __FUNCTION__, __LINE__, "[CHECK POINT] size() =", map_pid_parent.size(), iter->first);
-					
-				if (parent_info->peerInfo.pid != PK_PID) {
-					set_parent_manifest(parent_info, parent_new_manifest);
-
-					if (parent_info->peerInfo.connection_state == PEER_CONNECTED_PARENT) {
-						_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, parent_new_manifest, TOTAL_OP);
-					}
-						
-					if (parent_info->peerInfo.manifest == 0) {
-						// Take care the condition if the first element we want to delete
-						_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "close at add seed. pid =", iter->first);
-						//_peer_ptr->data_close(_peer_ptr->map_in_pid_fd[parent_info->peerInfo.pid], "close at add seed", CLOSE_PARENT);
-						_peer_ptr->CloseParent(parent_info->peerInfo.pid, false, "close at add seed");
-							
-						_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[CHECK POINT] size() =", map_pid_parent.size());
-
-						//delete iter->second;
-						//map_pid_parent.erase(iter);
-							
-						iter = map_pid_parent.begin();
-						if (iter == map_pid_parent.end()) {
-							break;
-						}
-					}
-				}
-			}
-			*/
-
-			// Reset substream state
-			struct timerStruct timer;
-			_log_ptr->timerGet(&timer);
-			memcpy(&(ss_table[ss_id]->parent_changed_time), &timer, sizeof(timer));
-			
-		}
-
+		HandleCMDSeed((struct seed_notify *)chunk_ptr);
 	}
 	// for each stream this protocol (only use to  decode to flv )  or (other protocol need some header)  
 	// light | streamID_1 (int) | stream_header_1 len (unsigned int) | protocol_1 header | streamID_2 ...... 
 	// This CMD only happen in "join" condition or "parent-peer of a peer unnormally terminate connection" condition
 	else if (chunk_ptr->header.cmd == CHNK_CMD_CHN_UPDATE_DATA) {		
-		debug_printf("===================CHNK_CMD_CHN_UPDATE_DATA=================\n");
+		debug_printf("===== CHNK_CMD_CHN_UPDATE_DATA ===== \n");
 		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_CHN_UPDATE_DATA");
 		
 		int *streamID_ptr = NULL;
@@ -1678,10 +1721,10 @@ int pk_mgr::handle_pkt_in(int sock)
 		#endif
 		
 		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "stream_number =", stream_number);
-		debug_printf("\n===================CHNK_CMD_CHN_UPDATE_DATA done=================\n");
+		debug_printf("===== CHNK_CMD_CHN_UPDATE_DATA done ===== \n");
 	}
 	else if (chunk_ptr->header.cmd == CHNK_CMD_PARENT_PEER){
-		debug_printf("===================CHNK_CMD_PARENT_PEER=================\n");
+		debug_printf("===== CHNK_CMD_PARENT_PEER ===== \n");
 		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_PARENT_PEER");
 		
 		int list_number = 0;
@@ -1731,6 +1774,8 @@ int pk_mgr::handle_pkt_in(int sock)
 			new_peer->manifest = child_info_ptr->manifest;
 			new_peer->peercomm_session = peercomm_session;
 			new_peer->priority = my_session;
+
+			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s(u) s u s u \n", "my_pid", my_pid, "CHNK_CMD_PARENT_PEER", __LINE__, "peer", new_peer->pid, "manifest", new_peer->manifest);
 		}
 
 		if((list_number == 0) || (list_number >1)){
@@ -1773,6 +1818,7 @@ int pk_mgr::handle_pkt_in(int sock)
 				"manifest", level_msg_ptr->manifest,
 				"list_number", lane_member);
 			_peer_mgr_ptr->_peer_communication_ptr->set_candidates_handler(level_msg_ptr, list_number, PARENT_PEER, my_session, peercomm_session);
+			//_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u u \n", "pid", my_pid, "CHNK_CMD_PARENT_PEER", child_info_ptr->pid, ss_id);
 
 			my_session++;
 		}
@@ -1790,15 +1836,24 @@ int pk_mgr::handle_pkt_in(int sock)
 			delete level_msg_ptr;
 		}
 	}
+	else if (chunk_ptr->header.cmd == CHNK_CMD_RTT_TEST_REQUEST) {
+		debug_printf("===== CHNK_CMD_RTT_TEST_REQUEST ===== \n");
+		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_RTT_TEST_REQUEST");
+
+		int peer_num = 0;
+		peer_num = (buf_len - sizeof(struct chunk_header_t) - 1 * sizeof(UINT32)) / sizeof(struct level_info_t);
+
+		HandleCMDRTT((chunk_rtt_request *)chunk_ptr, peer_num);
+	}
 	else if (chunk_ptr->header.cmd == CHNK_CMD_KICK_PEER) {
-		debug_printf("===================CHNK_CMD_KICK_PEER=================\n");
+		debug_printf("===== CHNK_CMD_KICK_PEER ===== \n");
 		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_KICK_PEER");
 		
 		handle_kickout(chunk_ptr, sock);
 	}
 	else {
-		debug_printf("===================CHNK_CMD_ERROR=================\n");
-		handle_error(UNKNOWN, "[ERROR] Receive unknown header command", __FUNCTION__, __LINE__);
+		debug_printf("sock %d chunk_ptr->header.cmd = %d  len = %d \n", sock, chunk_ptr->header.cmd, chunk_ptr->header.length);
+		handle_error(UNKNOWN, "[ERROR] Unknown header.cmd", __FUNCTION__, __LINE__);
 	}
 
 	if (chunk_ptr) {
@@ -1972,34 +2027,14 @@ void pk_mgr::HandleStream(struct chunk_t *chunk_ptr, int sockfd)
 
 		first_timestamp = chunk_ptr->header.timestamp;
 		_log_ptr->timerGet(&start);
-		/*
-		// Record input bandwidth
-		if (_logger_client_ptr->log_bw_in_init_flag == 1) {
-		_logger_client_ptr->set_in_bw(chunk_ptr->header.timestamp, chunk_ptr->header.length);
-		}
-		else {
-		_logger_client_ptr->log_bw_in_init_flag = 1;
-		_logger_client_ptr->bw_in_struct_init(chunk_ptr->header.timestamp, chunk_ptr->header.length);
-		}
-
-
-		if (_current_send_sequence_number == 0) {
-		_current_send_sequence_number = chunk_ptr->header.sequence_number;
-		}
-
-		// Record the timestamp of the first received packet
-		if (first_timestamp == 0) {
-		first_timestamp = chunk_ptr->header.timestamp;
-		_log_ptr->timerGet(&start);
-		}
-		*/
+		_log_ptr->timerGet(&child_queue_timer);
+		
 		first_legal_pkt_received = true;
 	}
 
 	if (_least_sequence_number < chunk_ptr->header.sequence_number) {
 		_least_sequence_number = chunk_ptr->header.sequence_number;
 	}
-
 
 	// Record input bandwidth
 	_logger_client_ptr->set_in_bw(chunk_ptr->header.timestamp, chunk_ptr->header.length);
@@ -2016,51 +2051,15 @@ void pk_mgr::HandleStream(struct chunk_t *chunk_ptr, int sockfd)
 	}
 
 	// Get parentPid and parentInfo of this chunk
-	for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = map_pid_parent.begin(); iter != map_pid_parent.end(); iter++) {
-		if (sockfd == iter->second->peerInfo.sock) {
-			//pid_peerDown_info_iter = iter;
-			parent_info = iter->second;
-			parent_pid = iter->second->peerInfo.pid;
-		}
-	}
+	parent_info = GetParentFromSock(sockfd);
 	if (parent_info == NULL) {
 		// UDP 的話可能會因為已經中斷連線卻收封包，因此忽略
-		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[DEBUG] can not find map_pid_parent", sockfd);
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[DEBUG] Not Found parent sock", sockfd);
 		delete[](unsigned char*)chunk_ptr;
 		return;
 	}
-
-	/*
-	if (_peer_ptr->map_fd_pid.find(sockfd) != _peer_ptr->map_fd_pid.end()) {
-	parent_pid = _peer_ptr->map_fd_pid[sockfd];				// Get parent-pid of this chunk
-	pid_peerDown_info_iter = map_pid_parent.find(parent_pid);
-	if (pid_peerDown_info_iter == map_pid_parent.end()) {
-	// UDP 的話可能會因為已經中斷連線卻收封包，因此忽略
-	//handle_error(MACCESS_ERROR, "[ERROR] can not find map_pid_parent", __FUNCTION__, __LINE__);
-	_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[DEBUG] [ERROR] can not find map_pid_parent");
-	delete[](unsigned char*)chunk_ptr;
-	return;
-	}
-	parent_info = pid_peerDown_info_iter->second;		// Get parent-info of this chunk
-	}
-	else if (_peer_ptr->map_udpfd_pid.find(sockfd) != _peer_ptr->map_udpfd_pid.end()) {
-	parent_pid = _peer_ptr->map_udpfd_pid[sockfd];				// Get parent-pid of this chunk
-	pid_peerDown_info_iter = map_pid_parent.find(parent_pid);
-	if (pid_peerDown_info_iter == map_pid_parent.end()) {
-	// UDP 的話可能會因為已經中斷連線卻收封包，因此忽略
-	//handle_error(MACCESS_ERROR, "[ERROR] can not find map_pid_parent", __FUNCTION__, __LINE__);
-	_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[DEBUG] [ERROR] can not find map_pid_parent");
-	delete[](unsigned char*)chunk_ptr;
-	return;
-	}
-	parent_info = pid_peerDown_info_iter->second;		// Get parent-info of this chunk
-	}
-	else {
-	handle_error(MACCESS_ERROR, "[ERROR] can not find map_fd_pid", __FUNCTION__, __LINE__);
-	}
-	*/
-
-
+	parent_pid = parent_info->peerInfo.pid;
+	
 	// If receive the first packet of each substream, send start-delay to PK
 	// Record the first packet's sequence number
 	if (sentStartDelay == false) {
@@ -2083,7 +2082,7 @@ void pk_mgr::HandleStream(struct chunk_t *chunk_ptr, int sockfd)
 				SetSubstreamState(ss_id, SS_STABLE2);
 			}
 			else {
-				SetSubstreamState(ss_id, SS_TEST2);
+				//SetSubstreamState(ss_id, SS_TEST2);
 			}
 
 			SetSubstreamParent(manifest, parent_pid);
@@ -2103,16 +2102,15 @@ void pk_mgr::HandleStream(struct chunk_t *chunk_ptr, int sockfd)
 	//												"first_timestamp =", first_timestamp);
 
 	//↓↓↓↓↓↓↓↓↓↓↓↓任何chunk 都會run↓↓↓↓↓↓↓↓↓↓↓↓↓
-	_log_ptr->write_log_format("s(u) s u s d s u s u s u s u s u s u s u s d \n", __FUNCTION__, __LINE__,
-		"parent", parent_pid,
-		"sock", sockfd,
-		"parent_manifest", parent_info->peerInfo.manifest,
-		"sID", chunk_ptr->header.stream_id,
-		"ssID", ss_id,
+	_log_ptr->write_log_format("s(u) s u(d) s u s u s u s u s u s u s u s d \n", __FUNCTION__, __LINE__,
+		"parent", parent_pid, sockfd,
+		"manifest", parent_info->peerInfo.manifest,
+		"s_id", chunk_ptr->header.stream_id,
+		"ss_id", ss_id,
 		"state", ss_table[ss_id]->state.state,
 		"seq", chunk_ptr->header.sequence_number,
 		"timestamp", chunk_ptr->header.timestamp,
-		"source_delay", ss_table[ss_id]->source_delay_table.source_delay_time,
+		"src_delay", GetChunkSourceDelay(chunk_ptr),
 		"bytes", chunk_ptr->header.length
 		);
 
@@ -2125,8 +2123,8 @@ void pk_mgr::HandleStream(struct chunk_t *chunk_ptr, int sockfd)
 
 
 	_log_ptr->timerGet(&pkt_recv_time);
-	if (ss_table[ss_id]->current_parent_pid != PK_PID || ss_table[ss_id]->state.state != SS_TEST2) {
-		// SS_TSET 狀態的 substream timer 只記錄從 parent 來的封包，PK 來的封包不記錄，為了能在 SS_TEST 狀態處發 RESCUE 
+	if (ss_table[ss_id]->current_parent_pid == parent_pid) {
+		// SS_TEST 狀態下，不記錄測試中的那個 parent
 		ss_table[ss_id]->timer.timer = pkt_recv_time;
 	}
 
@@ -2145,8 +2143,7 @@ void pk_mgr::HandleStream(struct chunk_t *chunk_ptr, int sockfd)
 			//
 		}
 		else if (ss_table[ss_id]->state.state == SS_RESCUE2) {
-			// 不應該發生
-			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[DEBUG]");
+			// 
 		}
 		else if (ss_table[ss_id]->state.state == SS_TEST2) {
 			//
@@ -2162,66 +2159,18 @@ void pk_mgr::HandleStream(struct chunk_t *chunk_ptr, int sockfd)
 			//ss_table[ss_id]->state.is_testing = true;
 		}
 		else if (ss_table[ss_id]->state.state == SS_RESCUE2) {
-			// 不應該發生
-			_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[DEBUG]");
+			// 
 		}
 		else if (ss_table[ss_id]->state.state == SS_TEST2) {
-			_log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "ss_id", ss_id, "in SS_TEST state");
-			
-			ss_table[ss_id]->data.testing_count++;
-			if (ss_table[ss_id]->data.testing_count == 1) {
-				SetSubstreamParent(manifest, parent_info->peerInfo.pid);
-			}
-			
-			//下面會濾掉慢到的封包 所以在此進入偵測
-			RescueDetecion(chunk_ptr);
-			ss_table[ss_id]->latest_pkt_timestamp = chunk_ptr->header.timestamp;
-			_log_ptr->timerGet(&ss_table[ss_id]->latest_pkt_client_time);
-			SourceDelayDetection(sockfd, ss_id, chunk_ptr->header.sequence_number);
-		
-			
-			//測試次數填滿整個狀態  也就是測量了PARAMETER_M  次都沒問題 ( 其中有PARAMETER_M 次計算不會連續觸發)
-			//if (ss_table[ss_id]->data.testing_count / ( TEST_DELAY_TIME*Xcount/sub_stream_num ) >= 1) {
-			// 經過6秒時間都處在 SS_TEST 狀態而沒處發 RESCUE 進入 SS_RESCUE 狀態，認定此 parent 狀態良好
-			if (ss_table[ss_id]->timer.inTest_flag == true) {
-				unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
-				unsigned long parent_old_manifest = parent_info->peerInfo.manifest;
-				unsigned long pk_new_manifest = pk_old_manifest & ~manifest;
-				unsigned long parent_new_manifest = parent_info->peerInfo.manifest;
-				
-				SetSubstreamState(ss_id, SS_STABLE2);
-				ss_table[ss_id]->state.is_testing = false;
-				ss_table[ss_id]->data.testing_count = 0;
-				ss_table[ss_id]->state.rescue_after_fail = true;
-				parent_info->outBuffCount = 0;
-				
-				// Test-delay succeed. Cut the substream from pk
-				_logger_client_ptr->log_to_server(LOG_TOPO_TEST_SUCCESS, parent_info->peerInfo.manifest, parent_info->peerInfo.pid);
-				_logger_client_ptr->log_to_server(LOG_RESCUE_DETECTION_TESTING_SUCCESS, manifest, 1, parent_info->peerInfo.pid);
-				set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
-				send_rescueManifestToPKUpdate(pk_new_manifest);
-				_logger_client_ptr->log_to_server(LOG_RESCUE_CUT_PK, manifest);
-				_logger_client_ptr->log_to_server(LOG_RESCUE_DATA_COME, manifest);
+			if (parent_pid == ss_table[ss_id]->testing_parent_pid) {
+				_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "ss_id", ss_id, "SS_TEST count", ss_table[ss_id]->inTest.pkt_count);
 
-				_log_ptr->write_log_format("s(u) s u s u s u s u \n", __FUNCTION__, __LINE__,
-																	"Test-delay succeed. pk manifest", pk_old_manifest,
-																	"->", pk_new_manifest,
-																	"parent manifest", parent_old_manifest,
-																	"->", parent_new_manifest);
-																	
-			
-				ss_table[ss_id]->state.dup_src = false;
-				
-				//選擇selected peer 送topology
-				send_parentToPK(SubstreamIDToManifest(ss_id), parent_info->peerInfo.pid);
-				
-				SetSubstreamParent(manifest, parent_info->peerInfo.pid);
-				
-				//testing function
-				//reSet_detectionInfo();
-				ss_table[ss_id]->timer.inTest_flag = false;
+				SourceDelayDetectionForTesting(sockfd, chunk_ptr);		// 專門來檢測 testing parent
+				ss_table[ss_id]->inTest.pkt_count++;			// testing parent 不做 PacketLostDetection, 只要求他有送出一定量的封包數
+				if (ss_table[ss_id]->data.testing_count == 1) {
+					//SetSubstreamParent(manifest, parent_info->peerInfo.pid);
+				}
 			}
-			
 		}
 	}
 	
@@ -2276,29 +2225,55 @@ void pk_mgr::HandleStream(struct chunk_t *chunk_ptr, int sockfd)
 	
 	pkt_count++;
 	
+
 	/// Check the packets. Divide into two part: 1.from testing-peer, 2.from others(check packets from pk as well)
 	// stream from normal parent(pk and non-testing-peer)
-	if (ss_table[ss_id]->state.is_testing == false) {
+	if (ss_table[ss_id]->state.state != SS_TEST2) {
 		//丟給rescue_detecion一定是有方向性的
 		RescueDetecion(chunk_ptr);
 		
-		ss_table[ss_id]->latest_pkt_timestamp = chunk_ptr->header.timestamp;
-		_log_ptr->timerGet(&ss_table[ss_id]->latest_pkt_client_time);
+		//ss_table[ss_id]->latest_pkt_timestamp = chunk_ptr->header.timestamp;
+		//_log_ptr->timerGet(&ss_table[ss_id]->latest_pkt_client_time);
 		
-		SourceDelayDetection(sockfd, ss_id, chunk_ptr->header.sequence_number);
+		SourceDelayDetection(sockfd, chunk_ptr);
+		//PacketLostDetection(sockfd, chunk_ptr);	// Commented 20150124
 	}
 	else {
-		if (parent_pid == PK_PID) {
-			// The chunk is from pk, and whose substream is in testing-state
-			// We don't check this chunk which is from pk when it is in testing-state
-		} else {
-			// The chunk is from testing-peer, and whose substream is in testing-state
-			// It is already checked before filtering
+		// 此狀態會從兩個 parent 收到 source, 只檢測原本 parent, 新的 parent 不檢測
+		if (parent_pid != ss_table[ss_id]->testing_parent_pid) {
+			if (parent_pid == PK_PID) {
+				// The chunk is from pk, and whose substream is in testing-state
+				RescueDetecion(chunk_ptr);
+
+				//ss_table[ss_id]->latest_pkt_timestamp = chunk_ptr->header.timestamp;
+				//_log_ptr->timerGet(&ss_table[ss_id]->latest_pkt_client_time);
+
+				SourceDelayDetection(sockfd, chunk_ptr);
+				//PacketLostDetection(sockfd, chunk_ptr);		// 測試階段不要偵測 packet lost  // Commented 20150124
+			}
+			else if (parent_pid != ss_table[ss_id]->testing_parent_pid) {
+				// The substream is in SS_TEST state cuased by MOVE, still need to check the original peer
+				RescueDetecion(chunk_ptr);
+
+				//ss_table[ss_id]->latest_pkt_timestamp = chunk_ptr->header.timestamp;
+				//_log_ptr->timerGet(&ss_table[ss_id]->latest_pkt_client_time);
+
+				SourceDelayDetection(sockfd, chunk_ptr);
+				//PacketLostDetection(sockfd, chunk_ptr);		// 測試階段不要偵測 packet lost  // Commented 20150124
+			}
+		}
+		else if (parent_pid == ss_table[ss_id]->testing_parent_pid) {
+			// The parent is the test state, it may or may not be my new parent
+			// We don't check this chunk which is from testing parent
+			// testing parent 送的封包比原本的 parent 還快, 此情況會發生檢測不到原本 parent 的封包, 不過因為
+			// 原本的 parent 可能會被 testing parent 換掉, 先不管這 case
 		}
 	}
-	
-	//_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "sentStartDelay =", sentStartDelay, "pkSendCapacity =", pkSendCapacity);
-	
+
+	if (ss_table[ss_id]->latest_pkt_seq < chunk_ptr->header.sequence_number) {
+		// 必須在 PacketLostDetection 之後再更新 sequence number
+		ss_table[ss_id]->latest_pkt_seq = chunk_ptr->header.sequence_number;
+	}
 	
 	// leastCurrDiff = latest received sequence number so far - latest sequence number sent to player
 	// Check whether packet is lost or not in buf_chunk_t[]
@@ -2312,15 +2287,12 @@ void pk_mgr::HandleStream(struct chunk_t *chunk_ptr, int sockfd)
 		handle_error(UNKNOWN, "[ERROR] leastCurrDiff >= _bucket_size", __FUNCTION__, __LINE__);
 	}
 	
-	if (parent_info->outBuffCount > 0) {
-		//ss_table[ss_id]->lost_packet_count -= 1;
-	}
 	//_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "parent", parent_info->peerInfo.pid, "outBuffCount =", parent_info->outBuffCount);
 	/// 封包太晚到，超過BUFF_SIZE秒(與目前為止收到最新的sequence相比)
 	// Skip the BUFF_SIZE-second-ago-packet and suppose it is lost.
-	for ( ; leastCurrDiff > (int)(Xcount * BUFF_SIZE); _current_send_sequence_number++) {
+	for (; leastCurrDiff > (int)(Xcount * BUFF_SIZE); _current_send_sequence_number++) {
 		leastCurrDiff = _least_sequence_number - _current_send_sequence_number;
-		
+
 		_log_ptr->write_log_format("s(u) d d d d d \n", __FUNCTION__, __LINE__,
 			leastCurrDiff,
 			_least_sequence_number,
@@ -2328,225 +2300,11 @@ void pk_mgr::HandleStream(struct chunk_t *chunk_ptr, int sockfd)
 			(**(buf_chunk_t + (_current_send_sequence_number % _bucket_size))).header.sequence_number,
 			_current_send_sequence_number);
 		//_log_ptr->write_log_format("s(u) u \n", __FUNCTION__, __LINE__, _log_ptr->diff_TimerGet_ms(&pkt_recv_time, &ss_table[ss_id]->parent_changed_time));
-
-
-		// 為了避免誤判, 對於剛換過parent(從test開始計時)的substream, 給予它一定時間的保護避免觸發type 1的rescue
-		if (_log_ptr->diff_TimerGet_ms(&pkt_recv_time, &ss_table[ss_id]->parent_changed_time) < BUFF_SIZE * 2 * 1000) {
-			_log_ptr->write_log_format("s(u) s d s d s d s \n", __FUNCTION__, __LINE__,
-				"pid", my_pid,
-				"parent pid", ss_table[ss_id]->current_parent_pid,
-				"is new parent by", BUFF_SIZE, "seconds");
-			continue;
-		}
-
-
-
-		// If BUFF_SIZE-second-ago-packet is lost
-		if ((**(buf_chunk_t + (_current_send_sequence_number % _bucket_size))).header.sequence_number != _current_send_sequence_number) {
-
-			// The "parent_info" and "ss_id" in this region represents the parent who lost packets and the lost packet ss_id, respectively
-			INT32 ss_id = _current_send_sequence_number % sub_stream_num;
-			if (map_pid_parent.find(ss_table[ss_id]->current_parent_pid) == map_pid_parent.end()) {
-				// This may happens if parent is closed after it lost packet
-				continue;
-			}
-			struct peer_connect_down_t *parent_info = map_pid_parent.find(ss_table[ss_id]->current_parent_pid)->second;
-
-
-
-
-			_logger_client_ptr->quality_struct_ptr->lost_pkt++;
-			debug_printf("Packet lost (%d, %d seconds) \n", Xcount*BUFF_SIZE, BUFF_SIZE);
-			_log_ptr->write_log_format("s(u) s u s u s u (d)(d) \n", __FUNCTION__, __LINE__,
-				"Packet sequence", _current_send_sequence_number,
-				"lost from parent", parent_info->peerInfo.pid,
-				"lost count", _logger_client_ptr->quality_struct_ptr->lost_pkt,
-				leastCurrDiff,
-				(Xcount * BUFF_SIZE));
-
-			ss_table[ss_id]->lost_packet_count += 1;
-			parent_info->outBuffCount += 1;
-
-			// 在觸發 rescue 的前一秒送 blocl_rescue 給相關的 child-peers
-			int threshold = (CHUNK_LOSE - 1) > 0 ? ((CHUNK_LOSE - 1)*Xcount) / sub_stream_num : 1;
-			if (ss_table[ss_id]->source_delay_table.delay_beyond_count > threshold && ss_table[ss_id]->can_send_block_rescue == TRUE) {
-				// 還沒被凍結 rescue 的話才會發出 Block Rescue，否則不發出
-				if (ss_table[ss_id]->block_rescue == FALSE) {
-					_peer_mgr_ptr->SendBlockRescue(ss_id, 1);
-					_log_ptr->timerGet(&ss_table[ss_id]->block_rescue_interval);
-					ss_table[ss_id]->can_send_block_rescue = FALSE;
-				}
-			}
-
-
-			if (ss_table[ss_id]->lost_packet_count > CHUNK_LOSE*Xcount / sub_stream_num || parent_info->outBuffCount > CHUNK_LOSE*Xcount / sub_stream_num) {
-				// If this substream is from PK, we have no idea to rescue it. Otherwise, find this substream's
-				// parent, and cut the testing substream from it(if have testing substream from it). If cannot find 
-				// testing substream, cut other normal substream
-				if (parent_info->peerInfo.pid == PK_PID) {
-					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 1 Parent is PK. Cannot rescue", (int)(CHUNK_LOSE*Xcount) / sub_stream_num);
-					debug_printf("[RESCUE_TYPE] 1. Parent is PK. Cannot rescue %f \n", (CHUNK_LOSE*Xcount) / sub_stream_num);
-					_log_ptr->write_log_format("s(u) s f \n", __FUNCTION__, __LINE__, "[RESCUE_TYPE] 1. Parent is PK. Cannot rescue", (CHUNK_LOSE*Xcount) / sub_stream_num);
-					
-					// Parent 是 PK 的情況下不重置，避免 Timeout Detection 無法偵測，只重置 lost_packet_count
-					//ResetDetection(ss_id);	
-					ss_table[ss_id]->lost_packet_count = 0;
-				}
-				else {
-					if (ss_table[ss_id]->block_rescue == FALSE) {
-						if (ss_table[ss_id]->state.state == SS_STABLE2) {
-							if (ss_table[ss_id]->state.rescue_after_fail == true) {
-								// RESCUE or MERGE
-								UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-								unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
-								unsigned long parent_old_manifest = parent_info->peerInfo.manifest;
-								unsigned long pk_new_manifest = pk_old_manifest | manifest;
-								unsigned long parent_new_manifest = parent_old_manifest & ~manifest;
-								bool need_source = true;
-
-								SetSubstreamState(ss_id, SS_RESCUE2);
-								debug_printf("[RESCUE_TYPE] 1. %d-second-ago-packet is lost \n", BUFF_SIZE);
-
-								// Log the messages
-								_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
-								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d s d \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 1.", BUFF_SIZE, "second-ago-packet is lost", parent_info->peerInfo.pid);
-								_log_ptr->write_log_format("s(u) s u s u d s \n", __FUNCTION__, __LINE__,
-									"[RESCUE_TYPE] 1. Rescue in STABLE state. substreamID =", ss_id,
-									"parentID=", parent_info->peerInfo.pid,
-									BUFF_SIZE, "second-ago-packet is lost");
-
-								ss_table[ss_id]->data.previousParentPID = parent_info->peerInfo.pid;
-								ss_table[ss_id]->state.is_testing = false;
-
-								// Update manifest
-								set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
-								set_parent_manifest(parent_info, parent_new_manifest);
-								SetSubstreamParent(manifest, PK_PID);
-								_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, parent_new_manifest, TOTAL_OP);
-								if (parent_info->peerInfo.manifest == 0) {
-									_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[REASON] manifest = 0 parent", parent_info->peerInfo.pid);
-									_peer_ptr->CloseParent(parent_info->peerInfo.pid, false, "[REASON] manifest = 0");
-									_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[CHECK POINT] map_pid_parent.size()", map_pid_parent.size());
-								}
-
-								//send_parentToPK(manifest, PK_PID+1);
-								NeedSourceDecision(&need_source);
-								//send_rescueManifestToPK(pk_new_manifest, need_source);
-								send_rescueManifestToPK(manifest, need_source);
-								ss_table[ss_id]->state.dup_src = need_source;
-
-								// Reset source delay parameters of testing substream of this parent
-								ResetDetection(ss_id);
-							}
-							else {
-								// MOVE
-								UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-								
-								SetSubstreamState(ss_id, SS_STABLE2);
-								debug_printf("[RESCUE_TYPE] 1M. %d-second-ago-packet is lost \n", BUFF_SIZE);
-
-								// Log the messages
-								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d s d \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 1M.", BUFF_SIZE, "second-ago-packet is lost", parent_info->peerInfo.pid);
-								_log_ptr->write_log_format("s(u) s u s u d s \n", __FUNCTION__, __LINE__,
-									"[RESCUE_TYPE] 1M. Rescue in STABLE state. substreamID =", ss_id,
-									"parentID=", parent_info->peerInfo.pid,
-									BUFF_SIZE, "second-ago-packet is lost");
-								ss_table[ss_id]->state.rescue_after_fail = true;
-							}
-						}
-						else if (ss_table[ss_id]->state.state == SS_CONNECTING2) {
-							// No more trigger rescue again
-							debug_printf("Should not happen \n");
-						}
-						else if (ss_table[ss_id]->state.state == SS_RESCUE2) {
-							// No more trigger rescue again
-							debug_printf("Should not happen \n");
-						}
-						else if (ss_table[ss_id]->state.state == SS_TEST2) {
-							if (ss_table[ss_id]->state.rescue_after_fail == true) {
-								// RESCUE or MERGE
-								UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-								unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
-								unsigned long parent_old_manifest = parent_info->peerInfo.manifest;
-								unsigned long pk_new_manifest = pk_old_manifest | manifest;
-								unsigned long parent_new_manifest = parent_old_manifest & ~manifest;
-								bool need_source = true;
-
-								SetSubstreamState(ss_id, SS_RESCUE2);
-								debug_printf("[RESCUE_TYPE] 1. %d-second-ago-packet is lost \n", BUFF_SIZE);
-
-								// Log the messages
-								_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
-								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d s d \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 1 3", BUFF_SIZE, "second-ago-packet is lost", parent_info->peerInfo.pid);
-								_log_ptr->write_log_format("s(u) s u s u d s \n", __FUNCTION__, __LINE__,
-									"[RESCUE_TYPE] 1. Rescue in TEST state. substreamID =", ss_id,
-									"parentID=", parent_info->peerInfo.pid,
-									BUFF_SIZE, "second-ago-packet is lost");
-
-								ss_table[ss_id]->state.is_testing = false;
-
-								// Update manifest
-								set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
-								set_parent_manifest(parent_info, parent_new_manifest);
-								SetSubstreamParent(manifest, PK_PID);
-								_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, parent_new_manifest, TOTAL_OP);
-								if (parent_info->peerInfo.manifest == 0) {
-									_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[REASON] manifest = 0 parent", parent_info->peerInfo.pid);
-									_peer_ptr->CloseParent(parent_info->peerInfo.pid, false, "[REASON] manifest = 0");
-									_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[CHECK POINT] map_pid_parent.size()", map_pid_parent.size());
-								}
-
-								//send_parentToPK(manifest, PK_PID+1);
-								NeedSourceDecision(&need_source);
-								//send_rescueManifestToPK(pk_new_manifest, need_source);
-								send_rescueManifestToPK(manifest, need_source);
-								ss_table[ss_id]->state.dup_src = need_source;
-
-								// Reset source delay parameters of testing substream of this parent
-								ResetDetection(ss_id);
-							}
-							else {
-								// MOVE
-								UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-								
-								SetSubstreamState(ss_id, SS_STABLE2);
-								debug_printf("[RESCUE_TYPE] 1M. %d-second-ago-packet is lost \n", BUFF_SIZE);
-
-								// Log the messages
-								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d s d \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 1M.", BUFF_SIZE, "second-ago-packet is lost", parent_info->peerInfo.pid);
-								_log_ptr->write_log_format("s(u) s u s u d s \n", __FUNCTION__, __LINE__,
-									"[RESCUE_TYPE] 1M. Rescue in TEST state. substreamID =", ss_id,
-									"parentID=", parent_info->peerInfo.pid,
-									BUFF_SIZE, "second-ago-packet is lost");
-								ss_table[ss_id]->state.rescue_after_fail = true;
-							}
-						}
-						else {
-							// Unexpected state
-						}
-					}
-					else {
-						debug_printf("Block Rescue [RESCUE_TYPE] 1. %d-second-ago-packet is lost \n", BUFF_SIZE);
-						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d s \n", "pid", my_pid, manifest, "Block Rescue[RESCUE_TYPE] 1", BUFF_SIZE, "second-ago-packet is lost");
-						_log_ptr->write_log_format("s(u) s u s u d s \n", __FUNCTION__, __LINE__,
-							"Block Rescue [RESCUE_TYPE] 1. Rescue in TEST state. substreamID =", ss_id,
-							"parentID=", parent_info->peerInfo.pid,
-							BUFF_SIZE, "second-ago-packet is lost");
-						ResetDetection(ss_id);
-						ss_table[ss_id]->state.rescue_after_fail = true;
-					}
-				}
-			}
-		}
-		else {
-			debug_printf("[WARNING] Skip the packet. buffer window %d < %d \n", Xcount*BUFF_SIZE, leastCurrDiff);
-			_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "[WARNING] Skip the packet. buffer window", Xcount*BUFF_SIZE, "<", leastCurrDiff);
-		}
 	}
-	
+
 	// Evaluate the quality
-	_log_ptr->timerGet(&ss_table[ss_id]->latest_pkt_client_time);
-	quality_source_delay_count(sockfd, ss_id, chunk_ptr->header.sequence_number);
+	//_log_ptr->timerGet(&ss_table[ss_id]->latest_pkt_client_time);
+	quality_source_delay_count(sockfd, chunk_ptr);
 	
 	/// Send the stream data to player in order of sequence
 	//for ( ; _current_send_sequence_number < (_least_sequence_number-5); ) {
@@ -2582,6 +2340,64 @@ void pk_mgr::HandleStream(struct chunk_t *chunk_ptr, int sockfd)
 		}
 	}
 }
+
+void pk_mgr::HandleCMDSeed(struct seed_notify *chunk_seed_notify)
+{
+	UINT32 ss_id = chunk_seed_notify->targetSubStreamId;
+	UINT32 chunk_manifest = chunk_seed_notify->manifest;
+	UINT32 manifest = SubstreamIDToManifest(ss_id);
+	UINT32 pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
+	UINT32 pk_new_manifest = pk_old_manifest | manifest;
+
+	_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "ss_id", ss_id, "manifest", chunk_manifest);
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s(u) s u \n", "my_pid", my_pid, "CHNK_CMD_PEER_SEED", __LINE__, "parent -1 manifest", manifest);
+	
+	SetParentManifest(pkDownInfoPtr, pk_new_manifest);
+	SetSubstreamParent(manifest, PK_PID);
+
+	SetSubstreamState(ss_id, SS_STABLE2);
+
+	// 清除與這條 substream 有關的 parent
+	for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = map_pid_parent.begin(); iter != map_pid_parent.end(); iter++) {
+		struct peer_connect_down_t *parent_info = iter->second;
+		UINT32 parent_old_manifest = parent_info->peerInfo.manifest;
+		UINT32 parent_new_manifest = parent_old_manifest & ~manifest;
+
+		if (parent_info->peerInfo.pid != PK_PID && parent_old_manifest != parent_new_manifest) {
+			SetParentManifest(parent_info, parent_new_manifest);
+			_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, manifest, MINUS_OP);
+			if (parent_info->peerInfo.manifest == 0) {
+				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[REASON] manifest = 0 parent", parent_info->peerInfo.pid);
+				_peer_ptr->CloseParent(parent_info->peerInfo.pid, parent_info->peerInfo.sock, false, "[REASON] manifest = 0");
+				iter = map_pid_parent.begin();
+				if (iter == map_pid_parent.end()) {
+					break;
+				}
+			}
+		}
+	}
+
+	ResetDetection(ss_id);
+
+	// Reset substream state
+	struct timerStruct timer;
+	_log_ptr->timerGet(&timer);
+	memcpy(&(ss_table[ss_id]->parent_changed_time), &timer, sizeof(timer));
+}
+
+void pk_mgr::HandleCMDRTT(struct chunk_rtt_request *chunk_rtt_req_ptr, int peer_num)
+{
+	for (int i = 0; i < peer_num; i++) {
+		struct peer_info_t peer_info;
+		memset(&peer_info, 0, sizeof(peer_info));
+		memcpy(&peer_info, &(chunk_rtt_req_ptr->test_peer_info[i]), sizeof(struct level_info_t));
+		peer_info.rtt = -1;
+
+		_peer_mgr_ptr->_peer_communication_ptr->non_blocking_build_connection_udp_now(&peer_info, 0, 0, peer_info.pid, 0, 0, 0, 1);
+		rtt_table.insert(pair<UINT32, struct peer_info_t>(peer_info.pid, peer_info));
+	}
+}
+
 
 void pk_mgr::handle_kickout(struct chunk_t *chunk_ptr, int sockfd)
 {
@@ -2632,7 +2448,88 @@ void pk_mgr::HandleRelayStream(struct chunk_t *chunk_ptr)
 {
 	UINT32 ss_id = chunk_ptr->header.sequence_number % sub_stream_num;
 	UINT32 manifest = SubstreamIDToManifest(ss_id);
-	
+	UINT32 total_queue_length = 0;
+	int child_num = 0;
+
+	//for (list<unsigned long>::reverse_iterator iter = _peer_ptr->priority_children.rbegin(); iter != _peer_ptr->priority_children.rend(); iter++) {
+	for (map<unsigned long, struct peer_info_t *>::iterator iter = map_pid_child.begin(); iter != map_pid_child.end(); iter++) {
+		// 檢查那些更高 priority 的 child 的 queue 是否為空
+		queue<struct chunk_t *> *other_child_queue_out_ctrl_ptr = NULL;
+		queue<struct chunk_t *> *other_child_queue_out_data_ptr = NULL;
+		struct peer_info_t *child_info = GetChildFromPid(iter->first);
+
+		if (child_info != NULL) {
+			if (child_info->connection_state == PEER_SELECTED) {
+				if (_peer_ptr->map_out_pid_udpfd.find(iter->first) != _peer_ptr->map_out_pid_udpfd.end()) {
+					total_queue_length += _peer_ptr->map_udpfd_queue[child_info->sock]->length;
+					child_num++;
+					int32_t pendingpkt_size = 0;
+					int len = sizeof(pendingpkt_size);
+					UDT::getsockopt(child_info->sock, 0, UDT_SNDDATA, &pendingpkt_size, &len);
+				
+					UDT::TRACEINFO trace;
+					memset(&trace, 0, sizeof(UDT::TRACEINFO));
+					int nnn = UDT::perfmon(child_info->sock, &trace);
+
+					_log_ptr->write_log_format("s(u) s u(d)(d) s u s u s u u s d s U s d s d s d s d \n", __FUNCTION__, __LINE__, 
+																					"child", iter->first, (child_info->sock), UDT::getsockstate(child_info->sock), 
+																					"manifest", iter->second->manifest, 
+																					"priority", iter->second->peercomm_session, 
+																					"pending_pkt", pendingpkt_size, _peer_ptr->map_udpfd_queue[child_info->sock]->length, 
+																					"sockstate", UDT::getsockstate(child_info->sock), 
+																					"SndTotal", trace.pktSentTotal, 
+																					"SndLossTotal", trace.pktSndLossTotal, 
+																					"RetransTotal", trace.pktRetransTotal, 
+																					"RecvAckTotal", trace.pktRecvACKTotal, 
+																					"RecvNakTotal", trace.pktRecvNAKTotal);
+				
+					
+				}
+			}
+			else {
+				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] child", iter->first);
+			}
+		}
+		else {
+			_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] child", iter->first);
+		}
+	}
+
+	for (list<unsigned long>::reverse_iterator iter = _peer_ptr->priority_children.rbegin(); iter != _peer_ptr->priority_children.rend(); iter++) {
+		// 檢查那些更高 priority 的 child 的 queue 是否為空
+		queue<struct chunk_t *> *other_child_queue_out_ctrl_ptr = NULL;
+		queue<struct chunk_t *> *other_child_queue_out_data_ptr = NULL;
+		struct peer_info_t *child_info = GetChildFromPid(*iter);
+
+		if (child_info != NULL) {
+			if (child_info->connection_state == PEER_SELECTED) {
+				if (_peer_ptr->map_out_pid_udpfd.find(*iter) != _peer_ptr->map_out_pid_udpfd.end()) {
+					//other_child_sock = _peer_ptr->map_out_pid_udpfd.find(*iter)->second;
+					if (_peer_ptr->map_udpfd_out_data.find(child_info->sock) != _peer_ptr->map_udpfd_out_data.end()) {
+						other_child_queue_out_data_ptr = _peer_ptr->map_udpfd_out_data[child_info->sock];	// Get queue_out_data_ptr
+					}
+
+					if (_peer_ptr->map_udpfd_out_ctrl.find(child_info->sock) != _peer_ptr->map_udpfd_out_ctrl.end()) {
+						other_child_queue_out_ctrl_ptr = _peer_ptr->map_udpfd_out_ctrl[child_info->sock];	// Get queue_out_data_ptr
+					}
+
+					if (other_child_queue_out_data_ptr == NULL || other_child_queue_out_ctrl_ptr == NULL) {
+						continue;
+					}
+
+					_log_ptr->write_log_format("s(u) s\tu\tu\td\td\td\td\td \n", __FUNCTION__, __LINE__, "[LOWEST PRIORITY] child", *iter, rescueNumAccumulate(), other_child_queue_out_ctrl_ptr->size(), other_child_queue_out_data_ptr->size(), _peer_ptr->map_udpfd_queue[child_info->sock]->length, total_queue_length, child_num);
+					break;
+				}
+			}
+			else {
+				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] child", *iter);
+			}
+		}
+		else {
+			_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] child", *iter);
+		}
+	}
+
 	for (map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter = map_pid_child.begin(); pid_peer_info_iter != map_pid_child.end(); pid_peer_info_iter++) {
 		unsigned long child_pid;
 		int child_sock;
@@ -2644,48 +2541,32 @@ void pk_mgr::HandleRelayStream(struct chunk_t *chunk_ptr)
 		srand(time(NULL));
 		int ran = rand() % 4;
 		if (chunk_ptr->header.sequence_number % (5*pkt_rate + ran) == 0) {
-			break;
+			//break;
 		}
 
 		child_pid = pid_peer_info_iter->first;		// Get child-Pid
-		child_peer = pid_peer_info_iter->second;	// Get child info
+		child_peer = pid_peer_info_iter->second;		// Get child info
+		child_sock = pid_peer_info_iter->second->sock;
 
-		_log_ptr->write_log_format("s(u) s u s u s u \n", __FUNCTION__, __LINE__, "Child", child_pid, "manifest", child_peer->manifest, "state", pid_peer_info_iter->second->connection_state);
+		//_log_ptr->write_log_format("s(u) s u s u s u \n", __FUNCTION__, __LINE__, "Child", child_pid, "manifest", child_peer->manifest, "state", pid_peer_info_iter->second->connection_state);
 
 		//if (pid_peer_info_iter->second->connection_state == PEER_CONNECTED_CHILD) {
-		if (pid_peer_info_iter->second->connection_state == PEER_SELECTED) {
+		if (child_peer->connection_state == PEER_SELECTED) {
 			if (_peer_ptr->map_out_pid_fd.find(child_pid) != _peer_ptr->map_out_pid_fd.end()) {
-				child_sock = _peer_ptr->map_out_pid_fd[child_pid];	// Get child socket
-
-				map<int, queue<struct chunk_t *> *>::iterator iter;
-				iter = _peer_ptr->map_fd_out_data.find(child_sock);
 				if (_peer_ptr->map_fd_out_data.find(child_sock) != _peer_ptr->map_fd_out_data.end()) {
 					queue_out_data_ptr = _peer_ptr->map_fd_out_data[child_sock];	// Get queue_out_data_ptr
 				}
-				else {
-					handle_error(UNKNOWN, "[DEBUG] Found child-peer in map_out_pid_fd but not found in map_fd_out_data", __FUNCTION__, __LINE__);
-				}
 			}
 			else if (_peer_ptr->map_out_pid_udpfd.find(child_pid) != _peer_ptr->map_out_pid_udpfd.end()) {
-				child_sock = _peer_ptr->map_out_pid_udpfd[child_pid];	// Get child socket
-
-				map<int, queue<struct chunk_t *> *>::iterator iter;
-				iter = _peer_ptr->map_udpfd_out_data.find(child_sock);
 				if (_peer_ptr->map_udpfd_out_data.find(child_sock) != _peer_ptr->map_udpfd_out_data.end()) {
 					queue_out_data_ptr = _peer_ptr->map_udpfd_out_data[child_sock];	// Get queue_out_data_ptr
 				}
-				else {
-					handle_error(UNKNOWN, "[DEBUG] Found child-peer in map_out_pid_udpfd but not found in map_udpfd_out_data", __FUNCTION__, __LINE__);
-				}
 			}
-			else {
-				debug_printf("Not found pid %d in map_out_pid_fd \n", pid_peer_info_iter->second->pid);
-				_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "Not found pid", pid_peer_info_iter->second->pid, "in map_out_pid_fd");
-				//handle_error(UNKNOWN, "[DEBUG] Not found pid in map_out_pid_fd", __FUNCTION__, __LINE__);
+			if (queue_out_data_ptr == NULL) {
+				debug_printf("Not found pid %d in map_out_pid_fd \n", child_pid);
+				_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "Not found pid", child_pid, "in map_out_pid_fd");
 				continue;
 			}
-
-
 
 			/*
 			for (list<unsigned long>::iterator iter = _peer_ptr->priority_children.begin(); iter != _peer_ptr->priority_children.end(); iter++) {
@@ -2732,33 +2613,35 @@ void pk_mgr::HandleRelayStream(struct chunk_t *chunk_ptr)
 
 			if (can_push_data == true) {
 				// Check whether child's manifest are equal to chunk_ptr's(new chunk) or not
-				if (queue_out_data_ptr != NULL) {
-					if (child_peer->manifest & (1 << (chunk_ptr->header.sequence_number % sub_stream_num))) {
-						// Put buf_chunk_t[index](chunk buffer) into output queue
-						queue_out_data_ptr->push(*(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size)));
-						//_net_ptr->epoll_control(child_sock, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
-						_log_ptr->write_log_format("s(u) s u s u s d \n", __FUNCTION__, __LINE__,
-							"Transmit packet to child", child_pid,
-							"substreamID", ss_id,
-							"seq", chunk_ptr->header.sequence_number);
+				
+				if (child_peer->manifest & (1 << (chunk_ptr->header.sequence_number % sub_stream_num))) {
+					// Put buf_chunk_t[index](chunk buffer) into output queue
+					queue_out_data_ptr->push(*(buf_chunk_t + (chunk_ptr->header.sequence_number % _bucket_size)));
+					_peer_ptr->map_udpfd_queue[child_sock]->length += chunk_ptr->header.length*8;
+					_peer_ptr->map_udpfd_queue[child_sock]->lambda += chunk_ptr->header.length*8;
+					//_net_ptr->epoll_control(child_sock, EPOLL_CTL_MOD, EPOLLIN | EPOLLOUT);
+					//_log_ptr->write_log_format("s(u) s u s u s d \n", __FUNCTION__, __LINE__,
+					//	"Transmit packet to child", child_pid,
+					//	"substreamID", ss_id,
+					//	"seq", chunk_ptr->header.sequence_number);
 
 
-						int udt_max_sndbuf;
-						int len1 = sizeof(udt_max_sndbuf);
-						int32_t udt_sndbuf;
-						int len2 = sizeof(udt_sndbuf);
-						int64_t udt_maxbw;
-						int len3 = sizeof(udt_maxbw);
-						int64_t aaa = 93750;
-						//UDT::getsockopt(child_sock, 0, UDT_SNDBUF, &udt_max_sndbuf, &len1);
-						//UDT::getsockopt(child_sock, 0, UDT_SNDDATA, &udt_sndbuf, &len2);
-						//UDT::setsockopt(child_sock, 0, UDT_MAXBW, &aaa, sizeof(aaa));
-						//UDT::getsockopt(child_sock, 0, UDT_MAXBW, &udt_maxbw, &len3);
+					int udt_max_sndbuf;
+					int len1 = sizeof(udt_max_sndbuf);
+					int32_t udt_sndbuf;
+					int len2 = sizeof(udt_sndbuf);
+					int64_t udt_maxbw;
+					int len3 = sizeof(udt_maxbw);
+					int64_t aaa = 93750;
+					//UDT::getsockopt(child_sock, 0, UDT_SNDBUF, &udt_max_sndbuf, &len1);
+					//UDT::getsockopt(child_sock, 0, UDT_SNDDATA, &udt_sndbuf, &len2);
+					//UDT::setsockopt(child_sock, 0, UDT_MAXBW, &aaa, sizeof(aaa));
+					//UDT::getsockopt(child_sock, 0, UDT_MAXBW, &udt_maxbw, &len3);
 
-						//debug_printf("sock %d child %d : UDT_SNDBUF %d UDT_SNDDATA %d  maxbw %d \n", child_sock, child_pid, udt_max_sndbuf, udt_sndbuf, udt_maxbw);
+					//debug_printf("sock %d child %d : UDT_SNDBUF %d UDT_SNDDATA %d  maxbw %d \n", child_sock, child_pid, udt_max_sndbuf, udt_sndbuf, udt_maxbw);
 
-					}
 				}
+				
 			}
 		}
 	}
@@ -2775,75 +2658,52 @@ void pk_mgr::HandleRelayStream(struct chunk_t *chunk_ptr)
 		}
 	}
 
+	// 記錄過去 PS_HISTORY_NUM 次的情形
+	my_queue_history.total_bits[my_queue_history.current_index] = total_queue_length;
+	my_queue_history.current_index = (my_queue_history.current_index + 1) % (PS_HISTORY_NUM);
+	GetPSClass();
+
+	// 定期更新 table
+	CheckSSNumState(total_queue_length);
+
 	priq_cnt2 = (priq_cnt2 + 1) % 10;
 	if (priq_cnt2 == 0) {
 		//_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u d \n", "[CHILD_PRIORITY] pid", my_pid, totalRescueNum);
 	}
 
-	for (list<unsigned long>::iterator iter = _peer_ptr->priority_children.begin(); iter != _peer_ptr->priority_children.end(); iter++) {
-		// 檢查那些更高 priority 的 child 的 queue 是否為空
-		//list<unsigned long>::reverse_iterator iter = _peer_ptr->priority_children.rbegin();
-		int other_child_sock = -1;
-		queue<struct chunk_t *> *other_child_queue_out_ctrl_ptr = NULL;
-		queue<struct chunk_t *> *other_child_queue_out_data_ptr = NULL;
+}
 
-		if (map_pid_child.find(*iter) != map_pid_child.end()) {
-			if (map_pid_child.find(*iter)->second->connection_state == PEER_SELECTED) {
-				if (_peer_ptr->map_out_pid_udpfd.find(*iter) != _peer_ptr->map_out_pid_udpfd.end()) {
-					other_child_sock = _peer_ptr->map_out_pid_udpfd.find(*iter)->second;
-					if (_peer_ptr->map_udpfd_out_data.find(other_child_sock) != _peer_ptr->map_udpfd_out_data.end()) {
-						other_child_queue_out_data_ptr = _peer_ptr->map_udpfd_out_data[other_child_sock];	// Get queue_out_data_ptr
-					}
-					else {
-						handle_error(UNKNOWN, "[DEBUG] Found child-peer in map_out_pid_udpfd but not found in map_udpfd_out_data", __FUNCTION__, __LINE__);
-					}
-
-					if (_peer_ptr->map_udpfd_out_ctrl.find(other_child_sock) != _peer_ptr->map_udpfd_out_ctrl.end()) {
-						other_child_queue_out_ctrl_ptr = _peer_ptr->map_udpfd_out_ctrl[other_child_sock];	// Get queue_out_data_ptr
-					}
-					else {
-						handle_error(UNKNOWN, "[DEBUG] Found child-peer in map_out_pid_udpfd but not found in map_udpfd_out_data", __FUNCTION__, __LINE__);
-					}
-					
-					//_log_ptr->write_log_format("s(u) s\tu\td\td\td \n", __FUNCTION__, __LINE__, "child", *iter, other_child_queue_out_ctrl_ptr->size(), other_child_queue_out_data_ptr->size(), other_child_queue_out_ctrl_ptr->size() + other_child_queue_out_data_ptr->size());
-				}
-			}
-			else {
-				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] child", *iter);
-			}
-		}
-		else {
-			_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] child", *iter);
-		}
-	}
-
+int pk_mgr::GetQueueInfo(int *sock, int *bits)
+{
+	*sock = -1;
+	*bits = -1;
 	for (list<unsigned long>::reverse_iterator iter = _peer_ptr->priority_children.rbegin(); iter != _peer_ptr->priority_children.rend(); iter++) {
-		// 檢查那些更高 priority 的 child 的 queue 是否為空
-		//list<unsigned long>::reverse_iterator iter = _peer_ptr->priority_children.rbegin();
-		int other_child_sock = -1;
-		queue<struct chunk_t *> *other_child_queue_out_ctrl_ptr = NULL;
-		queue<struct chunk_t *> *other_child_queue_out_data_ptr = NULL;
+		queue<struct chunk_t *> *queue_out_ctrl_ptr = NULL;
+		queue<struct chunk_t *> *queue_out_data_ptr = NULL;
+		struct peer_info_t *child_info = GetChildFromPid(*iter);
 
-		if (map_pid_child.find(*iter) != map_pid_child.end()) {
-			if (map_pid_child.find(*iter)->second->connection_state == PEER_SELECTED) {
+		if (child_info != NULL) {
+			if (child_info->connection_state == PEER_SELECTED) {
+				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "Child", *iter);
 				if (_peer_ptr->map_out_pid_udpfd.find(*iter) != _peer_ptr->map_out_pid_udpfd.end()) {
-					other_child_sock = _peer_ptr->map_out_pid_udpfd.find(*iter)->second;
-					if (_peer_ptr->map_udpfd_out_data.find(other_child_sock) != _peer_ptr->map_udpfd_out_data.end()) {
-						other_child_queue_out_data_ptr = _peer_ptr->map_udpfd_out_data[other_child_sock];	// Get queue_out_data_ptr
-					}
-					else {
+					//other_child_sock = _peer_ptr->map_out_pid_udpfd.find(*iter)->second;
+					if (_peer_ptr->map_udpfd_out_data.find(child_info->sock) == _peer_ptr->map_udpfd_out_data.end()) {
 						handle_error(UNKNOWN, "[DEBUG] Found child-peer in map_out_pid_udpfd but not found in map_udpfd_out_data", __FUNCTION__, __LINE__);
 					}
-
-					if (_peer_ptr->map_udpfd_out_ctrl.find(other_child_sock) != _peer_ptr->map_udpfd_out_ctrl.end()) {
-						other_child_queue_out_ctrl_ptr = _peer_ptr->map_udpfd_out_ctrl[other_child_sock];	// Get queue_out_data_ptr
-					}
-					else {
+					if (_peer_ptr->map_udpfd_out_ctrl.find(child_info->sock) == _peer_ptr->map_udpfd_out_ctrl.end()) {
 						handle_error(UNKNOWN, "[DEBUG] Found child-peer in map_out_pid_udpfd but not found in map_udpfd_out_data", __FUNCTION__, __LINE__);
 					}
+					if (_peer_ptr->map_udpfd_queue.find(child_info->sock) == _peer_ptr->map_udpfd_queue.end()) {
+						handle_error(UNKNOWN, "[DEBUG] Found child-peer in map_udpfd_queue but not found in map_udpfd_out_data", __FUNCTION__, __LINE__);
+					}
 
-					_log_ptr->write_log_format("s(u) s\tu\tu\td\td\td \n", __FUNCTION__, __LINE__, "[LOWEST PRIORITY] child", *iter, rescueNumAccumulate(), other_child_queue_out_ctrl_ptr->size(), other_child_queue_out_data_ptr->size(), other_child_queue_out_ctrl_ptr->size() + other_child_queue_out_data_ptr->size());
-					break;
+					*sock = child_info->sock;
+					*bits = _peer_ptr->map_udpfd_queue[child_info->sock]->length;
+					queue_out_ctrl_ptr = _peer_ptr->map_udpfd_out_ctrl[child_info->sock];
+					queue_out_data_ptr = _peer_ptr->map_udpfd_out_data[child_info->sock];
+
+					_log_ptr->write_log_format("s(u) s d(d) d d d \n", __FUNCTION__, __LINE__, "[LOWEST PRIORITY] child", *iter, *sock, rescueNumAccumulate(), queue_out_ctrl_ptr->size()+queue_out_data_ptr->size(), *bits);
+					return 1;
 				}
 			}
 			else {
@@ -2854,6 +2714,32 @@ void pk_mgr::HandleRelayStream(struct chunk_t *chunk_ptr)
 			_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] child", *iter);
 		}
 	}
+	return 0;
+}
+
+int pk_mgr::GetQueueTime(void)
+{
+	int sock = -1;
+	int bits = -1;
+	int queue_time = 0;
+	struct peer_info_t *child_info = NULL;
+
+	if (GetQueueInfo(&sock, &bits) == 0) {
+		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "No Children");
+		return queue_time;
+	}
+
+	child_info = GetChildFromSock(sock);
+	if (child_info == NULL) {
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[DEBUG] Not Found sock", sock);
+		return queue_time;
+	}
+
+	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "bits", bits);
+	queue_time = (static_cast<double>(bits) / static_cast<double>(_logger_client_ptr->bitrate))*(static_cast<double>(full_manifest) / static_cast<double>(child_info->manifest)) * 1000;
+	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Queueing time", queue_time);
+
+	return queue_time;
 }
 
 void pk_mgr::record_file_init(int stream_id)
@@ -3026,13 +2912,66 @@ void pk_mgr::SetSubstreamParent(unsigned long manifest, unsigned long pid)
 	}
 }
 
-void pk_mgr::set_parent_manifest(struct peer_connect_down_t *parent_info, UINT32 manifest)
+void pk_mgr::SetParentManifest(struct peer_connect_down_t *parent_info, UINT32 manifest)
 {
 	int old_manifest = parent_info->peerInfo.manifest;
 	parent_info->peerInfo.manifest = manifest;
-	_log_ptr->write_log_format("s(u) s u s u s u \n", __FUNCTION__, __LINE__, "parent pid", parent_info->peerInfo.pid,
-																			  "manifest change from", old_manifest,
-																			  "to", parent_info->peerInfo.manifest);
+	_log_ptr->write_log_format("s(u) s u s u s u \n", __FUNCTION__, __LINE__, "parent", parent_info->peerInfo.pid,
+																			  "manifest", old_manifest,
+																			  "->", parent_info->peerInfo.manifest);
+}
+
+void pk_mgr::SetChildManifest(struct peer_info_t *child_info, UINT32 manifest)
+{
+	int old_manifest = child_info->manifest;
+	child_info->manifest = manifest;
+	_log_ptr->write_log_format("s(u) s u s u s u \n", __FUNCTION__, __LINE__, "child", child_info->pid,
+		"manifest", old_manifest,
+		"->", child_info->manifest);
+}
+
+struct peer_connect_down_t* pk_mgr::GetParentFromPid(UINT32 pid)
+{
+	struct peer_connect_down_t* parent_info = NULL;
+	for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = map_pid_parent.begin(); iter != map_pid_parent.end(); iter++) {
+		if (pid == iter->second->peerInfo.pid) {
+			parent_info = iter->second;
+		}
+	}
+	return parent_info;
+}
+
+struct peer_connect_down_t* pk_mgr::GetParentFromSock(int sock)
+{
+	struct peer_connect_down_t* parent_info = NULL;
+	for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = map_pid_parent.begin(); iter != map_pid_parent.end(); iter++) {
+		if (sock == iter->second->peerInfo.sock) {
+			parent_info = iter->second;
+		}
+	}
+	return parent_info;
+}
+
+struct peer_info_t* pk_mgr::GetChildFromPid(UINT32 pid)
+{
+	struct peer_info_t* child_info = NULL;
+	for (map<unsigned long, struct peer_info_t *>::iterator iter = map_pid_child.begin(); iter != map_pid_child.end(); iter++) {
+		if (pid == iter->second->pid) {
+			child_info = iter->second;
+		}
+	}
+	return child_info;
+}
+
+struct peer_info_t* pk_mgr::GetChildFromSock(int sock)
+{
+	struct peer_info_t* child_info = NULL;
+	for (map<unsigned long, struct peer_info_t *>::iterator iter = map_pid_child.begin(); iter != map_pid_child.end(); iter++) {
+		if (sock == iter->second->sock) {
+			child_info = iter->second;
+		}
+	}
+	return child_info;
 }
 
 void pk_mgr::syn_table_init(int pk_sock)
@@ -3531,7 +3470,7 @@ void pk_mgr::Measure()
 			//PID是PK的有問題 (代表是這個peer下載能力有問題)
 			if (parent_info->peerInfo.pid == PK_PID) {
 				debug_printf("[RESCUE_TYPE] 2. Peer download bandwidth has problem \n");
-				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s \n", "pid", my_pid, "[RESCUE_TYPE] 2 Peer download bandwidth has problem");
+				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s \n", "my_pid", my_pid, "[RESCUE_TYPE] 2 Peer download bandwidth has problem");
 				_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[RESCUE_TYPE] 2. Peer download bandwidth has problem");
 			}
 			else {
@@ -3554,18 +3493,19 @@ void pk_mgr::Measure()
 							// Log the messages
 							_logger_client_ptr->log_to_server(LOG_RESCUE_TRIGGER, manifest);
 							_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d d \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 2", count_N, continuous_P);
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d d \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 2", count_N, continuous_P);
 							_log_ptr->write_log_format("s(u) s u s u d d \n", __FUNCTION__, __LINE__,
 								"[RESCUE_TYPE] 2. Rescue in STABLE state. substreamID =", ss_id,
 								"parentID=", parent_info->peerInfo.pid,
 								count_N, continuous_P);
 
 
-							ss_table[ss_id]->data.previousParentPID = parent_info->peerInfo.pid;
+							
 
 							// Update manifest
-							set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
-							set_parent_manifest(parent_info, parent_new_manifest);
+							SetParentManifest(pkDownInfoPtr, pk_new_manifest);
+							SetParentManifest(parent_info, parent_new_manifest);
+							ss_table[ss_id]->data.previousParentPID = parent_info->peerInfo.pid;
 							SetSubstreamParent(manifest, PK_PID);
 							_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, parent_new_manifest, TOTAL_OP);
 
@@ -3592,7 +3532,7 @@ void pk_mgr::Measure()
 							// Log the messages
 							_logger_client_ptr->log_to_server(LOG_TEST_DETECTION_FAIL, manifest, PK_PID);
 							_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d d \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 2", count_N, continuous_P);
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d d \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 2", count_N, continuous_P);
 							_log_ptr->write_log_format("s(u) s u s u d d \n", __FUNCTION__, __LINE__,
 								"[RESCUE_TYPE] 2. Rescue in TEST state. substreamID =", ss_id,
 								"parentID=", parent_info->peerInfo.pid,
@@ -3601,8 +3541,8 @@ void pk_mgr::Measure()
 							ss_table[ss_id]->state.is_testing = false;
 
 							// Update manifest
-							set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
-							set_parent_manifest(parent_info, parent_new_manifest);
+							SetParentManifest(pkDownInfoPtr, pk_new_manifest);
+							SetParentManifest(parent_info, parent_new_manifest);
 							SetSubstreamParent(manifest, PK_PID);
 							_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, parent_new_manifest, TOTAL_OP);
 
@@ -3660,6 +3600,7 @@ void pk_mgr::send_rescueManifestToPK(unsigned long manifestValue, bool need_sour
 	_net_ptr->send(_sock, (char*)chunk_rescueManifestPtr, sizeof(struct rescue_pkt_from_server), 0);
 	_net_ptr->set_nonblocking(_sock);
 
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s(u) s u \n", "my_pid", my_pid, "CHNK_CMD_PEER_RESCUE", __LINE__, "parent -1 manifest", manifestValue);
 	//debug_printf("sent rescue to PK manifest = %d  start from %d\n",manifestValue,_current_send_sequence_number -(sub_stream_num*5) );
 	_log_ptr->write_log_format("s(u) s u s u s d \n", __FUNCTION__, __LINE__,
 														"sent rescue to PK manifest =", manifestValue,
@@ -3841,9 +3782,45 @@ unsigned int pk_mgr::rescueNumAccumulate()
 	}
 
 	//debug_printf("sent capacity totalRescueNum = %d \n", totalRescueNum);
-	_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__, __LINE__, "sent capacity totalRescueNum", totalRescueNum);
+	//_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__, __LINE__, "sent capacity totalRescueNum", totalRescueNum);
 
 	return totalRescueNum;
+}
+
+void pk_mgr::CheckSSNumState(UINT32 total_queue_length)
+{
+	unsigned int totalRescueNum = rescueNumAccumulate();
+	
+	//_log_ptr->write_log_format("s(u) d d \n", __FUNCTION__, __LINE__, previous_ss_num, totalRescueNum);
+
+	if (previous_ss_num > totalRescueNum) {
+		// 有 child 離開
+		for (int i = previous_ss_num; i > totalRescueNum; i--) {
+			if (total_queue_length > 1000000) {
+				map_uploadssnum_state[i] = PS_DANGEROUS;
+				_log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "Set ss_num", i, "DANGREOUS");
+			}
+			else {
+				// 先暫時都認為是 parent 造成 child 離開 (暫時不考慮 child 主動離開的 case)
+				map_uploadssnum_state[i] = PS_DANGEROUS;
+				_log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "Set ss_num", i, "PS_DANGEROUS");
+				//map_uploadssnum_state[i] = PS_STABLE;
+				//_log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "Set ss_num", i, "STABLE");
+			}
+		}
+	}
+	else if (previous_ss_num < totalRescueNum) {
+		// 有 child 近來 (罪中扔被 child所選擇, 先改成 stable 再看情況)
+		for (int i = previous_ss_num; i < totalRescueNum; i++) {
+			
+			map_uploadssnum_state[i+1] = PS_STABLE;
+			_log_ptr->write_log_format("s(u) s d s \n", __FUNCTION__, __LINE__, "Set ss_num", i, "STABLE");
+		}
+	}
+	else {
+		
+	}
+	previous_ss_num = totalRescueNum;
 }
 
 //若對應到多個則只會回傳最小的(最右邊 最低位的)
@@ -3878,8 +3855,7 @@ unsigned long  pk_mgr::manifestToSubstreamNum(unsigned long  manifest)
 	return substreamNum ;
 }
 
-// This function only called for cutting off all substreams from PK, which means that the 
-// parameter manifestValue always 0, send_rescueManifestToPKUpdate(0)
+// This function only called for cutting off substreams from PK
 void pk_mgr::send_rescueManifestToPKUpdate(unsigned long manifestValue)
 {
 	struct rescue_update_from_server  *chunk_rescueManifestPtr = NULL;
@@ -3900,6 +3876,8 @@ void pk_mgr::send_rescueManifestToPKUpdate(unsigned long manifestValue)
 	_net_ptr->set_blocking(_sock);
 	_net_ptr ->send(_sock , (char*)chunk_rescueManifestPtr ,sizeof(struct rescue_update_from_server),0) ;
 	_net_ptr->set_nonblocking(_sock);
+
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s(u) s u \n", "my_pid", my_pid, "CHNK_CMD_PEER_RESCUE_UPDATE", __LINE__, "parent -1 manifest", chunk_rescueManifestPtr->manifest);
 
 	_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "send_rescueManifestToPKUpdate =",manifestValue) ;
 
@@ -3935,6 +3913,7 @@ void pk_mgr::send_parentToPK(unsigned long manifestValue,unsigned long parent_pi
 	parentListPtr->manifest = manifestValue ;
 	parentListPtr->parent_pid[0] = parent_pid;
 
+	_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s(u) s u s u \n", "my_pid", my_pid, "CHNK_CMD_TOPO_INFO", __LINE__, "parent", parent_pid, "manifest", manifestValue);
 	debug_printf("Send parent %d to PK \n", parent_pid);
 	_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "Send parent", parent_pid, "to PK");
 
@@ -4002,6 +3981,8 @@ void pk_mgr::ResetDetection(unsigned long ss_id)
 
 	pkDownInfoPtr->timeOutNewSeq = 0;
 	pkDownInfoPtr->timeOutLastSeq = 0;
+	ss_table[ss_id]->inTest.pkt_count = 0;
+	ss_table[ss_id]->inTest.overdelay_count = 0;
 
 	// Type 1: packet lost
 	if (map_pid_parent.find(ss_table[ss_id]->current_parent_pid) != map_pid_parent.end()) {
@@ -4082,6 +4063,33 @@ void pk_mgr::NeedSourceDecision(bool *need_source)
 	*need_source = true;
 }
 
+// 記錄過去收到 source 時的 queue 情形, 然後分析過去 PS_HISTORY_NUM 筆資料做分析
+INT32 pk_mgr::GetPSClass()
+{
+	double score = 0;
+	for (int i = my_queue_history.current_index; i < my_queue_history.current_index + PS_HISTORY_NUM - 1; i++) {
+		if (my_queue_history.total_bits[(i + 1) % PS_HISTORY_NUM] > my_queue_history.total_bits[i % PS_HISTORY_NUM]) {
+			score += 1;
+		}
+	}
+	score /= PS_HISTORY_NUM - 1;
+	_log_ptr->write_log_format("s(u) s f \n", __FUNCTION__, __LINE__, "avg", score);
+	
+
+	return PS_STABLE;
+	/*
+	if (score > 0.5) {
+		return PS_OVERLOADING;
+	}
+	else {
+		unsigned int totalRescueNum = rescueNumAccumulate();
+		//_log_ptr->write_log_format("s(u) u d \n", __FUNCTION__, __LINE__, totalRescueNum, map_uploadssnum_state[totalRescueNum + 1]);
+		// 回傳 table 記錄的 state
+		return map_uploadssnum_state[totalRescueNum+1];
+	}
+	*/
+}
+
 // handle timeout  connect time out
 // 1. Connect Timeout
 // 2. Log periodically sending(source-delay, quality, and bandwidth)
@@ -4091,7 +4099,7 @@ void pk_mgr::time_handle()
 {
 	struct timerStruct new_timer;
 	_log_ptr->timerGet(&new_timer);
-	
+
 	map<unsigned long, manifest_timmer_flag *>::iterator temp_substream_first_reply_peer_iter;
 	map<unsigned long, struct manifest_timmer_flag *>::iterator substream_first_reply_peer_iter;
 	
@@ -4112,43 +4120,70 @@ void pk_mgr::time_handle()
 	}
 	*/
 
-	
-	// Timer for some test
-	if (_log_ptr->diff_TimerGet_ms(&reconnect_timer, &new_timer) >= 200) {
 
-		reconnect_timer = new_timer;
+	if (_log_ptr->diff_TimerGet_ms(&base_timer, &new_timer) <= 50) {
+		return ;
+	}
+	base_timer = new_timer;
 
-		for (map<unsigned long, struct peer_info_t *>::iterator pid_peer_info_iter = map_pid_child.begin(); pid_peer_info_iter != map_pid_child.end(); pid_peer_info_iter++) {
-			
-			unsigned long child_pid;
-			int child_sock;
-			struct peer_info_t *child_peer = NULL;
 
-			// 計算這次 children 總共的 ss 數量和 queue 數量
-			child_pid = pid_peer_info_iter->first;
-			if (map_pid_child.find(child_pid) != map_pid_child.end()) {
-				child_peer = map_pid_child.find(child_pid)->second;		// Get child info
-				if (child_peer->connection_state == PEER_CONNECTED_CHILD) {
-					if (_peer_ptr->map_out_pid_fd.find(child_pid) != _peer_ptr->map_out_pid_fd.end()) {
-						child_sock = _peer_ptr->map_out_pid_fd[child_pid];	// Get child socket
+
+
+	if (_log_ptr->diff_TimerGet_ms(&base_timer, &new_timer) >= 1000) {
+
+		for (list<unsigned long>::reverse_iterator iter = _peer_ptr->priority_children.rbegin(); iter != _peer_ptr->priority_children.rend(); iter++) {
+			queue<struct chunk_t *> *other_child_queue_out_ctrl_ptr = NULL;
+			queue<struct chunk_t *> *other_child_queue_out_data_ptr = NULL;
+			struct peer_info_t *child_info = GetChildFromPid(*iter);
+
+			if (child_info != NULL) {
+
+				_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__, __LINE__, "child", *iter, "sock", child_info->sock);
+
+				if (child_info->connection_state == PEER_SELECTED) {
+					if (_peer_ptr->map_out_pid_udpfd.find(*iter) != _peer_ptr->map_out_pid_udpfd.end()) {
+						//other_child_sock = _peer_ptr->map_out_pid_udpfd.find(*iter)->second;
+						if (_peer_ptr->map_udpfd_out_data.find(child_info->sock) != _peer_ptr->map_udpfd_out_data.end()) {
+							other_child_queue_out_data_ptr = _peer_ptr->map_udpfd_out_data[child_info->sock];	// Get queue_out_data_ptr
+						}
+						else {
+							handle_error(UNKNOWN, "[DEBUG] Found child-peer in map_out_pid_udpfd but not found in map_udpfd_out_data", __FUNCTION__, __LINE__);
+						}
+
+						if (_peer_ptr->map_udpfd_out_ctrl.find(child_info->sock) != _peer_ptr->map_udpfd_out_ctrl.end()) {
+							other_child_queue_out_ctrl_ptr = _peer_ptr->map_udpfd_out_ctrl[child_info->sock];	// Get queue_out_data_ptr
+						}
+						else {
+							handle_error(UNKNOWN, "[DEBUG] Found child-peer in map_out_pid_udpfd but not found in map_udpfd_out_data", __FUNCTION__, __LINE__);
+						}
+
+						_log_ptr->write_log_format("s(u) s\tu\td\td\td \n", __FUNCTION__, __LINE__, "[QUEUE INFO] child", *iter, _peer_ptr->map_udpfd_queue[child_info->sock]->length, _peer_ptr->map_udpfd_queue[child_info->sock]->lambda, _peer_ptr->map_udpfd_queue[child_info->sock]->mu);
+						
+						/*
+						UDT::TRACEINFO trace;
+						memset(&trace, 0, sizeof(UDT::TRACEINFO));
+						int nnn = UDT::perfmon(child_info->sock, &trace);
+						*/
+						
+						break;
 					}
-					else if (_peer_ptr->map_out_pid_udpfd.find(child_pid) != _peer_ptr->map_out_pid_udpfd.end()) {
-						child_sock = _peer_ptr->map_out_pid_udpfd[child_pid];	// Get child socket
-					}
-					else {
-						continue;
-					}
-					
-					// 累加每個 queue 的 pending packets
-					int pendingpkt_size;
-					int len = sizeof(pendingpkt_size);
-					UDT::getsockopt(child_sock, 0, UDT_SNDDATA, &pendingpkt_size, &len);
-					_log_ptr->write_log_format("s(u) s\td\td \n", __FUNCTION__, __LINE__, "child pid", child_pid, pendingpkt_size);
+				}
+				else {
+					_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] child", *iter);
 				}
 			}
+			else {
+				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] child", *iter);
+			}
 		}
+
+		for (map<int, struct queue_info *>::iterator iter = _peer_ptr->map_udpfd_queue.begin(); iter != _peer_ptr->map_udpfd_queue.end(); iter++) {
+			iter->second->lambda = 0;
+			iter->second->mu = 0;
+		}
+
+		base_timer = new_timer;
 	}
-	
 
 	// Handle timer of Block Rescue
 	for (unsigned long ss_id = 0; ss_id < sub_stream_num; ss_id++) {
@@ -4167,10 +4202,84 @@ void pk_mgr::time_handle()
 		}
 	}
 
+	// Handle RTT messages
+	for (map<UINT32, struct peer_info_t>::iterator iter = rtt_table.begin(); iter != rtt_table.end(); iter++) {
+		if (_log_ptr->diff_TimerGet_ms(&(iter->second.time_start), &new_timer) >= RTT_CMD_TIMEOUT) {
+			SendRTTToPK(iter->second);
+			_net_udp_ptr->close(iter->second.sock);
+			// map_udpfd_NonBlockIO 還沒清除
+			rtt_table.erase(iter);
+			iter = rtt_table.begin();
+			
+			if (iter == rtt_table.end()) {
+				break;
+			}
+		}
+		// 每 100ms 送一個封包以計算 RTT
+		if (_log_ptr->diff_TimerGet_ms(&(iter->second.time_end), &new_timer) >= 100) {
+			if (UDT::getsockstate(iter->second.sock) == UDTSTATUS::CONNECTED) {
+				// 在 sockstate 還在 CONNECTING 的時候,  UDT 的資料結構還沒初始化完成
+				UDT::TRACEINFO trace;
+				memset(&trace, 0, sizeof(UDT::TRACEINFO));
+				int nnn = UDT::perfmon(iter->second.sock, &trace);
+				_net_udp_ptr->epoll_control(iter->second.sock, EPOLL_CTL_ADD, UDT_EPOLL_OUT);	// 打開 writable
+
+				_log_ptr->write_log_format("s(u) s d s f d d s d \n", __FUNCTION__, __LINE__, "sock", iter->second.sock, "rtt", trace.msRTT, (int)trace.msRTT, iter->second.rtt, "state", UDT::getsockstate(iter->second.sock));
+				_log_ptr->write_log_format("s(u) s d s U s d s d s d s d \n", __FUNCTION__, __LINE__, "sock", iter->second.sock, "SndTotal", trace.pktSentTotal, "SndLossTotal", trace.pktSndLossTotal, "RetransTotal", trace.pktRetransTotal, "RecvAckTotal", trace.pktRecvACKTotal, "RecvNakTotal", trace.pktRecvNAKTotal);
+
+				if (iter->second.rtt > (int)trace.msRTT || iter->second.rtt < 0) {
+					iter->second.rtt = (int)(trace.msRTT) + 1;
+					_log_ptr->write_log_format("s(u) s d s f d \n", __FUNCTION__, __LINE__, "sock", iter->second.sock, "rtt", trace.msRTT, (int)trace.msRTT);
+				}
+			}
+			iter->second.time_end = new_timer;
+			/*
+			printf("sizeof(int) = %d \n", sizeof(int));
+			printf("sizeof(int64_t) = %d \n", sizeof(int64_t));
+			printf("sizeof(double) = %d \n", sizeof(double));
+			printf("sizeof(trace) = %d \n", sizeof(trace));
+			printf("sizeof(UDT::TRACEINFO) = %d \n", sizeof(UDT::TRACEINFO));
+			printf("sizeof(CPerfMon) = %d \n", sizeof(CPerfMon));
+			printf("&(perf->msTimeStamp) = %d size = %d  \n", &(trace.msTimeStamp), sizeof(trace.msTimeStamp));
+			printf("&(perf->pktSentTotal) = %d size = %d  \n", &(trace.pktSentTotal), sizeof(trace.pktSentTotal));
+			printf("&(perf->pktRecvTotal) = %d size = %d  \n", &(trace.pktRecvTotal), sizeof(trace.pktRecvTotal));
+			printf("&(perf->pktSndLossTotal) = %d size = %d  \n", &(trace.pktSndLossTotal), sizeof(trace.pktSndLossTotal));
+			printf("&(perf->pktRcvLossTotal) = %d size = %d  \n", &(trace.pktRcvLossTotal), sizeof(trace.pktRcvLossTotal));
+			printf("&(perf->pktRetransTotal) = %d size = %d  \n", &(trace.pktRetransTotal), sizeof(trace.pktRetransTotal));
+			printf("&(perf->pktSentACKTotal) = %d size = %d  \n", &(trace.pktSentACKTotal), sizeof(trace.pktSentACKTotal));
+			printf("&(perf->pktRecvACKTotal) = %d size = %d  \n", &(trace.pktRecvACKTotal), sizeof(trace.pktRecvACKTotal));
+			printf("&(perf->pktSentNAKTotal) = %d size = %d  \n", &(trace.pktSentNAKTotal), sizeof(trace.pktSentNAKTotal));
+			printf("&(perf->pktRecvNAKTotal) = %d  size = %d \n", &(trace.pktRecvNAKTotal), sizeof(trace.pktRecvNAKTotal));
+			printf("&(perf->usSndDurationTotal) = %d size = %d  \n", &(trace.usSndDurationTotal), sizeof(trace.usSndDurationTotal));
+			printf("&(perf->pktSent) = %d size = %d  \n", &(trace.pktSent), sizeof(trace.pktSent));
+			printf("&(perf->pktRecv) = %d size = %d  \n", &(trace.pktRecv), sizeof(trace.pktRecv));
+			printf("&(perf->pktSndLoss) = %d size = %d  \n", &(trace.pktSndLoss), sizeof(trace.pktSndLoss));
+			printf("&(perf->pktRcvLoss) = %d size = %d  \n", &(trace.pktRcvLoss), sizeof(trace.pktRcvLoss));
+			printf("&(perf->pktRetrans) = %d size = %d  \n", &(trace.pktRetrans), sizeof(trace.pktRetrans));
+			printf("&(perf->pktSentACK) = %d size = %d  \n", &(trace.pktSentACK), sizeof(trace.pktSentACK));
+			printf("&(perf->pktRecvACK) = %d size = %d  \n", &(trace.pktRecvACK), sizeof(trace.pktRecvACK));
+			printf("&(perf->pktSentNAK) = %d size = %d  \n", &(trace.pktSentNAK), sizeof(trace.pktSentNAK));
+			printf("&(perf->pktRecvNAK) = %d size = %d  \n", &(trace.pktRecvNAK), sizeof(trace.pktRecvNAK));
+			printf("&(perf->mbpsSendRate) = %d size = %d  \n", &(trace.mbpsSendRate), sizeof(trace.mbpsSendRate));
+			printf("&(perf->mbpsRecvRate) = %d size = %d  \n", &(trace.mbpsRecvRate), sizeof(trace.mbpsRecvRate));
+			printf("&(perf->usSndDuration) = %d size = %d  \n", &(trace.usSndDuration), sizeof(trace.usSndDuration));
+			printf("&(perf->usPktSndPeriod) = %d size = %d  \n", &(trace.usPktSndPeriod), sizeof(trace.usPktSndPeriod));
+			printf("&(perf->pktFlowWindow) = %d size = %d  \n", &(trace.pktFlowWindow), sizeof(trace.pktFlowWindow));
+			printf("&(perf->pktCongestionWindow) = %d size = %d  \n", &(trace.pktCongestionWindow), sizeof(trace.pktCongestionWindow));
+			printf("&(perf->pktFlightSize) = %d  size = %d \n", &(trace.pktFlightSize), sizeof(trace.pktFlightSize));
+			printf("&(perf->msRTT) = %d  size = %d \n", &(trace.msRTT), sizeof(trace.msRTT));
+			printf("&(perf->mbpsBandwidth) = %d  size = %d \n", &(trace.mbpsBandwidth), sizeof(trace.mbpsBandwidth));
+			printf("&(perf->byteAvailSndBuf) = %d  size = %d \n", &(trace.byteAvailSndBuf), sizeof(trace.byteAvailSndBuf));
+			printf("&(perf->byteAvailRcvBuf) = %d  size = %d \n", &(trace.byteAvailRcvBuf), sizeof(trace.byteAvailRcvBuf));
+			*/
+			
+		}
+	}
+
 	// Timer for building UDP connection
 	for (list<struct delay_build_connection>::iterator iter = _peer_mgr_ptr->_peer_communication_ptr->list_build_connection.begin(); iter != _peer_mgr_ptr->_peer_communication_ptr->list_build_connection.end(); iter++) {
 		if (_log_ptr->diff_TimerGet_ms(&(iter->timer), &new_timer) >= NAT_WAITING_TIME) {
-			_peer_mgr_ptr->_peer_communication_ptr->non_blocking_build_connection_udp_now(iter->candidates_info, iter->caller, iter->manifest, iter->peer_pid, iter->flag, iter->my_session, iter->peercomm_session);
+			_peer_mgr_ptr->_peer_communication_ptr->non_blocking_build_connection_udp_now(iter->candidates_info, iter->caller, iter->manifest, iter->peer_pid, iter->flag, iter->my_session, iter->peercomm_session, 0);
 			_peer_mgr_ptr->_peer_communication_ptr->list_build_connection.erase(iter);
 			iter = _peer_mgr_ptr->_peer_communication_ptr->list_build_connection.begin();
 			if (iter == _peer_mgr_ptr->_peer_communication_ptr->list_build_connection.end()) {
@@ -4185,16 +4294,13 @@ void pk_mgr::time_handle()
 		UINT32 my_session = iter->first;
 		if (iter->second->session_state == SESSION_CONNECTING) {
 			// 2秒的建立時間
+			//_log_ptr->write_log_format("s(u) s u d \n", __FUNCTION__, __LINE__, "my_session", iter->first, _log_ptr->diff_TimerGet_ms(&(iter->second->timer), &new_timer));
 			if (_log_ptr->diff_TimerGet_ms(&(iter->second->timer), &new_timer) >= CONNECT_TIME_OUT) {
 				_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "my_session", iter->first, "state change to SESSION_SELECTING");
+				_log_ptr->write_log_format("s(u) u \n", __FUNCTION__, __LINE__, _log_ptr->diff_TimerGet_ms(&(iter->second->timer), &new_timer));
 				iter->second->session_state = SESSION_SELECTING;
 				int ss_id = manifestToSubstreamID(iter->second->manifest);
-				if (ss_table[ss_id]->state.state == SS_CONNECTING2) {
-					SetSubstreamState(ss_id, SS_TEST2);
-					ss_table[ss_id]->state.is_testing = true;
-					_log_ptr->timerGet(&(ss_table[ss_id]->timer.inTest_timer));
-				}
-				else {
+				if (ss_table[ss_id]->state.state != SS_CONNECTING2) {
 					_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] ss_id", ss_id);
 				}
 			}
@@ -4202,56 +4308,64 @@ void pk_mgr::time_handle()
 		else if (iter->second->session_state == SESSION_SELECTING) {
 			if (iter->second->myrole == CHILD_PEER) {
 				// Selecting parent strategy 
+				_log_ptr->write_log_format("s(u) s u d \n", __FUNCTION__, __LINE__, "my_session", iter->first, _log_ptr->diff_TimerGet_ms(&(iter->second->timer), &new_timer));
 				_peer_mgr_ptr->_peer_communication_ptr->SelectStrategy(my_session);		// 每個 my_session 只會進來一次
 				_peer_mgr_ptr->_peer_communication_ptr->SendPeerCon(my_session);			// 每個 my_session 只會進來一次
-				int n = SendParentTestToPK(my_session);
+				//int n = SendParentTestToPK(my_session);
 
-				if (n == 0) {
-					// Not get any parent in this session
-					unsigned long rescue_manifest = iter->second->manifest;
+				if (SendParentTestToPK(my_session) == 0) {
+					for (unsigned long ss_id = 0; ss_id < sub_stream_num; ss_id++) {
 
-					unsigned long ss_id = manifestToSubstreamID(rescue_manifest);
-					UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-					unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
-					unsigned long pk_new_manifest = pk_old_manifest | manifest;
-					bool need_source = true;
+						// 針對 JOIN 的情況設計
+						UINT32 manifest = SubstreamIDToManifest(ss_id);
+						if ((manifest & iter->second->manifest) == 0) {
+							continue;
+						}
 
+						//unsigned long ss_id = manifestToSubstreamID(rescue_manifest);
+						//UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
+						unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
+						unsigned long pk_new_manifest = pk_old_manifest | manifest;
+						bool need_source = true;
 
-					if (ss_table[ss_id]->state.rescue_after_fail == true) {
-						// RESCUE or MERGE
-						SetSubstreamState(ss_id, SS_RESCUE2);
-						debug_printf("[RESCUE_TYPE] 5 Connect all fail \n");
+						if (ss_table[ss_id]->state.rescue_after_fail == true) {
+							// RESCUE or MERGE
+							SetSubstreamState(ss_id, SS_RESCUE2);
+							debug_printf("[RESCUE_TYPE] 5 Connect all fail \n");
 
-						// Log the messages
-						_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
-						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 5 Connect all fail");
-						_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[RESCUE_TYPE] 5. Connect all fail");
+							// Log the messages
+							//_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 5 Connect all fail");
+							_log_ptr->write_log_format("s(u) s u(u) s \n", __FUNCTION__, __LINE__, "my_pid", my_pid, manifest, "[RESCUE_TYPE] 5. Connect all fail");
+							
+							// Update manifest
+							//set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
 
-						// Update manifest
-						set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
+							//send_parentToPK(manifest, PK_PID+1);
+							NeedSourceDecision(&need_source);
+							//send_rescueManifestToPK(pk_new_manifest, need_source);
+							send_rescueManifestToPK(manifest, need_source);
+							ss_table[ss_id]->state.dup_src = need_source;
 
-						//send_parentToPK(manifest, PK_PID+1);
-						NeedSourceDecision(&need_source);
-						//send_rescueManifestToPK(pk_new_manifest, need_source);
-						send_rescueManifestToPK(manifest, need_source);
-						ss_table[ss_id]->state.dup_src = need_source;
+						}
+						else {
+							// MOVE
+							SetSubstreamState(ss_id, SS_STABLE2);
+							debug_printf("[RESCUE_TYPE] 5M. Connect all fail \n");
 
-						rescue_manifest &= ~SubstreamIDToManifest(ss_id);
+							// Log the messages
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 5M. Connect all fail");
+							_log_ptr->write_log_format("s(u) s u(u) s \n", __FUNCTION__, __LINE__, "my_pid", my_pid, manifest, "[RESCUE_TYPE] 5M. Connect all fail");
+							ss_table[ss_id]->state.rescue_after_fail = true;
+
+							// Update manifest
+							//SetSubstreamParent(manifest, ori_parent_pid);
+							//_peer_mgr_ptr->send_manifest_to_parent(new_parent_pid, manifest, MINUS_OP);		// 告訴新 parent 切斷這條 substream
+							send_parentToPK(manifest, ss_table[ss_id]->current_parent_pid);
+
+							//ResetDetection(ss_id);
+						}
 					}
-					else {
-						// MOVE
-						SetSubstreamState(ss_id, SS_STABLE2);
-						debug_printf("[RESCUE_TYPE] 5 Connect all fail \n");
-
-						// Log the messages
-						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 5M. Connect all fail");
-						_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[RESCUE_TYPE] 5M. Connect all fail");
-						ss_table[ss_id]->state.rescue_after_fail = true;
-					}
-
-
-					//_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "manifest timeout and all connect fail", substream_first_reply_peer_iter->second->rescue_manifest);
-
 				}
 				else {
 					// 有和 peer 建立連線
@@ -4275,220 +4389,24 @@ void pk_mgr::time_handle()
 				_peer_mgr_ptr->_peer_communication_ptr->StopSession(my_session);
 			}
 			else {
-				// Parent 端等待一段時間再刪除 table，為了等待 child 送來的 CHNK_CMD_PEER_CON
-				if (_log_ptr->diff_TimerGet_ms(&(iter->second->timer), &new_timer) >= CONNECT_TIME_OUT+2000) {
+				// Parent 端等待一段時間再刪除 table，為了等待 child 送來的 CHNK_CMD_PEER_CON (保守只給它 2 秒的時間建立連線)
+				if (_log_ptr->diff_TimerGet_ms(&(iter->second->timer), &new_timer) >= CONNECT_TIME_OUT+500) {
+					// Parent 對於一個一直處於 CONNECTING 狀態的 socket，不能持續超過 3 秒，否則程式會死當
+					// 保守只給它 2 秒的時間建立連線
 					_peer_mgr_ptr->_peer_communication_ptr->StopSession(my_session);
 				}
 			}
 			//}
 			break;
 		}
-
 	}
 
-	/*
-	// Handle each session
-	for (substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer.begin(); substream_first_reply_peer_iter != _peer_ptr->substream_first_reply_peer.end(); ) {
-		unsigned long session_id = substream_first_reply_peer_iter->first;
-		
-		if (substream_first_reply_peer_iter->second->peer_role == PARENT_PEER) {
-			// If receive CHNK_CMD_PEER_CON, regarding that peer as first connected peer
-
-
-			if (substream_first_reply_peer_iter->second->session_state == FIRST_CONNECTED_READY) {
-
-			}
-			else if (substream_first_reply_peer_iter->second->session_state == FIRST_CONNECTED_RUNNING) {
-
-			}
-			else if (substream_first_reply_peer_iter->second->session_state == FIRST_CONNECTED_OK) {
-				substream_first_reply_peer_iter->second->session_state = FIRST_REPLY_READY;
-			}
-			else if (substream_first_reply_peer_iter->second->session_state == FIRST_REPLY_READY) {
-				_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "session", session_id, "handle_test_delay");
-				if (_peer_mgr_ptr->handle_test_delay(session_id) > 0) {
-					substream_first_reply_peer_iter->second->session_state = FIRST_REPLY_RUNNING;
-
-				}
-			}
-			else if (substream_first_reply_peer_iter->second->session_state == FIRST_REPLY_RUNNING) {
-
-			}
-			else if (substream_first_reply_peer_iter->second->session_state == FIRST_REPLY_OK) {
-				// If receive CHNK_CMD_PEER_TEST_DELAY REPLY, regarding that peer as real parent
-				
-				// 會進到這個 state 表示有拿到 first reply peer，立刻告訴 PK 這次 session 的結果
-				if (substream_first_reply_peer_iter->second->sentTestFlag == FALSE) {
-					SendParentTestToPK(session_id);
-					substream_first_reply_peer_iter->second->sentTestFlag = TRUE;
-				}
-			}
-
-
-			// Stop the session when timeout
-			if (_log_ptr->diff_TimerGet_ms(&(substream_first_reply_peer_iter->second->connectTimeOut), &new_timer) >= CONNECT_TIME_OUT) {
-				
-				// 如果全部都連線失敗，2秒後會告訴 PK 這次 session 的結果，順序要在 rescue 之前
-				if (substream_first_reply_peer_iter->second->sentTestFlag == FALSE) {
-					SendParentTestToPK(session_id);
-					substream_first_reply_peer_iter->second->sentTestFlag = TRUE;
-				}
-
-				if (substream_first_reply_peer_iter->second->session_state != FIRST_REPLY_OK) {
-					// Not get any parent in this session
-					unsigned long rescue_manifest = substream_first_reply_peer_iter->second->rescue_manifest;
-
-					while (rescue_manifest > 0) {
-						unsigned long ss_id = manifestToSubstreamID(rescue_manifest);
-						UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-						unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
-						unsigned long pk_new_manifest = pk_old_manifest | manifest;
-						bool need_source = true;
-						int candidate_num = -1;
-						int candidate_pid = -1;
-						int candidate_pid2 = -1;
-
-						if (_peer_mgr_ptr->_peer_communication_ptr->map_mysession_candidates.find(session_id) != _peer_mgr_ptr->_peer_communication_ptr->map_mysession_candidates.end()) {
-							candidate_num = _peer_mgr_ptr->_peer_communication_ptr->map_mysession_candidates.find(session_id)->second->candidates_num;
-							candidate_pid = _peer_mgr_ptr->_peer_communication_ptr->map_mysession_candidates.find(session_id)->second->candidates_info[0].pid;
-							if (candidate_num == 2) {
-								candidate_pid2 = _peer_mgr_ptr->_peer_communication_ptr->map_mysession_candidates.find(session_id)->second->candidates_info[0].pid;
-							}
-						}
-
-						
-						if (ss_table[ss_id]->state.rescue_after_fail == true) {
-							// RESCUE or MERGE
-							SetSubstreamState(ss_id, SS_RESCUE2);
-							debug_printf("[RESCUE_TYPE] 5 Connect all fail %d %d %d \n", candidate_num, candidate_pid, candidate_pid2);
-
-							// Log the messages
-							_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d d d \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 5 Connect all fail", candidate_num, candidate_pid, candidate_pid2);
-							_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[RESCUE_TYPE] 5. Connect all fail");
-
-							// Update manifest
-							set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
-
-							//send_parentToPK(manifest, PK_PID+1);
-							NeedSourceDecision(&need_source);
-							//send_rescueManifestToPK(pk_new_manifest, need_source);
-							send_rescueManifestToPK(manifest, need_source);
-							ss_table[ss_id]->state.dup_src = need_source;
-
-							rescue_manifest &= ~SubstreamIDToManifest(ss_id);
-						}
-						else {
-							// MOVE
-							SetSubstreamState(ss_id, SS_STABLE2);
-							debug_printf("[RESCUE_TYPE] 5 Connect all fail %d %d %d \n", candidate_num, candidate_pid, candidate_pid2);
-
-							// Log the messages
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d d d \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 5M. Connect all fail", candidate_num, candidate_pid, candidate_pid2);
-							_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[RESCUE_TYPE] 5M. Connect all fail");
-							ss_table[ss_id]->state.rescue_after_fail = true;
-						}
-					}
-
-					_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "manifest timeout and all connect fail", substream_first_reply_peer_iter->second->rescue_manifest);
-
-				}
-				else {
-					// 有和 peer 建立連線
-					if (_peer_mgr_ptr->_peer_communication_ptr->map_mysession_candidates.find(session_id) != _peer_mgr_ptr->_peer_communication_ptr->map_mysession_candidates.end()) {
-						if (_peer_mgr_ptr->_peer_communication_ptr->map_mysession_candidates[session_id]->all_behind_nat == TRUE) {
-							_logger_client_ptr->add_nat_success_times();
-						}
-					}
-				}
-				
-
-				
-				
-
-				int ss_id = manifestToSubstreamID(substream_first_reply_peer_iter->second->rescue_manifest);
-				ss_table[ss_id]->state.connecting_peer = false;
-				_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "Set substream", ss_id, "unblock by connecting peer");
-
-				unsigned long selected_pid = substream_first_reply_peer_iter->second->selected_pid;		// selected_pid 如果是 PK 代表這次 session 的 candidate 都沒建立成功
-
-				_peer_mgr_ptr->_peer_communication_ptr->StopSession(session_id);
-				_peer_ptr->StopSession(session_id);
-				for (multimap <unsigned long, struct peer_info_t *>::iterator iter = map_pid_parent_temp.begin(); iter != map_pid_parent_temp.end(); ) {
-					_log_ptr->write_log_format("s(u) s u s u s u s u \n", __FUNCTION__, __LINE__,
-						"size()", map_pid_parent_temp.size(),
-						"pid", iter->second->pid,
-						"manifest", iter->second->manifest,
-						"count", map_pid_parent_temp.count(iter->second->pid));
-
-					if (iter->second->priority == session_id) {
-						
-						for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = map_pid_parent.begin(); iter != map_pid_parent.end(); iter++) {
-							_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "pid", iter->first, "manifest", iter->second->peerInfo.manifest);
-						}
-						// Update temp-parent's manifest and erase when session stop, except the selected peer
-						if (iter->second->pid != selected_pid) {
-							map<unsigned long, struct peer_connect_down_t *>::iterator parent_iter = map_pid_parent.find(iter->first);
-							if (parent_iter != map_pid_parent.end()) {
-								set_parent_manifest(parent_iter->second, parent_iter->second->peerInfo.manifest & ~(iter->second->manifest));
-								_peer_mgr_ptr->send_manifest_to_parent(parent_iter->second->peerInfo.manifest, parent_iter->second->peerInfo.pid);
-								_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "manifest", parent_iter->second->peerInfo.manifest);
-								if (parent_iter->second->peerInfo.manifest == 0) {
-									_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "manifest", parent_iter->second->peerInfo.manifest);
-									_peer_ptr->CloseParent(parent_iter->first, false, "Session stop and manifest = 0");
-									//delete parent_iter->second;
-									//map_pid_parent.erase(parent_iter);
-									
-								}
-							}
-							else {
-								_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "Not found pid", iter->first, "in map_pid_parent");
-							}
-						}
-						delete iter->second;
-						iter = map_pid_parent_temp.erase(iter);
-					}
-					else {
-						iter++;
-					}
-				}
-				substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer.begin();
-			}
-			else {
-				substream_first_reply_peer_iter++;
-			}
-		}
-		else if (substream_first_reply_peer_iter->second->peer_role == CHILD_PEER) {
-			if (_log_ptr->diff_TimerGet_ms(&(substream_first_reply_peer_iter->second->connectTimeOut), &new_timer) >= CONNECT_TIME_OUT) {
-				
-				_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__,
-					"session", substream_first_reply_peer_iter->first,
-					"state", substream_first_reply_peer_iter->second->session_state);
-
-				unsigned long session_state = substream_first_reply_peer_iter->second->session_state;
-				_peer_mgr_ptr->_peer_communication_ptr->StopSession(session_id);
-				_peer_ptr->StopSession(session_id);
-				
-				substream_first_reply_peer_iter = _peer_ptr->substream_first_reply_peer.begin();
-			}
-			else {
-				substream_first_reply_peer_iter++;
-			}
-			
-		}
-	}
-	*/
-	/////////////////for connect timeout  END/////////////////////////////
-
-	
 	/*	Log periodically sending(source-delay, quality, and bandwidth)	*/
-	struct timerStruct log_now_time;
-	_log_ptr->timerGet(&log_now_time);
-	
+
 	// send source-delay
 	if (_logger_client_ptr->log_source_delay_init_flag) {
-		if (_log_ptr->diff_TimerGet_ms(&(_logger_client_ptr->log_period_source_delay_start),&log_now_time) > LOG_DELAY_SEND_PERIOD) {
-			_logger_client_ptr->log_period_source_delay_start = log_now_time;
+		if (_log_ptr->diff_TimerGet_ms(&(_logger_client_ptr->log_period_source_delay_start),&new_timer) > LOG_DELAY_SEND_PERIOD) {
+			_logger_client_ptr->log_period_source_delay_start = new_timer;
 			send_source_delay(_sock);		// Send souce-delay to pk
 			_logger_client_ptr->send_max_source_delay();		// Send source-delay to log-server
 			send_topology_to_log();				// Send topology to log-server
@@ -4523,7 +4441,7 @@ void pk_mgr::time_handle()
 			}
 			for (int ss_id = 0; ss_id < sub_stream_num; ss_id++) {
 				debug_printf("ss %d  parent %d  state %d \n", ss_id, ss_table[ss_id]->current_parent_pid, ss_table[ss_id]->state.state);
-				_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__, __LINE__, "ss_id", ss_id, "parent", ss_table[ss_id]->current_parent_pid);
+				_log_ptr->write_log_format("s(u) s u s d s d \n", __FUNCTION__, __LINE__, "ss_id", ss_id, "parent", ss_table[ss_id]->current_parent_pid, "state", ss_table[ss_id]->state.state);
 			}
 			for (list<unsigned long>::iterator iter = _peer_ptr->priority_children.begin(); iter != _peer_ptr->priority_children.end(); iter++) {
 				//debug_printf("priority child %d \n", *iter);
@@ -4534,20 +4452,28 @@ void pk_mgr::time_handle()
 			}
 			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "_peer_ptr->substream_first_reply_peer.size()", _peer_ptr->substream_first_reply_peer.size());
 			
-			
+		}
+	}
+
+	// 隨時檢查 Child socket state，一不正常就關閉，為了讓 queue 準確
+	for (map<unsigned long, struct peer_info_t *>::iterator iter = map_pid_child.begin(); iter != map_pid_child.end(); iter++) {
+		//debug_printf("child %d  manifest %d  state %d \n", iter->first, iter->second->manifest, iter->second->state);
+		if (iter->second->connection_state == UDTSTATUS::BROKEN) {
+			_peer_ptr->CloseChild(iter->first, iter->second->sock, false, "Socket state is BROKEN");
 		}
 	}
 	
 	// send quality and bandwidth
 	if (_logger_client_ptr->log_bw_in_init_flag) {
-		if (_log_ptr->diff_TimerGet_ms(&(_logger_client_ptr->log_period_bw_start),&log_now_time) > LOG_BW_SEND_PERIOD) {
-			_logger_client_ptr->log_period_bw_start = log_now_time;
+		if (_log_ptr->diff_TimerGet_ms(&(_logger_client_ptr->log_period_bw_start), &new_timer) > LOG_BW_SEND_PERIOD) {
+			_logger_client_ptr->log_period_bw_start = new_timer;
 			_logger_client_ptr->send_bw();
 		}
 	}
 
 	// Substream Timeout Detection
 	for (unsigned long ss_id = 0; ss_id < sub_stream_num; ss_id++) {
+		UINT32 manifest = SubstreamIDToManifest(ss_id);		// The manifest of this substream ID
 		// 在觸發 rescue 的前一秒送 blocl_rescue 給相關的 child-peers
 		int threshold = (DATA_TIMEOUT - 1000) > 0 ? DATA_TIMEOUT - 1000 : DATA_TIMEOUT;
 		if (_log_ptr->diff_TimerGet_ms(&ss_table[ss_id]->timer.timer, &new_timer) >= threshold && ss_table[ss_id]->can_send_block_rescue == TRUE) {
@@ -4558,43 +4484,213 @@ void pk_mgr::time_handle()
 				ss_table[ss_id]->can_send_block_rescue = FALSE;
 			}
 		}
-
+		
 		if (_log_ptr->diff_TimerGet_ms(&ss_table[ss_id]->timer.timer, &new_timer) >= DATA_TIMEOUT) {
 
-			map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
+			//map<unsigned long, struct peer_connect_down_t *>::iterator pid_peerDown_info_iter;
 			struct peer_connect_down_t *parent_info = NULL;
-			unsigned long parent_pid = -1;
+			
+			parent_info = GetParentFromPid(ss_table[ss_id]->current_parent_pid);
 
 			// Get neccessary info
-			// 這部分因為可能找不到 substream 的 parent，先暫時分兩部分寫
-			parent_pid = ss_table[ss_id]->current_parent_pid;
-			if ((pid_peerDown_info_iter = map_pid_parent.find(parent_pid)) == map_pid_parent.end()) {
+			// 這部分因為可能找不到 substream 的 parent，先暫時分兩部分寫(其他 class 的在 pkt_in 或 pkt_out 發現 socket 有問題而刪除 table)
+			//parent_pid = ss_table[ss_id]->current_parent_pid;
+			if (parent_info == NULL) {
 				// Timeout 發生時沒有找到 parent-peer
-				debug_printf("parent pid %d \n", parent_pid);
-				//handle_error(MACCESS_ERROR, "[ERROR] not found pid in map_pid_parent", __FUNCTION__, __LINE__);
-
-
+				
 				if (ss_table[ss_id]->block_rescue == FALSE) {
-						UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
+					// 沒有找到 parent 情況下就不管是不是 MOVE，都向 PK 發出 RESCUE
+					unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
+					unsigned long pk_new_manifest = pk_old_manifest | manifest;
+					bool need_source = true;
+
+					SetSubstreamState(ss_id, SS_RESCUE2);
+					debug_printf("[RESCUE_TYPE] 3 ss_id %d timeout \n", ss_id);
+
+					// Log the messages
+					_logger_client_ptr->log_to_server(LOG_TIME_OUT, SubstreamIDToManifest(ss_id));
+					_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
+					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 3 Not found parent");
+					_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__,
+						"[RESCUE_TYPE] 3 Rescue in STABLE state. ss_id =", ss_id,
+						"Not found parent");
+
+					ss_table[ss_id]->state.is_testing = false;
+
+					// Update manifest
+					SetParentManifest(pkDownInfoPtr, pk_new_manifest);
+					SetSubstreamParent(manifest, PK_PID);
+
+					//send_parentToPK(manifest, PK_PID+1);
+					NeedSourceDecision(&need_source);
+					//send_rescueManifestToPK(pk_new_manifest, need_source);
+					send_rescueManifestToPK(manifest, need_source);
+					ss_table[ss_id]->state.dup_src = need_source;
+
+					// Reset source delay parameters of testing substream of this parent
+					ResetDetection(ss_id);
+				}
+				else {
+					// 因為不是頭，不觸發 RESCUE
+					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s \n", "my_pid", my_pid, manifest, "Block Rescue [RESCUE_TYPE] 3. Parent Not Found");
+					_log_ptr->write_log_format("s(u) s u(u) s \n", __FUNCTION__, __LINE__,
+						"Block Rescue [RESCUE_TYPE] 3. my_pid", my_pid, manifest,
+						"parent Not Found");
+
+					ResetDetection(ss_id);
+					ss_table[ss_id]->state.rescue_after_fail = true;		// 回到預設值
+				}
+			}
+			else {
+				// Timeout 發生時有找到 parent-peer
+				if (ss_table[ss_id]->block_rescue == FALSE) {
+					if (parent_info->peerInfo.pid == PK_PID) {
 						unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
 						unsigned long pk_new_manifest = pk_old_manifest | manifest;
 						bool need_source = true;
 
 						SetSubstreamState(ss_id, SS_RESCUE2);
-						debug_printf("[RESCUE_TYPE] 3 substreamID %d timeout \n", ss_id);
+						debug_printf("[RESCUE_TYPE] 3 Parent is PK \n");
 
 						// Log the messages
-						_logger_client_ptr->log_to_server(LOG_TIME_OUT, SubstreamIDToManifest(ss_id));
-						_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
-						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 3 Not found parent");
-						_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__,
-							"[RESCUE_TYPE] 3 Rescue in STABLE state. ss_id =", ss_id,
-							"Not found parent");
-
-						ss_table[ss_id]->state.is_testing = false;
+						//_logger_client_ptr->log_to_server(LOG_TIME_OUT, SubstreamIDToManifest(ss_id));
+						//_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 3. Parent", parent_info->peerInfo.pid);
+						_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+							"[RESCUE_TYPE] 3. my_pid", my_pid, manifest,
+							"parent", parent_info->peerInfo.pid);
 
 						// Update manifest
-						set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
+						SetParentManifest(pkDownInfoPtr, pk_new_manifest);
+						ss_table[ss_id]->previous_parent_pid = ss_table[ss_id]->current_parent_pid;
+						SetSubstreamParent(manifest, PK_PID);
+
+						//send_parentToPK(manifest, PK_PID+1);
+						NeedSourceDecision(&need_source);
+						//send_rescueManifestToPK(pk_new_manifest, need_source);
+						send_rescueManifestToPK(manifest, need_source);
+						ss_table[ss_id]->state.dup_src = need_source;
+
+						//handle_error(RECV_NODATA, "[ERROR] Rescue triggered. PK timeout", __FUNCTION__, __LINE__);
+
+						// Reset source delay parameters of testing substream of this parent
+						ResetDetection(ss_id);
+					}
+					else {
+						UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
+						unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
+						unsigned long parent_old_manifest = parent_info->peerInfo.manifest;
+						unsigned long pk_new_manifest = pk_old_manifest | manifest;
+						unsigned long parent_new_manifest = parent_old_manifest & ~manifest;
+						bool need_source = true;
+
+						SetSubstreamState(ss_id, SS_RESCUE2);
+						debug_printf("[RESCUE_TYPE] 3. ss_id %d timeout \n", ss_id);
+
+						// Log the messages
+						//_logger_client_ptr->log_to_server(LOG_TIME_OUT, SubstreamIDToManifest(ss_id));
+						//_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 3. Parent", parent_info->peerInfo.pid);
+						_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+							"[RESCUE_TYPE] 3. my_pid", my_pid, manifest,
+							"parent", parent_info->peerInfo.pid);
+
+
+						// Update manifest
+						SetParentManifest(pkDownInfoPtr, pk_new_manifest);
+						SetParentManifest(parent_info, parent_new_manifest);
+						ss_table[ss_id]->previous_parent_pid = parent_info->peerInfo.pid;
+						SetSubstreamParent(manifest, PK_PID);
+						_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, manifest, MINUS_OP);
+						if (parent_info->peerInfo.manifest == 0) {
+							_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[REASON] manifest = 0 parent", parent_info->peerInfo.pid);
+							_peer_ptr->CloseParent(parent_info->peerInfo.pid, parent_info->peerInfo.sock, false, "[REASON] manifest = 0");
+						}
+
+						//send_parentToPK(manifest, PK_PID+1);
+						NeedSourceDecision(&need_source);
+						//send_rescueManifestToPK(pk_new_manifest, need_source);
+						send_rescueManifestToPK(manifest, need_source);
+						ss_table[ss_id]->state.dup_src = need_source;
+
+						// Reset source delay parameters of testing substream of this parent
+						ResetDetection(ss_id);
+
+					}
+				}
+				else {
+					// 因為不是頭，不觸發 RESCUE
+					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", my_pid, manifest, "Block Rescue [RESCUE_TYPE] 3. Parent", parent_info->peerInfo.pid);
+					_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+						"Block Rescue [RESCUE_TYPE] 3. my_pid", my_pid, manifest,
+						"parent", parent_info->peerInfo.pid);
+				
+					ResetDetection(ss_id);
+					ss_table[ss_id]->state.rescue_after_fail = true;		// 回到預設值
+				}
+			}
+		}
+	}
+
+	// SS_STATE state Timer
+	for (unsigned long ss_id = 0; ss_id < sub_stream_num; ss_id++) {
+		// 狀態可能不在 SS_TEST 狀態，因為測試過程中隨時可能觸發 RESCUE
+		if (ss_table[ss_id]->state.state == SS_TEST2 && _log_ptr->diff_TimerGet_ms(&ss_table[ss_id]->inTest.timer, &new_timer) >= TEST_DELAY_TIME) {
+			// SS_TEST 狀態時間結束
+			// Success - RESCUE/MERGE - 1.有找到 new_parent -> 更新拓樸  
+			//         -              - 2.沒找到 new_parent -> 觸發 RESCUE
+			//         - MOVE         - 1.有找到 new_parent 和 ori_parent -> 更新拓墣  
+			//         -              - 2.其中一個沒找到 -> 觸發 RESCUE
+			//
+			// Failure - RESCUE/MERGE - 1.不管有沒有找到 new_parent -> 觸發 RESCUE
+			//         - MOVE         - 1.不管有沒有找到 new_parent -> 沒任何動作
+
+			_log_ptr->write_log_format("s(u) u \n", __FUNCTION__, __LINE__, _log_ptr->diff_TimerGet_ms(&ss_table[ss_id]->inTest.timer, &new_timer));
+
+			struct peer_connect_down_t *ori_parent_info = NULL;
+			struct peer_connect_down_t *new_parent_info = NULL;		// 有可能找不到(因為其他原因而先前已經關閉 socket)
+			unsigned long ori_parent_pid = ss_table[ss_id]->current_parent_pid;
+			unsigned long ori_parent_new_manifest = 0;
+			unsigned long new_parent_pid = ss_table[ss_id]->testing_parent_pid;
+			unsigned long new_parent_new_manifest = 0;
+			UINT32 manifest = SubstreamIDToManifest(ss_id);
+
+			ori_parent_info = GetParentFromPid(ori_parent_pid);
+			new_parent_info = GetParentFromPid(new_parent_pid);
+
+			//// 決定測試結果成功或失敗
+			if (ss_table[ss_id]->inTest.pkt_count < (pkt_rate / sub_stream_num)) {
+				// 若測試期間收到太少的封包數量, 認定測試結果失敗
+				ss_table[ss_id]->inTest.inTest_success = FALSE;
+				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "pkt_count", ss_table[ss_id]->inTest.pkt_count);
+			}
+			if (ss_table[ss_id]->inTest.overdelay_count > (TEST_DELAY_TIME/1000)) {
+				// 若測試期間收到太多封包超出MAX_DELAY, 認定測試結果失敗
+				ss_table[ss_id]->inTest.inTest_success = FALSE;
+				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "overdelay_count", ss_table[ss_id]->inTest.overdelay_count);
+			}
+
+
+			// 至少需要收到一定量的封包，否則就算 inTest_success 也判定測試失敗
+			if (ss_table[ss_id]->inTest.inTest_success == TRUE) {
+				// 測試期間都沒任何問題
+				if (ss_table[ss_id]->state.rescue_after_fail == true) {
+					// RESCUE or MERGE
+					if (new_parent_info == NULL) {
+						// 測試期間成功，但最後找不到 new_parent，觸發 RESCUE
+						unsigned long pk_new_manifest = pkDownInfoPtr->peerInfo.manifest | manifest;
+						bool need_source = true;
+
+						SetSubstreamState(ss_id, SS_RESCUE2);
+
+						// Log the messages
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 7. Not Found new_parent", new_parent_pid);
+						_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+							"my_pid", my_pid, manifest,
+							"[RESCUE_TYPE] 7. new_parent", new_parent_pid);
+
+						// Update manifest
+						SetParentManifest(pkDownInfoPtr, pk_new_manifest);
 						SetSubstreamParent(manifest, PK_PID);
 
 						//send_parentToPK(manifest, PK_PID+1);
@@ -4605,41 +4701,135 @@ void pk_mgr::time_handle()
 
 						// Reset source delay parameters of testing substream of this parent
 						ResetDetection(ss_id);
+					}
+					else {
+						unsigned long pk_new_manifest = pkDownInfoPtr->peerInfo.manifest & ~manifest;
+
+						_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "Test success  new_parent", new_parent_pid, "ss_id", ss_id);
+
+						SetSubstreamState(ss_id, SS_STABLE2);
+						new_parent_info->outBuffCount = 0;
+
+						// Test-delay succeed. Cut the substream from pk
+						SetParentManifest(pkDownInfoPtr, pk_new_manifest);
+						send_rescueManifestToPKUpdate(pk_new_manifest);
+						
+						ss_table[ss_id]->state.dup_src = false;
+
+						//選擇selected peer 送topology
+						send_parentToPK(manifest, new_parent_pid);
+						ss_table[ss_id]->previous_parent_pid = ss_table[ss_id]->current_parent_pid;
+						SetSubstreamParent(manifest, new_parent_pid);
+
+						ResetDetection(ss_id);
+					}
 				}
 				else {
-					UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-					debug_printf("Block Rescue [RESCUE_TYPE] 3 substreamID %d timeout \n", ss_id);
-					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s \n", "pid", my_pid, manifest, "Block Rescue [RESCUE_TYPE] 3 Not found parent");
-					_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__,
-						"Block Rescue [RESCUE_TYPE] 3 Rescue in STABLE state. ss_id =", ss_id,
-						"Not found parent");
-					ResetDetection(ss_id);
+					// MOVE
+					if (ori_parent_info == NULL || new_parent_info == NULL) {
+						// 測試期間成功，但新的或原本的 parent 沒找到，觸發 RESCUE
+						unsigned long pk_new_manifest = pkDownInfoPtr->peerInfo.manifest | manifest;
+						bool need_source = true;
+
+						SetSubstreamState(ss_id, SS_RESCUE2);
+
+						// Log the messages
+						if (ori_parent_info == NULL) {
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", my_pid, manifest, "Not Found ori_parent", ori_parent_pid);
+							_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+								"my_pid", my_pid, manifest,
+								"ori_parent", ori_parent_pid);
+						}
+						if (new_parent_info == NULL) {
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", my_pid, manifest, "Not Found new_parent", new_parent_pid);
+							_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+								"my_pid", my_pid, manifest,
+								"new_parent", new_parent_pid);
+						}
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 7. Test fail  new_parent", new_parent_pid);
+						_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+							"my_pid", my_pid, manifest,
+							"[RESCUE_TYPE] 7.  test fail new_parent", new_parent_pid);
+
+						// Update manifest
+						SetParentManifest(pkDownInfoPtr, pk_new_manifest);
+						ss_table[ss_id]->previous_parent_pid = ss_table[ss_id]->current_parent_pid;
+						SetSubstreamParent(manifest, PK_PID);
+
+						//send_parentToPK(manifest, PK_PID+1);
+						NeedSourceDecision(&need_source);
+						//send_rescueManifestToPK(pk_new_manifest, need_source);
+						send_rescueManifestToPK(manifest, need_source);
+						ss_table[ss_id]->state.dup_src = need_source;
+
+						// Reset source delay parameters of testing substream of this parent
+						ResetDetection(ss_id);
+					}
+					else {
+						ori_parent_new_manifest = ori_parent_info->peerInfo.manifest & ~manifest;
+						//new_parent_new_manifest = new_parent_info->peerInfo.manifest | manifest;
+
+						_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "Test success  ori_parent", ori_parent_pid, "new_parent", new_parent_pid);
+
+						SetSubstreamState(ss_id, SS_STABLE2);
+						new_parent_info->outBuffCount = 0;
+
+						// Test-delay succeed. Cut the substream from ori_parent
+						SetParentManifest(ori_parent_info, ori_parent_new_manifest);
+						//set_parent_manifest(new_parent_info, new_parent_new_manifest);
+						_peer_mgr_ptr->send_manifest_to_parent(ori_parent_pid, manifest, MINUS_OP);		// 告訴舊 parent 切斷這條 substream
+
+						if (ori_parent_info->peerInfo.manifest == 0) {
+							_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[REASON] manifest = 0", ori_parent_pid);
+							_peer_ptr->CloseParent(ori_parent_pid, new_parent_info->peerInfo.sock, false, "[REASON] manifest = 0");
+						}
+						
+						ss_table[ss_id]->state.dup_src = false;
+
+						//選擇selected peer 送topology
+						send_parentToPK(manifest, new_parent_pid);
+						ss_table[ss_id]->previous_parent_pid = ss_table[ss_id]->current_parent_pid;
+						SetSubstreamParent(manifest, new_parent_pid);
+
+						ResetDetection(ss_id);
+					}
 				}
 			}
 			else {
-				// Timeout 發生時有找到 parent-peer
-				parent_info = pid_peerDown_info_iter->second;
-				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "Rescue triggered. timeout. ss_id =", ss_id);
+				if (ss_table[ss_id]->state.rescue_after_fail == true) {
+					// RESCUE or MERGE
+					// 會進到這裡是因為在 TEST_DELAY_TIME 期間收到不足的封包數量，parent 已在飽和狀態
 
-				if (parent_pid == PK_PID) {
-					UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-					unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
-					unsigned long pk_new_manifest = pk_old_manifest | manifest;
+					if (new_parent_info != NULL) {
+						new_parent_new_manifest = new_parent_info->peerInfo.manifest & ~manifest;
+						SetParentManifest(new_parent_info, new_parent_new_manifest);
+						_peer_mgr_ptr->send_manifest_to_parent(new_parent_pid, manifest, MINUS_OP);
+						if (new_parent_info->peerInfo.manifest == 0) {
+							_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[REASON] manifest = 0 parent", new_parent_pid);
+							_peer_ptr->CloseParent(new_parent_pid, new_parent_info->peerInfo.sock, false, "[REASON] manifest = 0");
+						}
+					}
+					else {
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "pid", my_pid, manifest, "Not Found new_parent", new_parent_pid);
+						_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+							"my_pid", my_pid, manifest,
+							"Not Found new_parent", new_parent_pid);
+					}
+					
+					unsigned long pk_new_manifest = pkDownInfoPtr->peerInfo.manifest | manifest;
 					bool need_source = true;
 
 					SetSubstreamState(ss_id, SS_RESCUE2);
-					debug_printf("[RESCUE_TYPE] 3 Parent is PK \n");
 
 					// Log the messages
-					_logger_client_ptr->log_to_server(LOG_TIME_OUT, SubstreamIDToManifest(ss_id));
-					_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
-					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s \n", "pid", my_pid, "[RESCUE_TYPE] 3 Parent is PK");
-					_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "[RESCUE_TYPE] 3 Parent is PK");
-
-					ss_table[ss_id]->state.is_testing = false;
+					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 7. test fail new_parent", new_parent_pid);
+					_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+						"my_pid", my_pid, manifest,
+						"[RESCUE_TYPE] 7. test fail new_parent", new_parent_pid);
 
 					// Update manifest
-					set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
+					SetParentManifest(pkDownInfoPtr, pk_new_manifest);
+					ss_table[ss_id]->previous_parent_pid = ss_table[ss_id]->current_parent_pid;
 					SetSubstreamParent(manifest, PK_PID);
 
 					//send_parentToPK(manifest, PK_PID+1);
@@ -4648,128 +4838,51 @@ void pk_mgr::time_handle()
 					send_rescueManifestToPK(manifest, need_source);
 					ss_table[ss_id]->state.dup_src = need_source;
 
-					//handle_error(RECV_NODATA, "[ERROR] Rescue triggered. PK timeout", __FUNCTION__, __LINE__);
-
 					// Reset source delay parameters of testing substream of this parent
 					ResetDetection(ss_id);
 				}
 				else {
-					debug_printf("parent pid %d ss_id %d Time out \n", parent_pid, ss_id);
-					_log_ptr->write_log_format("s(u) u s u \n", __FUNCTION__, __LINE__, my_pid, "Parent-peer Timeout. pid =", parent_pid);
-					//_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u u \n", "my_pid", my_pid, "Parent-peer Timeout. pid =", parent_pid, __LINE__);
-					if (ss_table[ss_id]->block_rescue == FALSE) {
-						if (ss_table[ss_id]->state.state == SS_STABLE2 || ss_table[ss_id]->state.state == SS_INIT) {
-							UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-							unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
-							unsigned long parent_old_manifest = parent_info->peerInfo.manifest;
-							unsigned long pk_new_manifest = pk_old_manifest | manifest;
-							unsigned long parent_new_manifest = parent_old_manifest & ~manifest;
-							bool need_source = true;
-
-							SetSubstreamState(ss_id, SS_RESCUE2);
-							debug_printf("[RESCUE_TYPE] 3 substreamID %d timeout \n", ss_id);
-
-							// Log the messages
-							_logger_client_ptr->log_to_server(LOG_TIME_OUT, SubstreamIDToManifest(ss_id));
-							_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 3 Parent", parent_info->peerInfo.pid, "timeout");
-							_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__,
-								"[RESCUE_TYPE] 3 Rescue in STABLE state. ss_id =", ss_id,
-								"parent pid =", parent_info->peerInfo.pid);
-
-							ss_table[ss_id]->data.previousParentPID = parent_info->peerInfo.pid;
-							ss_table[ss_id]->state.is_testing = false;
-
-							// Update manifest
-							set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
-							set_parent_manifest(parent_info, parent_new_manifest);
-							SetSubstreamParent(manifest, PK_PID);
-							_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, parent_new_manifest, TOTAL_OP);
-							if (parent_info->peerInfo.manifest == 0) {
-								_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[REASON] manifest = 0 parent", parent_info->peerInfo.pid);
-								_peer_ptr->CloseParent(parent_info->peerInfo.pid, false, "[REASON] manifest = 0");
-								_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[CHECK POINT] map_pid_parent.size()", map_pid_parent.size());
-							}
-
-							//send_parentToPK(manifest, PK_PID+1);
-							NeedSourceDecision(&need_source);
-							//send_rescueManifestToPK(pk_new_manifest, need_source);
-							send_rescueManifestToPK(manifest, need_source);
-							ss_table[ss_id]->state.dup_src = need_source;
-
-							// Reset source delay parameters of testing substream of this parent
-							ResetDetection(ss_id);
-						}
-						else if (ss_table[ss_id]->state.state == SS_CONNECTING2) {
-							// No more trigger rescue again
-							debug_printf("Should not happen \n");
-						}
-						else if (ss_table[ss_id]->state.state == SS_RESCUE2) {
-							// No more trigger rescue again
-							debug_printf("Should not happen \n");
-						}
-						else if (ss_table[ss_id]->state.state == SS_TEST2) {
-							UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-							unsigned long pk_old_manifest = pkDownInfoPtr->peerInfo.manifest;
-							unsigned long parent_old_manifest = parent_info->peerInfo.manifest;
-							unsigned long pk_new_manifest = pk_old_manifest | manifest;
-							unsigned long parent_new_manifest = parent_old_manifest & ~manifest;
-							bool need_source = true;
-
-							SetSubstreamState(ss_id, SS_RESCUE2);
-							debug_printf("[RESCUE_TYPE] 3 Parent timeout \n");
-
-							// Log the messages
-							_logger_client_ptr->log_to_server(LOG_TEST_DETECTION_FAIL, SubstreamIDToManifest(ss_id), PK_PID);
-							_logger_client_ptr->log_to_server(LOG_TOPO_RESCUE_TRIGGER, manifest, PK_PID);
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s \n", "pid", my_pid, manifest, "[RESCUE_TYPE] 3 Parent", parent_info->peerInfo.pid, "timeout");
-							_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__,
-								"[RESCUE_TYPE] 3 Rescue in TEST state. ss_id =", ss_id,
-								"parent pid =", parent_info->peerInfo.pid);
-
-							ss_table[ss_id]->state.is_testing = false;
-
-							// Update manifest
-							set_parent_manifest(pkDownInfoPtr, pk_new_manifest);
-							set_parent_manifest(parent_info, parent_new_manifest);
-							SetSubstreamParent(manifest, PK_PID);
-							_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, parent_new_manifest, TOTAL_OP);
-							if (parent_info->peerInfo.manifest == 0) {
-								_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[REASON] manifest = 0 parent", parent_info->peerInfo.pid);
-								_peer_ptr->CloseParent(parent_info->peerInfo.pid, false, "[REASON] manifest = 0");
-								_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[CHECK POINT] map_pid_parent.size()", map_pid_parent.size());
-							}
-
-							//send_parentToPK(manifest, PK_PID+1);
-							NeedSourceDecision(&need_source);
-							//send_rescueManifestToPK(pk_new_manifest, need_source);
-							send_rescueManifestToPK(manifest, need_source);
-							ss_table[ss_id]->state.dup_src = need_source;
-
-							// Reset source delay parameters of testing substream of this parent
-							ResetDetection(ss_id);
-						}
-						else {
-							// Unexpected state
+					// MOVE
+					if (new_parent_info != NULL) {
+						new_parent_new_manifest = new_parent_info->peerInfo.manifest & ~manifest;
+						SetParentManifest(new_parent_info, new_parent_new_manifest);
+						_peer_mgr_ptr->send_manifest_to_parent(new_parent_pid, manifest, MINUS_OP);
+						if (new_parent_info->peerInfo.manifest == 0) {
+							_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[REASON] manifest = 0 parent", new_parent_pid);
+							_peer_ptr->CloseParent(new_parent_pid, new_parent_info->peerInfo.sock, false, "[REASON] manifest = 0");
 						}
 					}
 					else {
-						UINT32 manifest = SubstreamIDToManifest(ss_id);		// Manifest of this substream
-						debug_printf("Block Rescue [RESCUE_TYPE] 3 substreamID %d timeout \n", ss_id);
-						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s \n", "pid", my_pid, manifest, "Block Rescue [RESCUE_TYPE] 3 Not found parent");
-						_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__,
-							"Block Rescue [RESCUE_TYPE] 3 Rescue in STABLE state. ss_id =", ss_id,
-							"Not found parent");
-						ResetDetection(ss_id);
+						/*
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 7M. Not Found new_parent", new_parent_pid);
+						_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__,
+							"my_pid", my_pid, manifest,
+							"[RESCUE_TYPE] 7M. Not Found new_parent", new_parent_pid);
+						*/
 					}
+
+					_log_ptr->write_log_format("s(u) s u(u) s u(u) \n", __FUNCTION__, __LINE__, "Test failure  ori_parent", ori_parent_pid, ori_parent_new_manifest, "new_parent", new_parent_pid, new_parent_new_manifest);
+
+					SetSubstreamState(ss_id, SS_STABLE2);				// MOVE 狀態下不 RESCUE
+					
+					// Log the messages
+					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s d \n", "my_pid", my_pid, manifest, "[RESCUE_TYPE] 7M. test fail parent", new_parent_pid);
+					_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__,
+						"[RESCUE_TYPE] 7M. test fail parent", new_parent_pid,
+						"manifest", manifest);
+
+					// Update manifest
+					SetSubstreamParent(manifest, ori_parent_pid);
+					_peer_mgr_ptr->send_manifest_to_parent(new_parent_pid, manifest, MINUS_OP);		// 告訴新 parent 切斷這條 substream
+					send_parentToPK(manifest, ori_parent_pid);
+
+					ResetDetection(ss_id);
 				}
 			}
+			//ss_table[ss_id]->inTest.count = 0;					// Set to default
+			//ss_table[ss_id]->inTest.inTest_success = TRUE;		// Set to default
+			ss_table[ss_id]->state.rescue_after_fail = true;		// Set to default
 		}
-
-		if (ss_table[ss_id]->state.state == SS_TEST2 && _log_ptr->diff_TimerGet_ms(&ss_table[ss_id]->timer.inTest_timer, &new_timer) >= TEST_DELAY_TIME) {
-			ss_table[ss_id]->timer.inTest_flag = true;
-		}
-		
 	}
 	
 	////////////////////for RE-SYN time START////////////////////////////////

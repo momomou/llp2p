@@ -36,10 +36,12 @@ public:
 	unsigned long totalMod ;
 	unsigned long reSynTime;
 	struct timerStruct lastSynStartclock;
+	struct queue_history my_queue_history;
 	unsigned long pkt_count ;			// 一次 XCOUNT_INTERVAL 時間內收到的chunk數量(有過濾過)
 	unsigned long totalbyte;
 	int syncLock;					// set 1 if send sync token to pk and not yet receive the response
 	unsigned char exit_code;		// Error code (for program exit)
+	int previous_ss_num;
 
 	UINT32 first_timestamp;		// 第一個收到的封包的timestampd
 	bool firstIn;
@@ -78,6 +80,12 @@ public:
 	// substreamID, peer-info
 	map<unsigned long, struct peer_info_t> map_substream_peerInfo;
 
+	// upload_ss_num - state table
+	map<int, int> map_uploadssnum_state;
+
+	// Used for handle RTT messages
+	map<UINT32, struct peer_info_t> rtt_table;
+
 	struct chunk_level_msg_t *level_msg_ptr;
 	unsigned long lane_member;
 
@@ -107,7 +115,9 @@ public:
 	int syn_round_time;
 	struct syn_struct syn_table;
 
-
+	struct timerStruct child_queue_timer;
+	struct timerStruct base_timer;
+	struct timerStruct base2_timer;
 
 	void syn_table_init(int pk_sock);
 	void send_syn_token_to_pk(int pk_sock);
@@ -115,8 +125,10 @@ public:
 	void delay_table_init();
 	void SubstreamTableInit();
 	void source_delay_detection(int sock, unsigned long sub_id, unsigned int seq_now);
-	void SourceDelayDetection(int sock, unsigned long sub_id, unsigned int seq_now);
-	void quality_source_delay_count(int sock, unsigned long substream_id, unsigned int seq_now);	// Calculation of quality and source-delay
+	void SourceDelayDetection(int sock, struct chunk_t *chunk_ptr);
+	void SourceDelayDetectionForTesting(int sock, struct chunk_t *chunk_ptr);
+	void PacketLostDetection(int sock, struct chunk_t *chunk_ptr);
+	void quality_source_delay_count(int sock, struct chunk_t *chunk_ptr);	// Calculation of quality and source-delay
 	void reset_source_delay_detection(unsigned long sub_id);
 	void set_rescue_state(unsigned long sub_id,int state);
 	int check_rescue_state(unsigned long sub_id,int state);
@@ -124,14 +136,24 @@ public:
 	void SetSubstreamParent(unsigned long manifest, unsigned long pid);		// Set new selected parent in these substream
 	void SetSubstreamBlockRescue(unsigned long ss_id, unsigned long type);
 	void SetSubstreamUnblockRescue(unsigned long ss_id);
+	void SetParentManifest(struct peer_connect_down_t* parent_info, UINT32 manifest);
+	void SetChildManifest(struct peer_info_t* child_info, UINT32 manifest);
 
-	void set_parent_manifest(struct peer_connect_down_t* parent_info, UINT32 manifest);
+	INT32 GetChunkSourceDelay(struct chunk_t *chunk_ptr);
+	INT32 GetPSClass();
+	void CheckSSNumState(UINT32 total_queue_length);
+
+	struct peer_connect_down_t* GetParentFromPid(UINT32 pid);
+	struct peer_connect_down_t* GetParentFromSock(int sock);
+	struct peer_info_t* GetChildFromPid(UINT32 pid);
+	struct peer_info_t* GetChildFromSock(int sock);
 
 	int peer_start_delay_count;		// If received first packet of each substream, peer_start_delay_count++
 	void send_source_delay(int sock);		// Send source-delay info to pk
 	void send_topology_to_log();			// Send topology to log server
 	int SendParentTestToPK(UINT32 my_session);
 	void SendCapacityToPK();
+	void SendRTTToPK(struct peer_info_t peer_info);
 
 	volatile UINT32 _least_sequence_number;			//收到目前為止最新的seq
 	volatile UINT32 _current_send_sequence_number;	//最後送給player的seq(還沒送)
@@ -168,12 +190,17 @@ public:
 	void send_request_sequence_number_to_pk(unsigned int req_from, unsigned int req_to);
     void send_pkt_to_pk(struct chunk_t *chunk_ptr);
 
-
 	void handle_stream(struct chunk_t *chunk_ptr, int sockfd);
 	void HandleStream(struct chunk_t *chunk_ptr, int sockfd);
 	void handle_kickout(struct chunk_t *chunk_ptr, int sockfd);
 	void handle_error(int exit_code, const char *msg, const char *func, unsigned int line);
 	void HandleRelayStream(struct chunk_t *chunk_ptr);
+	void HandleCMDSeed(struct seed_notify *chunk_seed_notify);
+	void HandleCMDRTT(struct chunk_rtt_request *chunk_rtt_req_ptr, int peer_num);
+
+	// Queue Handler
+	int GetQueueInfo(int *sock, int *bits);		// Get the lowest queue
+	int GetQueueTime();
 
 ///new rescue function
 	//	void handleAppenSelfdPid(struct chunk_t *chunk_ptr );
@@ -234,6 +261,7 @@ public:
 	unsigned short my_private_port;
 
 	UINT32 my_session;
+
 
 	// Priority Queue parameters
 	unsigned long sampling_interval;	// number of pkts per 100ms

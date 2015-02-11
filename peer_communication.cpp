@@ -9,6 +9,7 @@
 #include "io_accept.h"
 #include "io_connect.h"
 #include "io_connect_udp.h"
+#include "io_connect_udp_ctrl.h"
 #include "logger_client.h"
 #include "io_nonblocking.h"
 #include "io_nonblocking_udp.h"
@@ -37,6 +38,7 @@ peer_communication::peer_communication(network *net_ptr,network_udp *net_udp_ptr
 	_io_accept_ptr =NULL;
 	_io_connect_ptr =NULL;
 	_io_connect_udp_ptr =NULL;
+	_io_connect_udp_ctrl_ptr = NULL;
 	_io_nonblocking_ptr=NULL;
 	_io_nonblocking_udp_ptr=NULL;
 	_io_nonblocking_ptr = new io_nonblocking(_net_ptr,log_ptr ,this,logger_client_ptr);
@@ -44,7 +46,8 @@ peer_communication::peer_communication(network *net_ptr,network_udp *net_udp_ptr
 	_io_accept_ptr = new io_accept(net_ptr,log_ptr,prep_ptr,peer_mgr_ptr,peer_ptr,pk_mgr_ptr,this,logger_client_ptr);
 	_io_connect_ptr = new io_connect(net_ptr,log_ptr,prep_ptr,peer_mgr_ptr,peer_ptr,pk_mgr_ptr,this,logger_client_ptr);
 	_io_connect_udp_ptr = new io_connect_udp(net_udp_ptr,log_ptr,prep_ptr,peer_mgr_ptr,peer_ptr,pk_mgr_ptr,this,logger_client_ptr);
-	if(!(_io_nonblocking_ptr) || !(_io_accept_ptr) || !(_io_connect_ptr) || !(_io_connect_udp_ptr)){
+	_io_connect_udp_ctrl_ptr = new io_connect_udp_ctrl(net_udp_ptr, log_ptr, prep_ptr, peer_mgr_ptr, peer_ptr, pk_mgr_ptr, this, logger_client_ptr);
+	if (!(_io_nonblocking_ptr) || !(_io_accept_ptr) || !(_io_connect_ptr) || !(_io_connect_udp_ptr) || !(_io_connect_udp_ctrl_ptr)){
 		_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] !(_io_nonblocking_ptr) || !(_io_accept_ptr) || !(_io_connect_ptr) || !(_io_connect_ptr)  new error", __FUNCTION__, __LINE__);
 	}
 	fd_list_ptr =NULL;
@@ -100,7 +103,7 @@ peer_communication::~peer_communication(){
 	}
 	map_udpfd_NonBlockIO.clear();
 
-	printf("==============deldet peer_communication success==========\n");
+	debug_printf("Have deleted peer_communication \n");
 }
 
 void peer_communication::set_self_info(unsigned long public_ip){
@@ -165,14 +168,16 @@ void peer_communication::set_candidates_handler(struct chunk_level_msg_t *testin
 				map_mysession_candidates[my_session]->p_candidates_info[i].peercomm_session = peercomm_session;
 				map_mysession_candidates[my_session]->p_candidates_info[i].priority = my_session;
 				map_mysession_candidates[my_session]->p_candidates_info[i].connection_state = PEER_CONNECTING;
+				//_log_ptr->timerGet(&(map_mysession_candidates[my_session]->p_candidates_info[i].time_start));
 
 				memcpy(&map_mysession_candidates[my_session]->n_candidates_info[i], testing_info->level_info[i], sizeof(struct level_info_t));
 				map_mysession_candidates[my_session]->n_candidates_info[i].manifest = manifest;
 				map_mysession_candidates[my_session]->n_candidates_info[i].peercomm_session = peercomm_session;
 				map_mysession_candidates[my_session]->n_candidates_info[i].priority = my_session;
-				map_mysession_candidates[my_session]->n_candidates_info[i].connection_state = PEER_LISTENING;
+				map_mysession_candidates[my_session]->n_candidates_info[i].connection_state = PEER_CONNECTING;
 
-				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s u \n", "[PEER_LIST] parent", testing_info->level_info[i]->pid,
+				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s u s u s u \n", "my_pid", _pk_mgr_ptr->my_pid, "[PEER_LIST] parent", testing_info->level_info[i]->pid,
+					"manifest", manifest,
 					"peercomm_session", peercomm_session,
 					"my_session", my_session);
 				_log_ptr->write_log_format("s(u) s u s u s u \n", __FUNCTION__, __LINE__, "[PEER_LIST] parent", testing_info->level_info[i]->pid,
@@ -181,9 +186,9 @@ void peer_communication::set_candidates_handler(struct chunk_level_msg_t *testin
 
 
 				// 檢查 peer 是否已經有連線存在
-				if (_pk_mgr_ptr->map_pid_parent.find(testing_info->level_info[i]->pid) != _pk_mgr_ptr->map_pid_parent.end()) {
-					if (_pk_mgr_ptr->map_pid_parent.find(testing_info->level_info[i]->pid)->second->peerInfo.connection_state != PEER_CONNECTING) {
-						//map_mysession_candidates[my_session]->p_candidates_info[i].sock = _pk_mgr_ptr->map_pid_parent.find(testing_info->level_info[i]->pid)->second->peerInfo.sock;
+				struct peer_connect_down_t *parent_info = _pk_mgr_ptr->GetParentFromPid(testing_info->level_info[i]->pid);
+				if (parent_info != NULL) {
+					if (parent_info->peerInfo.connection_state != PEER_CONNECTING) {
 						map_mysession_candidates[my_session]->p_candidates_info[i].connection_state = PEER_CONNECTED;
 						_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "Has a connection with parent", testing_info->level_info[i]->pid);
 					}
@@ -219,21 +224,24 @@ void peer_communication::set_candidates_handler(struct chunk_level_msg_t *testin
 					if (self_info->private_ip == testing_info->level_info[i]->private_ip && self_info->public_ip == testing_info->level_info[i]->public_ip) {
 						//continue;
 					}
-					if (testing_info->level_info[i]->pid != 1) {
+					if (testing_info->level_info[i]->pid != 0) {
 						//continue;
 					}
-
+					
 					struct peer_connect_down_t *parent_info_ptr = new struct peer_connect_down_t;
 					if (!parent_info_ptr) {
 						_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::peerDownInfoPtr  new error", __FUNCTION__, __LINE__);
 					}
 					memset(parent_info_ptr, 0, sizeof(struct peer_connect_down_t));
-					memcpy(parent_info_ptr, testing_info->level_info[i], sizeof(struct peer_info_t));
+					_log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
+					memcpy(parent_info_ptr, testing_info->level_info[i], sizeof(struct level_info_t));
+					_log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
 					parent_info_ptr->peerInfo.connection_state = PEER_CONNECTING;
+					parent_info_ptr->peerInfo.manifest = 0;
 
 					_pk_mgr_ptr->map_pid_parent.insert(pair<unsigned long, struct peer_connect_down_t *>(parent_info_ptr->peerInfo.pid, parent_info_ptr));
 					_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[INSERT PARENT]", parent_info_ptr->peerInfo.pid);
-					_pk_mgr_ptr->set_parent_manifest(parent_info_ptr, testing_info->manifest);
+					_pk_mgr_ptr->SetParentManifest(parent_info_ptr, testing_info->manifest);
 
 					// Self not behind NAT, candidate-peer not behind NAT
 					if (self_info->private_ip == self_info->public_ip && testing_info->level_info[i]->private_ip == testing_info->level_info[i]->public_ip) {	
@@ -266,8 +274,9 @@ void peer_communication::set_candidates_handler(struct chunk_level_msg_t *testin
 					}
 				}
 				else {
+					_log_ptr->write_log_format("s(u) \n", __FUNCTION__, __LINE__);
 					map<unsigned long, struct peer_connect_down_t *>::iterator iter = _pk_mgr_ptr->map_pid_parent.find(testing_info->level_info[i]->pid);
-					_pk_mgr_ptr->set_parent_manifest(iter->second, iter->second->peerInfo.manifest | testing_info->manifest);
+					_pk_mgr_ptr->SetParentManifest(iter->second, iter->second->peerInfo.manifest | testing_info->manifest);
 					_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "parent", testing_info->level_info[i]->pid, "has existed in map_pid_parent");
 				}
 			}
@@ -319,12 +328,13 @@ void peer_communication::set_candidates_handler(struct chunk_level_msg_t *testin
 					map_mysession_candidates[my_session]->p_candidates_info[i].peercomm_session = peercomm_session;
 					map_mysession_candidates[my_session]->p_candidates_info[i].priority = my_session;
 					map_mysession_candidates[my_session]->p_candidates_info[i].connection_state = PEER_CONNECTING;
+					//_log_ptr->timerGet(&(map_mysession_candidates[my_session]->p_candidates_info[i].time_start));
 
 					memcpy(&map_mysession_candidates[my_session]->n_candidates_info[i], testing_info->level_info[i], sizeof(struct level_info_t));
 					map_mysession_candidates[my_session]->n_candidates_info[i].manifest = manifest;
 					map_mysession_candidates[my_session]->n_candidates_info[i].peercomm_session = peercomm_session;
 					map_mysession_candidates[my_session]->n_candidates_info[i].priority = my_session;
-					map_mysession_candidates[my_session]->n_candidates_info[i].connection_state = PEER_LISTENING;
+					map_mysession_candidates[my_session]->n_candidates_info[i].connection_state = PEER_CONNECTING;
 
 					
 					_log_ptr->write_log_format("s(u) s u s u s u \n", __FUNCTION__, __LINE__, "[PEER_LIST] child", testing_info->level_info[i]->pid,
@@ -333,8 +343,9 @@ void peer_communication::set_candidates_handler(struct chunk_level_msg_t *testin
 
 
 					// 檢查 peer 是否已經有連線存在
-					if (_pk_mgr_ptr->map_pid_child.find(testing_info->level_info[i]->pid) != _pk_mgr_ptr->map_pid_child.end()) {
-						if (_pk_mgr_ptr->map_pid_child.find(testing_info->level_info[i]->pid)->second->connection_state != PEER_CONNECTING) {
+					struct peer_info_t *child_info = _pk_mgr_ptr->GetChildFromPid(testing_info->level_info[i]->pid);
+					if (child_info != NULL) {
+						if (child_info->connection_state != PEER_CONNECTING) {
 							//map_mysession_candidates[my_session]->p_candidates_info[i].sock = _pk_mgr_ptr->map_pid_child.find(testing_info->level_info[i]->pid)->second->sock;
 							map_mysession_candidates[my_session]->p_candidates_info[i].connection_state = PEER_CONNECTED;
 							_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "Has a connection with child", testing_info->level_info[i]->pid);
@@ -350,20 +361,19 @@ void peer_communication::set_candidates_handler(struct chunk_level_msg_t *testin
 				for (map<unsigned long, int>::iterator iter = _pk_mgr_ptr->children_table.begin(); iter != _pk_mgr_ptr->children_table.end(); iter++) {
 					_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__, __LINE__, "children_table pid", iter->first, "state", iter->second);
 				}
-				
 				for (map<unsigned long, struct peer_info_t *>::iterator iter = _pk_mgr_ptr->map_pid_child.begin(); iter != _pk_mgr_ptr->map_pid_child.end(); iter++) {
-					_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "parent", iter->first, "in map_pid_child");
+					_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "child", iter->first, "in map_pid_child");
 				}
 
-				if (_pk_mgr_ptr->map_pid_child.find(testing_info->level_info[0]->pid) == _pk_mgr_ptr->map_pid_child.end()) {
-						
+				if (_pk_mgr_ptr->GetChildFromPid(testing_info->level_info[0]->pid) == NULL) {
+					
 					struct peer_info_t *child_info_ptr = new struct peer_info_t;
 					if (!child_info_ptr) {
 						_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::peerDownInfoPtr  new error", __FUNCTION__, __LINE__);
 					}
 
 					memset(child_info_ptr, 0, sizeof(struct peer_info_t));
-					memcpy(child_info_ptr, testing_info->level_info[0], sizeof(struct peer_info_t));
+					memcpy(child_info_ptr, testing_info->level_info[0], sizeof(struct level_info_t));
 					//child_info_ptr->manifest = manifest;
 					child_info_ptr->manifest = 0;
 					child_info_ptr->peercomm_session = peercomm_session;
@@ -409,7 +419,7 @@ void peer_communication::set_candidates_handler(struct chunk_level_msg_t *testin
 				else {
 					//map<unsigned long, struct peer_info_t *>::iterator iter = _pk_mgr_ptr->map_pid_child.find(testing_info->level_info[0]->pid);
 					//iter->second->manifest |= testing_info->manifest;
-					_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "parent", testing_info->level_info[0]->pid, "has existed in map_pid_child");
+					_log_ptr->write_log_format("s(u) s u s \n", __FUNCTION__, __LINE__, "child", testing_info->level_info[0]->pid, "has existed in map_pid_child");
 				}
 			}
 		}
@@ -803,9 +813,9 @@ int peer_communication::non_blocking_build_connection_udp(struct peer_info_t *ca
 	
 	return RET_OK;
 }
-
+ 
 //int peer_communication::non_blocking_build_connection_udp_now(struct build_udp_conn build_udp_conn_temp)
-int peer_communication::non_blocking_build_connection_udp_now(struct peer_info_t *candidates_info, INT32 caller, UINT32 manifest, UINT32 peer_pid, INT32 flag, UINT32 my_session, UINT32 peercomm_session)
+int peer_communication::non_blocking_build_connection_udp_now(struct peer_info_t *candidates_info, INT32 caller, UINT32 manifest, UINT32 peer_pid, INT32 flag, UINT32 my_session, UINT32 peercomm_session, INT32 bctype)
 {
 	int retVal;
 	int _sock;		// UDP socket
@@ -864,15 +874,25 @@ int peer_communication::non_blocking_build_connection_udp_now(struct peer_info_t
 		PAUSE
 	}
 
+	_log_ptr->timerGet(&(candidates_info->time_start));
 	if (UDT::ERROR == UDT::connect(_sock, (struct sockaddr*)&peer_saddr, sizeof(peer_saddr))) {
 		cout << "connect: " << UDT::getlasterror().getErrorMessage() << "  " << UDT::getlasterror().getErrorCode();
 		_pk_mgr_ptr->handle_error(SOCKET_ERROR, "[ERROR] Connect failed", __FUNCTION__, __LINE__);
 		PAUSE
 	}
 
+	struct timerStruct new_timer;
+	_log_ptr->timerGet(&new_timer);
+	_log_ptr->write_log_format("s(u) s d s d s d \n", __FUNCTION__, __LINE__, "sock", _sock, "clocktime", new_timer.clockTime, "ticktime", new_timer.tickTime, new_timer.tickTime.QuadPart);
+
 	if (UDT::getsockstate(_sock) == CONNECTING || UDT::getsockstate(_sock) == CONNECTED) {
 		_net_udp_ptr->epoll_control(_sock, EPOLL_CTL_ADD, UDT_EPOLL_IN | UDT_EPOLL_OUT);
-		_net_udp_ptr->set_fd_bcptr_map(_sock, dynamic_cast<basic_class *> (_io_connect_udp_ptr));
+		if (bctype == 0) {
+			_net_udp_ptr->set_fd_bcptr_map(_sock, dynamic_cast<basic_class *> (_io_connect_udp_ptr));
+		}
+		else {
+			_net_udp_ptr->set_fd_bcptr_map(_sock, dynamic_cast<basic_class *> (_io_connect_udp_ctrl_ptr));
+		}
 		//_peer_mgr_ptr->fd_udp_list_ptr->push_back(_sock);	
 		_net_udp_ptr->fd_list_ptr->push_back(_sock);
 	}
@@ -1506,9 +1526,21 @@ void peer_communication::stop_attempt_connect(unsigned long stop_session_id)
 	*/
 }
 
+// 限定 child 呼叫
+// 挑選順序:
+// 1. 從 stable_list 挑選
+// 2. 從已建立連線之 parent 挑選
+// 3. 從 warning_list 挑選
+// 4. 從 dangerous_list 挑選
 void peer_communication::SelectStrategy(UINT32 my_session)
 {
 	bool selection_done = false;	// 讓被選中的 parent 只有一個
+	UINT32 selected_pid = -1;
+	UINT32 selected_est_delay = 100000;
+	list<UINT32> stable_list;
+	list<UINT32> warning_list;
+	list<UINT32> dangerous_list;
+	list<UINT32> overloading_list;
 	map<unsigned long, struct mysession_candidates *>::iterator map_mysession_candidates_iter;
 	map_mysession_candidates_iter = map_mysession_candidates.find(my_session);
 	if (map_mysession_candidates_iter == map_mysession_candidates.end()){
@@ -1516,8 +1548,197 @@ void peer_communication::SelectStrategy(UINT32 my_session)
 		return;
 	}
 
+	
+	// 新的PS找法
+	for (int i = 0; i < map_mysession_candidates_iter->second->candidates_num; i++) {
+		int peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
+		int peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
+		int peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
+		int peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
+
+		_log_ptr->write_log_format("s(u) s u s u s u s u(u)(u)(u) s u(u)(u)(u) \n", __FUNCTION__, __LINE__,
+			"parent", peer_pid,
+			"my_session", my_session,
+			"peercomm_session", map_mysession_candidates_iter->second->p_candidates_info[i].peercomm_session,
+			"sock1", peer_fd1, map_mysession_candidates_iter->second->p_candidates_info[i].connection_state, map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, map_mysession_candidates_iter->second->p_candidates_info[i].PS_class,
+			"sock2", peer_fd2, map_mysession_candidates_iter->second->n_candidates_info[i].connection_state, map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay, map_mysession_candidates_iter->second->n_candidates_info[i].PS_class);
+		
+
+		if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED || map_mysession_candidates_iter->second->n_candidates_info[i].connection_state == PEER_CONNECTED) {
+			struct peer_connect_down_t *parent_info = _pk_mgr_ptr->GetParentFromPid(peer_pid);
+			if (parent_info != NULL) {
+				// 必須確定有在 map_pid_parent/map_pid_child 找到，因為 table 隨時可能因為收到 SEED 而被清除
+				if (map_mysession_candidates_iter->second->p_candidates_info[i].PS_class == PS_STABLE || map_mysession_candidates_iter->second->n_candidates_info[i].PS_class == PS_STABLE) {
+					_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "PS_STABLE");
+					stable_list.push_back(peer_pid);
+				}
+				else if (map_mysession_candidates_iter->second->p_candidates_info[i].PS_class == PS_WARNING || map_mysession_candidates_iter->second->n_candidates_info[i].PS_class == PS_WARNING) {
+					_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "PS_WARNING");
+					warning_list.push_back(peer_pid);
+				}
+				else if (map_mysession_candidates_iter->second->p_candidates_info[i].PS_class == PS_DANGEROUS || map_mysession_candidates_iter->second->n_candidates_info[i].PS_class == PS_DANGEROUS) {
+					_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "PS_DANGEROUS");
+					dangerous_list.push_back(peer_pid);
+				}
+				else if (map_mysession_candidates_iter->second->p_candidates_info[i].PS_class == PS_OVERLOADING || map_mysession_candidates_iter->second->n_candidates_info[i].PS_class == PS_OVERLOADING) {
+					_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "PS_OVERLOADING");
+					overloading_list.push_back(peer_pid);
+				}
+			}
+		}
+	}
+	
+	// 1. 先從 stable_list 中挑選 parent (找 estimated_delay 最低的)
+	for (list<UINT32>::iterator iter = stable_list.begin(); iter != stable_list.end(); iter++) {
+		for (int i = 0; i < map_mysession_candidates_iter->second->candidates_num; i++) {
+			int peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
+			int peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
+			int peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
+			int peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
+
+			if (peer_pid == *iter) {
+				if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED) {
+					if (selected_est_delay > map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay) {
+						selected_pid = peer_pid;
+						selection_done = true;
+					}
+				}
+				else if (map_mysession_candidates_iter->second->n_candidates_info[i].connection_state == PEER_CONNECTED) {
+					if (selected_est_delay > map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay) {
+						selected_pid = peer_pid;
+						selection_done = true;
+					}
+				}
+			}
+		}
+	}
+
+	// 2. 都沒選到再從已建立連線之 parent 中挑選 parent (找 estimated_delay 最低的)
+	if (selection_done == false) {
+		for (int i = 0; i < map_mysession_candidates_iter->second->candidates_num; i++) {
+			int peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
+			int peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
+			int peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
+			int peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
+
+			struct peer_connect_down_t *parent_info = _pk_mgr_ptr->GetParentFromPid(peer_pid);
+			if (parent_info != NULL) {
+				if (parent_info->peerInfo.connection_state == PEER_SELECTED) {
+					selected_pid = peer_pid;
+					selection_done = true;
+				}
+			}
+		}
+	}
+
+	// 都沒選到再從 warning_list 中挑選 parent (找 estimated_delay 最低的)
+	if (selection_done == false) {
+		for (list<UINT32>::iterator iter = warning_list.begin(); iter != warning_list.end(); iter++) {
+			for (int i = 0; i < map_mysession_candidates_iter->second->candidates_num; i++) {
+				int peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
+				int peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
+				int peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
+				int peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
+
+				if (peer_pid == *iter) {
+					if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED) {
+						if (selected_est_delay > map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay) {
+							selected_pid = peer_pid;
+							selection_done = true;
+							selected_est_delay = map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay;
+						}
+					}
+					else if (map_mysession_candidates_iter->second->n_candidates_info[i].connection_state == PEER_CONNECTED) {
+						if (selected_est_delay > map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay) {
+							selected_pid = peer_pid;
+							selection_done = true;
+							selected_est_delay = map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay;
+						}
+					}
+				}
+			}
+		}
+	}
+
+
+	// 都沒選到再從 dangerous_list 中挑選 parent (找 estimated_delay 最低的)
+	if (selection_done == false) {
+		for (list<UINT32>::iterator iter = dangerous_list.begin(); iter != dangerous_list.end(); iter++) {
+			for (int i = 0; i < map_mysession_candidates_iter->second->candidates_num; i++) {
+				int peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
+				int peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
+				int peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
+				int peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
+
+				if (peer_pid == *iter) {
+					if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED) {
+						if (selected_est_delay > map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay) {
+							selected_pid = peer_pid;
+							selection_done = true;
+							selected_est_delay = map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay;
+						}
+					}
+					else if (map_mysession_candidates_iter->second->n_candidates_info[i].connection_state == PEER_CONNECTED) {
+						if (selected_est_delay > map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay) {
+							selected_pid = peer_pid;
+							selection_done = true;
+							selected_est_delay = map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "select parent", selected_pid, "in my_session", my_session);
+	for (int i = 0; i < map_mysession_candidates_iter->second->candidates_num; i++) {
+		int peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
+		int peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
+		int peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
+		int peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
+
+		if (selected_pid == peer_pid) {
+			if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED) {
+				struct peer_connect_down_t *parent_info = _pk_mgr_ptr->GetParentFromPid(peer_pid);
+				if (parent_info != NULL) {
+					// 必須確定有在 map_pid_parent/map_pid_child 找到，因為 table 隨時可能因為收到 SEED 而被清除
+					_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "select parent", peer_pid, "in my_session", my_session);
+					if (peer_fd1 != 0) {
+						parent_info->peerInfo.sock = peer_fd1;
+					}
+					parent_info->peerInfo.connection_state = PEER_SELECTED;
+					map_mysession_candidates_iter->second->p_candidates_info[i].connection_state = PEER_SELECTED;
+				}
+			}
+			else if (map_mysession_candidates_iter->second->n_candidates_info[i].connection_state == PEER_CONNECTED) {
+				struct peer_connect_down_t *parent_info = _pk_mgr_ptr->GetParentFromPid(peer_pid);
+				if (parent_info != NULL) {
+					// 必須確定有在 map_pid_parent/map_pid_child 找到，因為 table 隨時可能因為收到 SEED 而被清除
+					_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "select parent", peer_pid, "in my_session", my_session);
+					if (peer_fd2 != 0) {
+						parent_info->peerInfo.sock = peer_fd2;
+					}
+					parent_info->peerInfo.connection_state = PEER_SELECTED;
+					map_mysession_candidates_iter->second->n_candidates_info[i].connection_state = PEER_SELECTED;
+				}
+			}
+		}
+
+		struct peer_connect_down_t *parent_info = _pk_mgr_ptr->GetParentFromPid(peer_pid);
+		if (parent_info != NULL) {
+			if (parent_info->peerInfo.connection_state != PEER_SELECTED) {
+				_pk_mgr_ptr->SetParentManifest(parent_info, parent_info->peerInfo.manifest & ~peer_manifest);
+			}
+		}
+		else {
+			_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] Not Found parent", peer_pid);
+		}
+	}
+	
+	/*
+	// 最簡單找法
 	// 變成 PEER_SELECTED 的 peer 接下來將成為真正 parent，其他的 peer 在這次 peercomm_session 落選
-	// 落選的 parent manifest 修正
+	// 修正落選的 parent manifest 
 	for (int i = 0; i < map_mysession_candidates_iter->second->candidates_num; i++) {
 		int peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
 		int peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
@@ -1529,25 +1750,27 @@ void peer_communication::SelectStrategy(UINT32 my_session)
 				_log_ptr->write_log_format("s(u) s u s u s u \n", __FUNCTION__, __LINE__, "parent", peer_pid, "my_session", my_session, "peercomm_session", map_mysession_candidates_iter->second->p_candidates_info[i].peercomm_session);
 
 				if (map_mysession_candidates_iter->second->myrole == CHILD_PEER) {
-					if (_pk_mgr_ptr->map_pid_parent.find(peer_pid) != _pk_mgr_ptr->map_pid_parent.end()) {
+					struct peer_connect_down_t *parent_info = _pk_mgr_ptr->GetParentFromPid(peer_pid);
+					if (parent_info != NULL) {
 						// 必須確定有在 map_pid_parent/map_pid_child 找到，因為 table 隨時可能因為收到 SEED 而被清除
 						_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "select parent", peer_pid, "in my_session", my_session);
 						if (peer_fd1 != 0) {
-							_pk_mgr_ptr->map_pid_parent.find(peer_pid)->second->peerInfo.sock = peer_fd1;
+							parent_info->peerInfo.sock = peer_fd1;
 						}
-						_pk_mgr_ptr->map_pid_parent.find(peer_pid)->second->peerInfo.connection_state = PEER_SELECTED;
+						parent_info->peerInfo.connection_state = PEER_SELECTED;
 						map_mysession_candidates_iter->second->p_candidates_info[i].connection_state = PEER_SELECTED;
 						selection_done = true;
 					}
 				}
 				else if (map_mysession_candidates_iter->second->myrole == PARENT_PEER) {
-					if (_pk_mgr_ptr->map_pid_child.find(peer_pid) != _pk_mgr_ptr->map_pid_child.end()) {
+					struct peer_info_t *child_info = _pk_mgr_ptr->GetChildFromPid(peer_pid);
+					if (child_info != NULL) {
 						// 必須確定有在 map_pid_parent/map_pid_child 找到，因為 table 隨時可能因為收到 SEED 而被清除
 						_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "select child", peer_pid, "in my_session", my_session);
 						if (peer_fd1 != 0) {
-							_pk_mgr_ptr->map_pid_child.find(peer_pid)->second->sock = peer_fd1;
+							child_info->sock = peer_fd1;
 						}
-						_pk_mgr_ptr->map_pid_child.find(peer_pid)->second->connection_state = PEER_SELECTED;
+						child_info->connection_state = PEER_SELECTED;
 						map_mysession_candidates_iter->second->p_candidates_info[i].connection_state = PEER_SELECTED;
 						selection_done = true;
 					}
@@ -1557,25 +1780,27 @@ void peer_communication::SelectStrategy(UINT32 my_session)
 				_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "Select pid", map_mysession_candidates_iter->second->n_candidates_info[i].pid, "in peercomm_session", map_mysession_candidates_iter->second->n_candidates_info[i].peercomm_session);
 
 				if (map_mysession_candidates_iter->second->myrole == CHILD_PEER) {
-					if (_pk_mgr_ptr->map_pid_parent.find(peer_pid) != _pk_mgr_ptr->map_pid_parent.end()) {
+					struct peer_connect_down_t *parent_info = _pk_mgr_ptr->GetParentFromPid(peer_pid);
+					if (parent_info != NULL) {
 						// 必須確定有在 map_pid_parent/map_pid_child 找到，因為 table 隨時可能因為收到 SEED 而被清除
 						_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "select parent", peer_pid, "in my_session", my_session);
 						if (peer_fd2 != 0) {
-							_pk_mgr_ptr->map_pid_parent.find(peer_pid)->second->peerInfo.sock = peer_fd2;
+							parent_info->peerInfo.sock = peer_fd2;
 						}
-						_pk_mgr_ptr->map_pid_parent.find(peer_pid)->second->peerInfo.connection_state = PEER_SELECTED;
+						parent_info->peerInfo.connection_state = PEER_SELECTED;
 						map_mysession_candidates_iter->second->n_candidates_info[i].connection_state = PEER_SELECTED;
 						selection_done = true;
 					}
 				}
 				else if (map_mysession_candidates_iter->second->myrole == PARENT_PEER) {
-					if (_pk_mgr_ptr->map_pid_child.find(peer_pid) != _pk_mgr_ptr->map_pid_child.end()) {
+					struct peer_info_t *child_info = _pk_mgr_ptr->GetChildFromPid(peer_pid);
+					if (child_info != NULL) {
 						// 必須確定有在 map_pid_parent/map_pid_child 找到，因為 table 隨時可能因為收到 SEED 而被清除
 						_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "select child", peer_pid, "in my_session", my_session);
 						if (peer_fd2 != 0) {
-							_pk_mgr_ptr->map_pid_child.find(peer_pid)->second->sock = peer_fd2;
+							child_info->sock = peer_fd2;
 						}
-						_pk_mgr_ptr->map_pid_child.find(peer_pid)->second->connection_state = PEER_SELECTED;
+						child_info->connection_state = PEER_SELECTED;
 						map_mysession_candidates_iter->second->n_candidates_info[i].connection_state = PEER_SELECTED;
 						selection_done = true;
 					}
@@ -1583,16 +1808,17 @@ void peer_communication::SelectStrategy(UINT32 my_session)
 			}
 		}
 
-		if (_pk_mgr_ptr->map_pid_parent.find(peer_pid) != _pk_mgr_ptr->map_pid_parent.end()) {
-			struct peer_connect_down_t *parent_info_ptr = _pk_mgr_ptr->map_pid_parent.find(peer_pid)->second;
-			if (parent_info_ptr->peerInfo.connection_state != PEER_SELECTED) {
-				_pk_mgr_ptr->set_parent_manifest(parent_info_ptr, parent_info_ptr->peerInfo.manifest & ~peer_manifest);
+		struct peer_connect_down_t *parent_info = _pk_mgr_ptr->GetParentFromPid(peer_pid);
+		if (parent_info != NULL) {
+			if (parent_info->peerInfo.connection_state != PEER_SELECTED) {
+				_pk_mgr_ptr->SetParentManifest(parent_info, parent_info->peerInfo.manifest & ~peer_manifest);
 			}
 		}
 		else {
 			_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] Not Found parent", peer_pid);
 		}
 	}
+	*/
 }
 
 // Child 發送這個 CMD 給 parent 表示已認定這個 parent
@@ -1602,7 +1828,7 @@ int peer_communication::SendPeerCon(UINT32 my_session)
 	map<unsigned long, struct mysession_candidates *>::iterator map_mysession_candidates_iter;
 	map<int, struct ioNonBlocking*>::iterator map_udpfd_NonBlockIO_iter;
 	Nonblocking_Ctl *Nonblocking_Send_Ctrl_ptr = NULL;
-	struct peer_info_t *peer_info = NULL;		// 指向被選中的 parent
+	struct peer_connect_down_t *parent_info = NULL;		// 指向被選中的 parent
 	
 	map_mysession_candidates_iter = map_mysession_candidates.find(my_session);
 	if (map_mysession_candidates_iter == map_mysession_candidates.end()) {
@@ -1614,37 +1840,27 @@ int peer_communication::SendPeerCon(UINT32 my_session)
 	// 找出被選中的 parent
 	for (int i = 0; i < map_mysession_candidates_iter->second->candidates_num; i++) {
 		if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_SELECTED) {
-			UINT32 peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
-			if (_pk_mgr_ptr->map_pid_parent.find(peer_pid) != _pk_mgr_ptr->map_pid_parent.end()) {
-				peer_info = &(_pk_mgr_ptr->map_pid_parent.find(peer_pid)->second->peerInfo);
+			parent_info = _pk_mgr_ptr->GetParentFromPid(map_mysession_candidates_iter->second->p_candidates_info[i].pid);
+			if (parent_info != NULL) {
 				break;
-			}
-			else {
-				// 隨時可能因為收到 SEED 造成 table 被清除
-				_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "pid", peer_pid, "my_session", my_session);
 			}
 		}
 		else if (map_mysession_candidates_iter->second->n_candidates_info[i].connection_state == PEER_SELECTED) {
-			UINT32 peer_pid = map_mysession_candidates_iter->second->n_candidates_info[i].pid;
-			if (_pk_mgr_ptr->map_pid_parent.find(peer_pid) != _pk_mgr_ptr->map_pid_parent.end()) {
-				peer_info = &(_pk_mgr_ptr->map_pid_parent.find(peer_pid)->second->peerInfo);
+			parent_info = _pk_mgr_ptr->GetParentFromPid(map_mysession_candidates_iter->second->n_candidates_info[i].pid);
+			if (parent_info != NULL) {
 				break;
-			}
-			else {
-				// 隨時可能因為收到 SEED 造成 table 被清除
-				_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "pid", peer_pid, "my_session", my_session);
 			}
 		}
 	}
-	if (peer_info == NULL) {
+
+	if (parent_info == NULL) {
 		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "No suitable parents in my_session", my_session);
 		return 0;
 	}
 	
-	
-	map_udpfd_NonBlockIO_iter = map_udpfd_NonBlockIO.find(peer_info->sock);
+	map_udpfd_NonBlockIO_iter = map_udpfd_NonBlockIO.find(parent_info->peerInfo.sock);
 	if (map_udpfd_NonBlockIO_iter == map_udpfd_NonBlockIO.end()) {
-		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] target fd", peer_info->sock);
+		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[DEBUG] target fd", parent_info->peerInfo.sock);
 		for (map<int, struct ioNonBlocking*>::iterator iter = map_udpfd_NonBlockIO.begin(); iter != map_udpfd_NonBlockIO.end(); iter++) {
 			_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "udpfd", iter->first);
 		}
@@ -1685,7 +1901,7 @@ int peer_communication::SendPeerCon(UINT32 my_session)
 		chunk_request_ptr->info.public_udp_port = (unsigned short)atoi(svc_udp_port.c_str());		// 先暫時隨便給個值
 		chunk_request_ptr->info.private_udp_port = (unsigned short)atoi(svc_udp_port.c_str());		// 先暫時隨便給個值
 
-		_net_udp_ptr->set_nonblocking(peer_info->sock);
+		_net_udp_ptr->set_nonblocking(parent_info->peerInfo.sock);
 
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.offset = 0;
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.total_len = sizeof(struct chunk_request_peer_t);
@@ -1694,14 +1910,14 @@ int peer_communication::SendPeerCon(UINT32 my_session)
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = (chunk_t *)chunk_request_ptr;
 		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.serial_num = chunk_request_ptr->header.sequence_number;
 
-		send_byte = _net_udp_ptr->nonblock_send(peer_info->sock, &(Nonblocking_Send_Ctrl_ptr->recv_ctl_info));
-		_log_ptr->write_log_format("s(u) s u s u s u s u \n", __FUNCTION__, __LINE__, "Send CHNK_CMD_PEER_CON to pid", peer_info->pid, "sock", peer_info->sock, "in my_session", my_session, "bytes", send_byte);
+		send_byte = _net_udp_ptr->nonblock_send(parent_info->peerInfo.sock, &(Nonblocking_Send_Ctrl_ptr->recv_ctl_info));
+		_log_ptr->write_log_format("s(u) s u s u s u s u \n", __FUNCTION__, __LINE__, "Send CHNK_CMD_PEER_CON to pid", parent_info->peerInfo.pid, "sock", parent_info->peerInfo.sock, "in my_session", my_session, "bytes", send_byte);
 
 		if (send_byte < 0) {
-			_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[DEBUG] Send bytes", send_byte, peer_info->sock);
+			_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[DEBUG] Send bytes", send_byte, parent_info->peerInfo.sock);
 		}
 		else if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.ctl_state == READY) {
-			_net_udp_ptr->set_fd_bcptr_map(peer_info->sock, dynamic_cast<basic_class *> (_peer_ptr));
+			_net_udp_ptr->set_fd_bcptr_map(parent_info->peerInfo.sock, dynamic_cast<basic_class *> (_peer_ptr));
 		}
 
 		delete chunk_request_ptr;
@@ -1709,7 +1925,7 @@ int peer_communication::SendPeerCon(UINT32 my_session)
 	}
 	else if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.ctl_state == RUNNING) {
 		int send_byte;
-		send_byte = _net_udp_ptr->nonblock_send(peer_info->sock, &(Nonblocking_Send_Ctrl_ptr->recv_ctl_info));
+		send_byte = _net_udp_ptr->nonblock_send(parent_info->peerInfo.sock, &(Nonblocking_Send_Ctrl_ptr->recv_ctl_info));
 		/*
 		if (_send_byte < 0) {
 		if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr) {
@@ -1731,8 +1947,8 @@ int peer_communication::SendPeerCon(UINT32 my_session)
 		*/
 	}
 
-	_peer_ptr->InitPeerInfo(peer_info->sock, peer_info->pid, peer_info->manifest, map_mysession_candidates_iter->second->myrole);
-	_peer_mgr_ptr->send_manifest_to_parent(peer_info->pid, peer_info->manifest, ADD_OP);
+	_peer_ptr->InitPeerInfo(parent_info->peerInfo.sock, parent_info->peerInfo.pid, parent_info->peerInfo.manifest, map_mysession_candidates_iter->second->myrole);
+	_peer_mgr_ptr->send_manifest_to_parent(parent_info->peerInfo.pid, parent_info->peerInfo.manifest, ADD_OP);
 }
 
 
@@ -1770,9 +1986,8 @@ void peer_communication::StopSession(UINT32 my_session)
 
 			_log_ptr->write_log_format("s(u) s d s d s d s d \n", __FUNCTION__, __LINE__, "pid", peer_pid, "fd1", peer_fd1, "fd2", peer_fd2, "peercomm_session", map_mysession_candidates_iter->second->p_candidates_info[i].peercomm_session);
 
-
-			if (_pk_mgr_ptr->map_pid_parent.find(peer_pid) != _pk_mgr_ptr->map_pid_parent.end()) {
-				struct peer_connect_down_t *parent_info_ptr = _pk_mgr_ptr->map_pid_parent.find(peer_pid)->second;
+			struct peer_connect_down_t *parent_info_ptr = _pk_mgr_ptr->GetParentFromPid(peer_pid);
+			if (parent_info_ptr != NULL) {
 				if (parent_info_ptr->peerInfo.connection_state != PEER_SELECTED) {
 
 					//_pk_mgr_ptr->set_parent_manifest(parent_info_ptr, parent_info_ptr->peerInfo.manifest & ~peer_manifest);
@@ -1800,6 +2015,7 @@ void peer_communication::StopSession(UINT32 my_session)
 
 						_peer_ptr->CloseSocketUDP(peer_fd1, false, "Closed by session stopped with manifest = 0");
 						_peer_ptr->CloseSocketUDP(peer_fd2, false, "Closed by session stopped with manifest = 0");
+						_peer_ptr->CloseParent(parent_info_ptr->peerInfo.pid, parent_info_ptr->peerInfo.sock, false, "Closed by session stopped with manifest = 0");
 					}
 				}
 				else {
@@ -1834,7 +2050,6 @@ void peer_communication::StopSession(UINT32 my_session)
 				iter++;
 			}
 		}
-		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "conn_from_parent_list.size()", conn_from_parent_list.size());
 	}
 	else if (map_mysession_candidates_iter->second->myrole == PARENT_PEER) {
 		
@@ -1864,23 +2079,24 @@ void peer_communication::StopSession(UINT32 my_session)
 				map_udpfd_NonBlockIO.erase(map_udpfd_NonBlockIO_iter);
 			}
 
-			if (_pk_mgr_ptr->map_pid_child.find(peer_pid) != _pk_mgr_ptr->map_pid_child.end()) {
-				struct peer_info_t *child_info_ptr = _pk_mgr_ptr->map_pid_child.find(peer_pid)->second;
-				if (child_info_ptr->connection_state != PEER_SELECTED) {
+			struct peer_info_t *child_info = _pk_mgr_ptr->GetChildFromPid(peer_pid);
+			if (child_info != NULL) {
+				if (child_info->connection_state != PEER_SELECTED) {
 					//child_info_ptr->manifest &= ~peer_manifest;
-					if (child_info_ptr->manifest == 0) {
+					if (child_info->manifest == 0) {
 						// Close socket
 						_peer_ptr->CloseSocketUDP(peer_fd1, false, "Closed by session stopped with manifest = 0");
 						_peer_ptr->CloseSocketUDP(peer_fd2, false, "Closed by session stopped with manifest = 0");
+						_peer_ptr->CloseChild(child_info->pid, child_info->sock, false, "Closed by session stopped with manifest = 0");
 					}
 				}
 				else {
 					// 如果兩邊都成功建立連線，刪除較慢建成的那條連線
-					_log_ptr->write_log_format("s(u) s d s d s d s d \n", __FUNCTION__, __LINE__, "parent", peer_pid, "fd", child_info_ptr->sock, "fd1", peer_fd1, "fd2", peer_fd2);
-					if (peer_fd1 != child_info_ptr->sock) {
+					_log_ptr->write_log_format("s(u) s d s d s d s d \n", __FUNCTION__, __LINE__, "parent", peer_pid, "fd", child_info->sock, "fd1", peer_fd1, "fd2", peer_fd2);
+					if (peer_fd1 != child_info->sock) {
 						_peer_ptr->CloseSocketUDP(peer_fd1, false, "Closed by duplicate connection");
 					}
-					if (peer_fd2 != child_info_ptr->sock) {
+					if (peer_fd2 != child_info->sock) {
 						_peer_ptr->CloseSocketUDP(peer_fd2, false, "Closed by duplicate connection");
 					}
 				}
@@ -2279,8 +2495,8 @@ int peer_communication::handle_pkt_in(int sock)
 	return RET_OK;
 }
 
-// Socket is already built, receive "CHNK_CMD_PEER_CON" to build virtual connection again
-// 由 child 發出給最終選擇的 parent
+// CHNK_CMD_ROLE: Child 會收到 parent 回覆的 ACK
+// CHNK_CMD_PEER_CON: Parent 會收到這個訊息，表示被 child 選中
 int peer_communication::handle_pkt_in_udp(int sock)
 {	
 	map<unsigned long, struct mysession_candidates *>::iterator map_mysession_candidates_iter = map_mysession_candidates.end();
@@ -2302,14 +2518,145 @@ int peer_communication::handle_pkt_in_udp(int sock)
 		}
 	}
 	if (map_mysession_candidates_iter == map_mysession_candidates.end()) {
-		// 會發生，待解 
+		if (UDT::getsockstate(sock) != UDTSTATUS::CONNECTED) {
+			_peer_ptr->CloseSocketUDP(sock, false, "Not Found in map_mysession_candidates");
+		}
 		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[ERROR] Not found in map_mysession_candidates", sock);
 		debug_printf("[ERROR] Not found in map_mysession_candidates %d \n", sock);
 		return 0;
 	}
 
 	if (map_mysession_candidates_iter->second->myrole == CHILD_PEER) {
-		// Do nothing, just wait for socket writable
+		map<int, struct ioNonBlocking*>::iterator map_udpfd_NonBlockIO_iter;
+
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Recv from", sock);
+
+		map_udpfd_NonBlockIO_iter = map_udpfd_NonBlockIO.find(sock);
+		if (map_udpfd_NonBlockIO_iter == map_udpfd_NonBlockIO.end()) {
+			debug_printf("[DEBUG] Not found map_udpfd_NonBlockIO %d \n", sock);
+			_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[DEBUG] Not found map_udpfd_NonBlockIO", sock);
+			return RET_SOCK_ERROR;		// 關閉這條 socket
+		}
+
+		Nonblocking_Ctl * Nonblocking_Recv_Ctl_ptr = NULL;
+		struct chunk_header_t* chunk_header_ptr = NULL;
+		struct chunk_t* chunk_ptr = NULL;
+		unsigned long buf_len = 0;
+		int recv_byte = 0;
+
+		Nonblocking_Recv_Ctl_ptr = &(map_udpfd_NonBlockIO_iter->second->io_nonblockBuff.nonBlockingRecv);
+
+		for (int i = 0; i < 5; i++) {
+			if (Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_HEADER_READY) {
+				chunk_header_ptr = (struct chunk_header_t *)new unsigned char[sizeof(chunk_header_t)];
+				if (!chunk_header_ptr) {
+					_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[ERROR] chunk_header_t new error", sock);
+					_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] chunk_header_t  new error", __FUNCTION__, __LINE__);
+					return RET_OK;
+				}
+				memset(chunk_header_ptr, 0x0, sizeof(struct chunk_header_t));
+
+				Nonblocking_Recv_Ctl_ptr->recv_ctl_info.offset = 0;
+				Nonblocking_Recv_Ctl_ptr->recv_ctl_info.total_len = sizeof(chunk_header_t);
+				Nonblocking_Recv_Ctl_ptr->recv_ctl_info.expect_len = sizeof(chunk_header_t);
+				Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer = (char *)chunk_header_ptr;
+			}
+			else if (Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_HEADER_RUNNING) {
+				//do nothing
+			}
+			else if (Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_HEADER_OK) {
+				buf_len = sizeof(chunk_header_t)+((chunk_t *)(Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer))->header.length;
+				chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
+				if (!chunk_ptr) {
+					_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[ERROR] chunk_t new error", sock);
+					_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] chunk_t new error", __FUNCTION__, __LINE__);
+					return RET_OK;
+				}
+
+				memset(chunk_ptr, 0x0, buf_len);
+				memcpy(chunk_ptr, Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer, sizeof(chunk_header_t));
+
+				if (Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer) {
+					delete[](unsigned char*)Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer;
+				}
+
+
+				Nonblocking_Recv_Ctl_ptr->recv_ctl_info.offset = sizeof(chunk_header_t);
+				Nonblocking_Recv_Ctl_ptr->recv_ctl_info.total_len = chunk_ptr->header.length;
+				Nonblocking_Recv_Ctl_ptr->recv_ctl_info.expect_len = chunk_ptr->header.length;
+				Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer = (char *)chunk_ptr;
+				Nonblocking_Recv_Ctl_ptr->recv_packet_state = READ_PAYLOAD_READY;
+
+			}
+			else if (Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_PAYLOAD_READY){
+				//do nothing
+			}
+			else if (Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_PAYLOAD_RUNNING){
+				//do nothing
+			}
+			else if (Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_PAYLOAD_OK){
+				break;
+			}
+
+			recv_byte = _net_udp_ptr->nonblock_recv(sock, Nonblocking_Recv_Ctl_ptr);
+
+			if (recv_byte < 0) {
+				_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[DEBUG] Recv bytes", recv_byte, sock);
+				return RET_SOCK_ERROR;		// 關閉這條 socket
+			}
+		}
+
+		if (Nonblocking_Recv_Ctl_ptr->recv_packet_state == READ_PAYLOAD_OK) {
+			chunk_ptr = (chunk_t *)Nonblocking_Recv_Ctl_ptr->recv_ctl_info.buffer;
+			Nonblocking_Recv_Ctl_ptr->recv_packet_state = READ_HEADER_READY;
+			buf_len = sizeof(struct chunk_header_t) + chunk_ptr->header.length;
+		}
+		else {
+			//other stats
+			_log_ptr->write_log_format("s(u) u \n", __FUNCTION__, __LINE__, Nonblocking_Recv_Ctl_ptr->recv_packet_state);
+			return RET_OK;
+		}
+
+		// Get response from parent
+		if (chunk_ptr->header.cmd == CHNK_CMD_ROLE) {
+			struct role_struct *role_protocol_ptr = (struct role_struct *)chunk_ptr;
+			map<unsigned long, struct mysession_candidates *>::iterator map_mysession_candidates_iter = map_mysession_candidates.end();
+			struct peer_info_t *peer_info_ptr = NULL;
+
+			// Get iter of map_mysession_candidates
+			for (map<unsigned long, struct mysession_candidates *>::iterator iter = map_mysession_candidates.begin(); iter != map_mysession_candidates.end(); iter++) {
+				for (int i = 0; i != iter->second->candidates_num; i++) {
+					if (iter->second->p_candidates_info[i].sock == sock) {
+						map_mysession_candidates_iter = iter;
+						peer_info_ptr = &(iter->second->p_candidates_info[i]);
+						peer_info_ptr->estimated_delay = role_protocol_ptr->parent_src_delay + role_protocol_ptr->queueing_time + role_protocol_ptr->transmission_time;
+						peer_info_ptr->PS_class = role_protocol_ptr->PS_class;
+						_log_ptr->write_log_format("s(u) s d(d) u u u \n", __FUNCTION__, __LINE__, "peer", peer_info_ptr->pid, sock, role_protocol_ptr->parent_src_delay, role_protocol_ptr->queueing_time, role_protocol_ptr->transmission_time);
+					}
+				}
+			}
+			if (map_mysession_candidates_iter == map_mysession_candidates.end()) {
+				// 可能是 peer-list 還沒收到，對方就先連進來
+				//return RET_OK;
+			}
+
+			_log_ptr->write_log_format("s(u) s u s u s d s u s u s u s u \n", __FUNCTION__, __LINE__, "Recv CHNK_CMD_ROLE from sock", sock,
+				"pid", role_protocol_ptr->send_pid,
+				"role", role_protocol_ptr->flag,
+				"manifest", role_protocol_ptr->manifest,
+				"parent_src_delay", role_protocol_ptr->parent_src_delay,
+				"queueint_time", role_protocol_ptr->queueing_time,
+				"transmission_time", role_protocol_ptr->transmission_time);
+		}
+		else {
+			debug_printf("[ERROR] Recv error CMD %d from sock %d \n", chunk_ptr->header.cmd, sock);
+			_log_ptr->write_log_format("s(u) s u u \n", __FUNCTION__, __LINE__, "[ERROR] Recv error CMD from sock", sock, chunk_ptr->header.cmd);
+			//_pk_mgr_ptr->handle_error(UNKNOWN, "[ERROR] Receive unknown header command", __FUNCTION__, __LINE__);
+		}
+
+		if (chunk_ptr) {
+			delete chunk_ptr;
+		}
 	}
 	else if (map_mysession_candidates_iter->second->myrole == PARENT_PEER) {
 		map<int, struct ioNonBlocking*>::iterator map_udpfd_NonBlockIO_iter;
@@ -2411,18 +2758,35 @@ int peer_communication::handle_pkt_in_udp(int sock)
 			UINT32 my_role = 0;
 
 			for (map<unsigned long, struct mysession_candidates *>::iterator iter = map_mysession_candidates.begin(); iter != map_mysession_candidates.end(); iter++) {
+
 				for (int i = 0; i != iter->second->candidates_num; i++) {
+					int peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
+					int peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
+					int peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
+					int peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
+
+					_log_ptr->write_log_format("s(u) s u s u s u s u(u)(u)(u) s u(u)(u)(u) \n", __FUNCTION__, __LINE__,
+						"parent", peer_pid,
+						"my_session", iter->first,
+						"peercomm_session", map_mysession_candidates_iter->second->p_candidates_info[i].peercomm_session,
+						"sock1", peer_fd1, map_mysession_candidates_iter->second->p_candidates_info[i].connection_state, map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, map_mysession_candidates_iter->second->p_candidates_info[i].PS_class,
+						"sock2", peer_fd2, map_mysession_candidates_iter->second->n_candidates_info[i].connection_state, map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay, map_mysession_candidates_iter->second->n_candidates_info[i].PS_class);
+
 					if (iter->second->p_candidates_info[i].sock == sock) {
 						iter->second->p_candidates_info[i].connection_state = PEER_SELECTED;
 						peer_info_ptr = &(iter->second->p_candidates_info[i]);
 						my_role = iter->second->myrole;
-						_peer_ptr->priority_children.push_back(iter->second->p_candidates_info[i].pid);
+						if (std::find(std::begin(_peer_ptr->priority_children), std::end(_peer_ptr->priority_children), iter->second->p_candidates_info[i].pid) == std::end(_peer_ptr->priority_children)) {
+							_peer_ptr->priority_children.push_back(iter->second->p_candidates_info[i].pid);
+						}
 					}
 					else if (iter->second->n_candidates_info[i].sock == sock) {
 						iter->second->n_candidates_info[i].connection_state = PEER_SELECTED;
 						peer_info_ptr = &(iter->second->n_candidates_info[i]);
 						my_role = iter->second->myrole;
-						_peer_ptr->priority_children.push_back(iter->second->n_candidates_info[i].pid);
+						if (std::find(std::begin(_peer_ptr->priority_children), std::end(_peer_ptr->priority_children), iter->second->n_candidates_info[i].pid) == std::end(_peer_ptr->priority_children)) {
+							_peer_ptr->priority_children.push_back(iter->second->p_candidates_info[i].pid);
+						}
 					}
 				}
 			}
@@ -2431,9 +2795,10 @@ int peer_communication::handle_pkt_in_udp(int sock)
 				return RET_SOCK_ERROR;		// 關閉這條 socket
 			}
 
-			if (_pk_mgr_ptr->map_pid_child.find(peer_info_ptr->pid) != _pk_mgr_ptr->map_pid_child.end()) {
-				_pk_mgr_ptr->map_pid_child.find(peer_info_ptr->pid)->second->connection_state = PEER_SELECTED;
-				_pk_mgr_ptr->map_pid_child.find(peer_info_ptr->pid)->second->sock = sock;
+			struct peer_info_t *child_info = _pk_mgr_ptr->GetChildFromPid(peer_info_ptr->pid);
+			if (child_info != NULL) {
+				child_info->connection_state = PEER_SELECTED;
+				child_info->sock = sock;
 			}
 			else {
 				// 不做任何事，由 Child 等待 timeout 關閉連線

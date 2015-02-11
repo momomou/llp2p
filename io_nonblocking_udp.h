@@ -26,6 +26,7 @@ public:
 	virtual void handle_sock_error(int sock, basic_class *bcptr);
 	virtual void handle_job_realtime();
 	virtual void handle_job_timer();
+	virtual void HandleCMDRole(int sock, struct role_struct *role_protocol_ptr);
 	void data_close(int sock);
 
 	peer_communication *_peer_communication_ptr;

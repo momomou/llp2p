@@ -2069,18 +2069,24 @@ int CUDT::epoll_remove_ssock(const int eid, const SYSSOCKET s)
 
 int CUDT::epoll_wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefds, int64_t msTimeOut, set<SYSSOCKET>* lrfds, set<SYSSOCKET>* lwfds)
 {
+	
    try
    {
+	  // printf("%s:%d \n", __FUNCTION__, __LINE__);
       return s_UDTUnited.epoll_wait(eid, readfds, writefds, msTimeOut, lrfds, lwfds);
    }
    catch (CUDTException e)
    {
+	 //  printf("%s:%d \n", __FUNCTION__, __LINE__);
       s_UDTUnited.setError(new CUDTException(e));
+	//  printf("%s:%d \n", __FUNCTION__, __LINE__);
       return ERROR;
    }
    catch (...)
    {
+	//   printf("%s:%d \n", __FUNCTION__, __LINE__);
       s_UDTUnited.setError(new CUDTException(-1, 0, 0));
+	//  printf("%s:%d \n", __FUNCTION__, __LINE__);
       return ERROR;
    }
 }

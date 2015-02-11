@@ -36,6 +36,7 @@ public:
 	// UDP
 	map<int, queue<struct chunk_t *> *> map_udpfd_out_ctrl;	// <fd, queue of chunk pointer which store outgoing control packet(chunk) >
 	map<int, queue<struct chunk_t *> *> map_udpfd_out_data;	// <fd, queue of chunk pointer which store outgoin data packet(chunk) >
+	map<int, struct queue_info *> map_udpfd_queue;				// Queue information
 	map<unsigned long, int> map_in_pid_udpfd;					// store parent-peer which alreay established connection(including temp parent-peer)
 	map<unsigned long, int> map_out_pid_udpfd;					// store child-peer which alreay established connection(including temp child-peer)
 	map<int , unsigned long> map_udpfd_pid;					// store fd in both map_in_pid_fd and map_out_pid_fd
@@ -80,12 +81,12 @@ public:
 	//  
 	///////////////////////////////////////////
 	void data_close(int cfd, const char *reason ,int type); 
-	void peer::CloseParent(unsigned long pid, bool care, const char *reason);
-	void peer::CloseParentTCP(unsigned long pid, const char *reason);
-	void peer::CloseParentUDP(unsigned long pid, const char *reason);
-	void peer::CloseChild(unsigned long pid, bool care, const char *reason);
-	void peer::CloseChildTCP(unsigned long pid, const char *reason);
-	void peer::CloseChildUDP(unsigned long pid, const char *reason);
+	void peer::CloseParent(unsigned long pid, int sock, bool care, const char *reason);
+	void peer::CloseParentTCP(unsigned long pid, int sock, const char *reason);
+	void peer::CloseParentUDP(unsigned long pid, int sock, const char *reason);
+	void peer::CloseChild(unsigned long pid, int sock, bool care, const char *reason);
+	void peer::CloseChildTCP(unsigned long pid, int sock, const char *reason);
+	void peer::CloseChildUDP(unsigned long pid, int sock, const char *reason);
 	void peer::CloseSocketTCP(int sock, bool care, const char *reason);
 	void peer::CloseSocketUDP(int sock, bool care, const char *reason);
 private:

@@ -178,6 +178,7 @@ int CEPoll::remove_ssock(const int eid, const SYSSOCKET& s)
 
 int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefds, int64_t msTimeOut, set<SYSSOCKET>* lrfds, set<SYSSOCKET>* lwfds)
 {
+	//printf("%s:%d \n", __FUNCTION__, __LINE__);
    // if all fields is NULL and waiting time is infinite, then this would be a deadlock
    if (!readfds && !writefds && !lrfds && lwfds && (msTimeOut < 0))
       throw CUDTException(5, 3, 0);
@@ -296,7 +297,7 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
 
       CTimer::waitForEvent();
    }
-
+   //printf("%s:%d \n", __FUNCTION__, __LINE__);
    return 0;
 }
 

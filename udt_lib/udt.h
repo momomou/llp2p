@@ -191,6 +191,7 @@ struct CPerfMon
    int pktRecvACKTotal;                 // total number of received ACK packets
    int pktSentNAKTotal;                 // total number of sent NAK packets
    int pktRecvNAKTotal;                 // total number of received NAK packets
+   int padding1;						// self-defined padding variable
    int64_t usSndDurationTotal;		// total time duration when UDT is sending data (idle time exclusive)
 
    // local measurements
@@ -203,6 +204,7 @@ struct CPerfMon
    int pktRecvACK;                      // number of received ACK packets
    int pktSentNAK;                      // number of sent NAK packets
    int pktRecvNAK;                      // number of received NAK packets
+   int padding2;						// self-defined padding variable
    double mbpsSendRate;                 // sending rate in Mb/s
    double mbpsRecvRate;                 // receiving rate in Mb/s
    int64_t usSndDuration;		// busy sending time (i.e., idle time exclusive)
@@ -212,6 +214,7 @@ struct CPerfMon
    int pktFlowWindow;                   // flow window size, in number of packets
    int pktCongestionWindow;             // congestion window size, in number of packets
    int pktFlightSize;                   // number of packets on flight
+   int padding3;						// self-defined padding variable
    double msRTT;                        // RTT, in milliseconds
    double mbpsBandwidth;                // estimated bandwidth, in Mb/s
    int byteAvailSndBuf;                 // available UDT sender buffer size

@@ -24,6 +24,7 @@ logger_client::logger_client(logger *log_ptr)
 	delay_list=NULL;
 	_log_ptr =log_ptr;
 	exit_code = PEER_ALIVE;
+	bitrate = 0;
 	
 	chunk_buffer = (struct chunk_t *)new unsigned char[(CHUNK_BUFFER_SIZE + sizeof(struct chunk_header_t))];
 	if (!chunk_buffer) {
@@ -51,22 +52,28 @@ logger_client::logger_client(logger *log_ptr)
 
 logger_client::~logger_client()
 {
-	if(chunk_buffer)
+	if (chunk_buffer) {
 		delete chunk_buffer;
-	if(max_source_delay)
+	}
+	if (max_source_delay) {
 		delete max_source_delay;
-	if(delay_list)
+	}
+	if (delay_list) {
 		delete delay_list;
-	if(quality_struct_ptr)
+	}
+	if (quality_struct_ptr) {
 		delete quality_struct_ptr;
-	while(1){
-		if(log_buffer.size() != 0){
+	}
+	while (1) {
+		if (log_buffer.size() != 0) {
 			delete log_buffer.front();
 			log_buffer.pop();
-		}else
+		}
+		else {
 			break;
+		}
 	}
-	debug_printf("==============deldet logger_client success==========\n");
+	debug_printf("Have deleted logger_client \n");
 }
 
 void logger_client::set_self_pid_channel(unsigned long pid,unsigned long channel_id)
@@ -327,6 +334,7 @@ void logger_client::send_bw()
 	}
 	real_in_bw = 1000 * (double)accumulated_packet_size_in / (double)period_msec;
 	accumulated_packet_size_in = 0;
+	bitrate = 0.5*bitrate + 0.5*static_cast<int>(real_in_bw);
 
 	// Calculate bandwidth-out
 	if(log_bw_out_init_flag == 1){
@@ -375,7 +383,7 @@ void logger_client::send_bw()
 
 	//log_to_server(LOG_CLIENT_BW, 0, should_in_bw, real_in_bw,real_out_bw, quality_result);
 	log_to_server(LOG_DATA_BANDWIDTH, 0, should_in_bw, real_in_bw,real_out_bw, quality_result, nat_success_ratio);
-	debug_printf("in_bw: %.2lf Mbps  out_bw: %.2lf Mbps \n", real_in_bw/1000000, real_out_bw/1000000);
+	debug_printf("in_bw: %.2lf Mb/s  out_bw: %.2lf Mb/s \n", real_in_bw/1000000, real_out_bw/1000000);
 	_log_ptr->write_log_format("s(u) s f s f \n", __FUNCTION__, __LINE__, "in_bw", real_in_bw/1000000, "out_bw", real_out_bw/1000000);
 	if (real_in_bw != 0) {
 		debug_printf("Capacity: %.1lf, RescueNum: %d \n", real_out_bw / real_in_bw, _pk_mgr_ptr->rescueNumAccumulate());

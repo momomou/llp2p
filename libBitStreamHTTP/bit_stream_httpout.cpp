@@ -109,10 +109,12 @@ bit_stream_httpout::bit_stream_httpout(int stream_id,network *net_ptr, logger *l
 	//fwrite(FLV_Header,1,sizeof(FLV_Header),file_ptr);
 }
 
-bit_stream_httpout::~bit_stream_httpout(){
-	printf("==============deldet bit_stream_httpout success==========\n");
-	if(_queue_out_data_ptr)
+bit_stream_httpout::~bit_stream_httpout()
+{
+	debug_printf("Have deleted bit_stream_httpout \n");
+	if (_queue_out_data_ptr) {
 		delete _queue_out_data_ptr;
+	}
 }
 
 void bit_stream_httpout::init()

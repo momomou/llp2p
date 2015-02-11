@@ -25,7 +25,7 @@ io_connect::io_connect(network *net_ptr,logger *log_ptr,configuration *prep_ptr,
 
 io_connect::~io_connect()
 {
-	printf("==============deldet io_connect success==========\n");
+	debug_printf("Have deleted io_connect \n");
 }
 
 int io_connect::handle_pkt_in(int sock)

@@ -82,3 +82,32 @@ OBS 的 FPS 會影響 RTMP 封包大小的變動率，FPS越高，變動率越小
 /* 2014.12.07 */
 UDT 的 epoll_waiter 太耗時，導致 pkt_rate 最好不要超過60
 會有 substream 卡在 CONNECTING 狀態
+
+/* 2014.12.21 */
+UDT 在 CONNECTING 狀態下被刪除時會當掉，WHY? (已找出原因: 非阻塞模式下 connecting 時間不能超過 3 秒，否則一定當，應該是 UDT bug 之一)
+
+/* 2014.01.09 */
+UDT Header: 44 bytes
+Type: Control/Data
+	Control:	0 (handshake)
+				1 (keepalive)
+				2 (ack)
+				3 (nak`)
+				5 (shutdown)
+				6 (ack2)
+																1 (Keepalive)
+																				1 (Keepalive)
+	Type: 	0 (Handshake)
+			1 (Keepalive)	
+			
+/* 2015.01.11 */
+/MTd模式下，在專案->屬性->C/C++->前置處理器->前置處理器定義 加入 "_SCL_SECURE_NO_WARNINGS" 解決一個C4996問題
+
+/* 2015.01.25 */
+peer::1405 bug
+
+/* 2015.02.02 */
+(已解決)UDT::TRACEINFO trace 在 socket 剛建好的時候不能呼叫 perfmon(), 否則會 crash, 應該是 UDT 的 bug(可能有些 structure 還沒建好)
+
+/* 2015.02.03 */
+UDT struct CPerfMon 需要對成員做補齊動作

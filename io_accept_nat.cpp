@@ -24,11 +24,10 @@ io_accept_nat::io_accept_nat(network *net_ptr,logger *log_ptr,configuration *pre
 	_stunt_mgr_ptr = stunt_mgr_ptr;
 }
 
-io_accept_nat::~io_accept_nat(){
-	printf("==============deldet io_accept_nat success==========\n");
-
+io_accept_nat::~io_accept_nat()
+{
+	debug_printf("Have deleted io_accept_nat \n");
 }
-
 
 //should change to non-blocking
 int io_accept_nat::handle_pkt_in(int sock)

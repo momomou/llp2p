@@ -16,6 +16,7 @@ class pk_mgr;
 class io_accept;
 class io_connect;
 class io_connect_udp;
+class io_connect_udp_ctrl;
 class logger_client;
 class io_nonblocking;
 class io_nonblocking_udp;
@@ -33,7 +34,7 @@ public:
 	void clear_udpfd_in_peer_com(int sock);
 	int non_blocking_build_connection(struct level_info_t *level_info_ptr,int fd_role,unsigned long manifest,unsigned long fd_pid, int flag, unsigned long session_id);
 	int non_blocking_build_connection_udp(struct peer_info_t *candidates_info, INT32 caller, UINT32 manifest, UINT32 peer_pid, INT32 flag, UINT32 my_session, UINT32 peercomm_session);
-	int non_blocking_build_connection_udp_now(struct peer_info_t *candidates_info, INT32 caller, UINT32 manifest, UINT32 peer_pid, INT32 flag, UINT32 my_session, UINT32 peercomm_session);
+	int non_blocking_build_connection_udp_now(struct peer_info_t *candidates_info, INT32 caller, UINT32 manifest, UINT32 peer_pid, INT32 flag, UINT32 my_session, UINT32 peercomm_session, INT32 bctype);
 	int fake_conn_udp(struct level_info_t *level_info_ptr, int fd_role, unsigned long manifest, unsigned long fd_pid, int flag, unsigned long session_id);
 	int non_blocking_build_connectionNAT_udp(struct level_info_t *level_info_ptr, int fd_role, unsigned long manifest, unsigned long fd_pid, int flag, unsigned long session_id);
 	void WaitForParentConn(unsigned long parent_pid, unsigned long manifest, unsigned long session_id);
@@ -92,6 +93,7 @@ public:
 	io_accept *_io_accept_ptr;
 	io_connect *_io_connect_ptr;
 	io_connect_udp *_io_connect_udp_ptr;
+	io_connect_udp_ctrl *_io_connect_udp_ctrl_ptr;
 	io_nonblocking *_io_nonblocking_ptr;
 	io_nonblocking_udp *_io_nonblocking_udp_ptr;
 	stunt_mgr *_stunt_mgr_ptr;

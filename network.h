@@ -2,7 +2,7 @@
 #define __NETWORK_H__
 
 #include "common.h"
-//#include "logger.h"
+#include "logger.h"
 #include "peer.h"
 #ifdef _WIN32
 	#include "EpollFake.h"

@@ -46,7 +46,7 @@ bit_stream_server::~bit_stream_server()
 	}
 	_pk_mgr_ptr->_map_stream_fd_stream.clear();
 
-	debug_printf("==============delete bit_stream_server success==========\n");
+	debug_printf("Have deleted bit_stream_server \n");
 }
 
 //init socket to listen , set nob-locking ,start to epoll LIN

@@ -210,6 +210,9 @@
     <ClCompile Include="..\..\stund\udp.cxx">
       <Filter>原始程式檔\stund</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\io_connect_udp_ctrl.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\basic_class.h">
@@ -439,6 +442,9 @@
     </ClInclude>
     <ClInclude Include="..\..\irc\libircclient.h">
       <Filter>原始程式檔\irc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\io_connect_udp_ctrl.h">
+      <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

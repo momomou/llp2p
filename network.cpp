@@ -650,8 +650,8 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 	int send_rt_val;
 	if (send_info->ctl_state == READY) {
 		send_rt_val = send(sock, send_info->buffer + send_info->offset, send_info->expect_len, 0);
-		//debug_printf("Send %d(expected:%d) bytes to sock %d \n", send_rt_val, send_info->expect_len, sock);
-	
+		_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__, "Send", send_rt_val, send_info->expect_len, "bytes to", sock);
+
 		if (send_rt_val < 0) {
 #ifdef _WIN32 
 			int socketErr = WSAGetLastError();
@@ -741,7 +741,7 @@ network::network(int * errorRestartFlag,list<int>  * fd_list)
 
 network::~network() 
 {
-	printf("==============deldet network success==========\n");
+	debug_printf("Have deleted network \n");
 }
 
 //================below not important=====================

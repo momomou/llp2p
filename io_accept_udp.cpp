@@ -22,8 +22,9 @@ io_accept_udp::io_accept_udp(network_udp *net_udp_ptr,logger *log_ptr,peer_mgr *
 	_logger_client_ptr = logger_client_ptr;
 }
 
-io_accept_udp::~io_accept_udp(){
-	printf("==============deldet io_accept success==========\n");
+io_accept_udp::~io_accept_udp()
+{
+	debug_printf("Have deleted io_accept \n");
 }
 
 int io_accept_udp::handle_pkt_in(int sock)

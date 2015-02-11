@@ -10,7 +10,6 @@
 //#include "irc/keyboard.h"
 */
 
-
 #include "common.h"
 #ifdef _WIN32
 #include "EpollFake.h"
@@ -634,7 +633,6 @@ int main(int argc, char **argv){
 	
 	//cout << UDT::stunRandomPort() << endl;
 
-
 	cout << "tst_speed_svr " << version << " (Compiled Time: "__DATE__ << " "__TIME__")" << endl << endl;
 
 	FILE *record_file_fp2 = NULL;
@@ -729,7 +727,7 @@ int main(int argc, char **argv){
 			printf("[ERROR] log_ptr new error \n");
 			PAUSE
 		}
-		log_ptr->logger_set(net_ptr);
+		//log_ptr->logger_set(net_ptr);
 		logger_client_ptr = new logger_client(log_ptr);
 		if (logger_client_ptr == NULL) {
 			printf("[ERROR] logger_client_ptr new error \n");
@@ -1050,6 +1048,7 @@ int main(int argc, char **argv){
 		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "bit_stream_server", *bit_stream_server_ptr);
 		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "io_accept_udp", *io_accept_udp_ptr);
 		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "io_connect_udp", peer_communication_ptr->_io_connect_udp_ptr);
+		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "io_connect_udp_ctrl", peer_communication_ptr->_io_connect_udp_ctrl_ptr);
 		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "io_nonblocking_udp", peer_communication_ptr->_io_nonblocking_udp_ptr);
 		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "peer_communication", *peer_communication_ptr);
 		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "peer", peer_communication_ptr->_peer_ptr);
@@ -1086,7 +1085,7 @@ int main(int argc, char **argv){
 #endif
 
 #ifdef _WIN32
-			for (int i = 0; i < 1; i++) {
+			for (int i = 0; i < 2; i++) {
 #ifdef _FIRE_BREATH_MOD_
 				net_ptr->epoll_waiter(1000, map_channelID_globalVar[thread_key]->fd_list);
 #else
@@ -1102,15 +1101,18 @@ int main(int argc, char **argv){
 #ifdef _FIRE_BREATH_MOD_
 			net_udp_ptr->epoll_waiter(5, map_channelID_globalVar[thread_key]->udp_fd_list);
 #else
-			net_udp_ptr->epoll_waiter(5, &udp_fd_list);
+			//log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "1");
+			net_udp_ptr->epoll_waiter(10, &udp_fd_list);
 #endif
-
+			//log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "2");
 			net_udp_ptr->epoll_dispatcher();
-
+			//log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "---");
 			if (*(net_ptr->_errorRestartFlag) == RESTART) {
 				log_ptr->write_log_format("s(u) s \n\n\n", __FUNCTION__, __LINE__, "Program Restart");
 				break;
 			}
+			Sleep(1);	// 避免過度使用CPU, 不休息的話它的頻率會衝到 10k次/s
+
 
 		}
 

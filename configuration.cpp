@@ -134,8 +134,7 @@ configuration::~configuration()
 		}
 	}
 */	
-	printf("==============deldet configuration success==========\n");
-
+	debug_printf("Have deleted configuration \n");
 }
 
 std::string configuration::readConfigFile(const char *path) {

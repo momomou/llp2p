@@ -12,7 +12,7 @@ void logger::timer()
 {
 	timerMod =MOD_TIME__CLOCK ;
 	if (--_systime == 0) {
-		write_log_format("s => [U/U]\n", "Rate[KB]", _net_ptr->send_byte/SIG_FREQ/1024, _net_ptr->recv_byte/SIG_FREQ/1024);
+		//write_log_format("s => [U/U]\n", "Rate[KB]", _net_ptr->send_byte/SIG_FREQ/1024, _net_ptr->recv_byte/SIG_FREQ/1024);
 		_systime = SYS_FREQ;
 	}
 }
@@ -187,9 +187,9 @@ void logger::exit(int status, const char *action)
 {
 	write_log_format("s(u) s (s) \n", __FUNCTION__,__LINE__, "log terminate by", action);
 	stop_log_record();
-	_net_ptr->garbage_collection();
+	//_net_ptr->garbage_collection();
 	debug_printf("logger error\n");
-	*(_net_ptr->_errorRestartFlag) = RESTART;
+	//*(_net_ptr->_errorRestartFlag) = RESTART;
 }
 
 bool logger::check_arch_compatible() 
@@ -208,10 +208,12 @@ int logger::set_resource_limit(int maxfds)
 	return 1;
 }
 
+/*
 void logger::logger_set(network *net_ptr )
 {
 	_net_ptr = net_ptr;
 }
+*/
 
 logger::logger()
 {
@@ -226,7 +228,7 @@ logger::~logger()
 	if (_fp) {
 		fclose(_fp);
 	}
-	debug_printf("==============deldet logger success==========\n");
+	debug_printf("Have deleted logger \n");
 }
 
 int logger::is_little_endian() 
@@ -527,26 +529,24 @@ unsigned int logger::diff_TimerGet_ms(struct timerStruct *start, struct timerStr
 {
 	if (start->initClockFlag != INITED) {
 		//debug_printf("start timer initClockFlag  not INITED \n");
-		write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "start timer initClockFlag  not INITED");
-		//PAUSE
+		//write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "start timer initClockFlag  not INITED");
 	}
 
 	if (end->initClockFlag != INITED) {
 		//debug_printf("end timer initClockFlag  not INITED \n");
-		write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "end timer initClockFlag  not INITED");
-		//PAUSE
+		//write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "end timer initClockFlag  not INITED");
 	}
 
 	if (start->initTickFlag != INITED) {
 		//debug_printf("start timer initTickFlag  not INITED \n");
-		write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "start timer initClockFlag  not INITED");
+		//write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "start timer initClockFlag  not INITED");
 		timerMod = MOD_TIME__CLOCK;
 		//PAUSE
 	}
 
 	if (end->initTickFlag != INITED) {
 		//debug_printf("start timer initTickFlag  not INITED \n");
-		write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "end timer initClockFlag  not INITED");
+		//write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "end timer initClockFlag  not INITED");
 		timerMod = MOD_TIME__CLOCK;
 		//PAUSE
 	}

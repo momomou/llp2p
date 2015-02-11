@@ -169,6 +169,7 @@ public:
 	unsigned long pre_in_pkt_size;
 	unsigned long pre_out_pkt_size;
 	int log_bw_in_init_flag,log_bw_out_init_flag;
+	unsigned long bitrate;
 
 	double nat_total_times;							// 嘗試的所有NAT穿透次數
 	double nat_success_times;						// 成功的NAT穿透成功次數
@@ -187,7 +188,7 @@ public:
 	unsigned short my_private_port;
 	int log_server_sock;
 	unsigned char exit_code;		// Error code (for program exit)
-
+	
 
 	Nonblocking_Buff non_log_recv_struct;
 };

@@ -18,7 +18,7 @@ io_nonblocking_udp::io_nonblocking_udp(network_udp *net_udp_ptr,logger *log_ptr 
 
 io_nonblocking_udp::~io_nonblocking_udp()
 {
-	debug_printf("==============deldet io_nonblocking_udp success==========\n");
+	debug_printf("Have deleted io_nonblocking_udp \n");
 }
 
 int io_nonblocking_udp::handle_pkt_in(int sock)
@@ -145,6 +145,9 @@ int io_nonblocking_udp::handle_pkt_in_udp(int sock)
 				if (iter->second->n_candidates_info[i].pid == role_protocol_ptr->send_pid && iter->second->n_candidates_info[i].peercomm_session == role_protocol_ptr->peercomm_session) {
 					map_mysession_candidates_iter = iter;
 					peer_info_ptr = &(iter->second->n_candidates_info[i]);
+					peer_info_ptr->estimated_delay = role_protocol_ptr->parent_src_delay + role_protocol_ptr->queueing_time + role_protocol_ptr->transmission_time;
+					peer_info_ptr->PS_class = role_protocol_ptr->PS_class;
+					_log_ptr->write_log_format("s(u) s d(d) u u u \n", __FUNCTION__, __LINE__, "peer", peer_info_ptr->pid, sock, role_protocol_ptr->parent_src_delay, role_protocol_ptr->queueing_time, role_protocol_ptr->transmission_time);
 				}
 			}
 		}
@@ -195,19 +198,29 @@ int io_nonblocking_udp::handle_pkt_in_udp(int sock)
 				if (iter->second->n_candidates_info[i].pid == peer_info_ptr->pid && iter->second->n_candidates_info[i].connection_state == PEER_CONNECTING) {
 					iter->second->n_candidates_info[i].connection_state = PEER_CONNECTED;
 					iter->second->n_candidates_info[i].sock = sock;
+					_log_ptr->write_log_format("s(u) s u s u s d \n", __FUNCTION__, __LINE__, "Set peer_pid", iter->second->n_candidates_info[i].pid, "PEER_CONNECTED in my_session", iter->first, "sock", sock);
 				}
 			}
 		}
 
-
-		_log_ptr->write_log_format("s(u) s u s u s d s u \n", __FUNCTION__, __LINE__, "Recv CHNK_CMD_ROLE from sock", sock, 
+		_log_ptr->write_log_format("s(u) s u s u s d s u s u s u s u s u \n", __FUNCTION__, __LINE__, "Recv CHNK_CMD_ROLE from sock", sock, 
 																						"pid", role_protocol_ptr->send_pid, 
 																						"role", role_protocol_ptr->flag, 
-																						"manifest", role_protocol_ptr->manifest);
+																						"manifest", role_protocol_ptr->manifest,
+																						"class", role_protocol_ptr->PS_class,
+																						"parent_src_delay", role_protocol_ptr->parent_src_delay,
+																						"queueint_time", role_protocol_ptr->queueing_time,
+																						"transmission_time", role_protocol_ptr->transmission_time);
+		if (map_mysession_candidates_iter->second->myrole == PARENT_PEER) {
+			HandleCMDRole(sock, role_protocol_ptr);
+		}
 
 		_net_udp_ptr->epoll_control(sock, EPOLL_CTL_ADD, EPOLLIN | EPOLLOUT);
 		_net_udp_ptr->set_fd_bcptr_map(sock, dynamic_cast<basic_class *> (_peer_communication_ptr));
 	} 
+	else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_RTT) {
+		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "Recv CHNK_CMD_PEER_RTT from sock", sock);
+	}
 	else {
 		// 儘管延後開始建立連線的時間，還是可能發生尚未收到 peer-list，對方就先連過來的情況，此 case 就放棄
 		debug_printf("[ERROR] Recv error CMD %d from sock %d \n", chunk_ptr->header.cmd, sock);
@@ -219,6 +232,81 @@ int io_nonblocking_udp::handle_pkt_in_udp(int sock)
 	}
 		
 	return RET_OK;
+}
+
+
+void io_nonblocking_udp::HandleCMDRole(int sock, struct role_struct *role_protocol_ptr)
+{
+	UINT32 transmisstion_time = 0;
+	Nonblocking_Ctl *Nonblocking_Send_Ctrl_ptr = NULL;
+	map<int, struct ioNonBlocking*>::iterator map_udpfd_NonBlockIO_iter;
+	map<unsigned long, struct mysession_candidates *>::iterator map_mysession_candidates_iter = _peer_communication_ptr->map_mysession_candidates.end();
+	int _send_byte = 0;
+	struct peer_info_t *peer_info_ptr = NULL;		// 這個 sock 的 peer
+
+	// Get iter of map_udpfd_NonBlockIO
+	map_udpfd_NonBlockIO_iter = _peer_communication_ptr->map_udpfd_NonBlockIO.find(sock);
+	if (map_udpfd_NonBlockIO_iter == _peer_communication_ptr->map_udpfd_NonBlockIO.end()) {
+		debug_printf("[DEBUG] Not found map_udpfd_NonBlockIO %d \n", sock);
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[DEBUG] Not found map_udpfd_NonBlockIO", sock);
+		return ;
+	}
+	Nonblocking_Send_Ctrl_ptr = &(map_udpfd_NonBlockIO_iter->second->io_nonblockBuff.nonBlockingSendCtrl);
+
+	// Get iter of map_mysession_candidates
+	for (map<unsigned long, struct mysession_candidates *>::iterator iter = _peer_communication_ptr->map_mysession_candidates.begin(); iter != _peer_communication_ptr->map_mysession_candidates.end(); iter++) {
+		for (int i = 0; i != iter->second->candidates_num; i++) {
+			_log_ptr->write_log_format("s(u) s u s u s u s u \n", __FUNCTION__, __LINE__,
+				"my_session", iter->first,
+				"peer_pid", iter->second->p_candidates_info[i].pid,
+				"fd1", iter->second->p_candidates_info[i].sock,
+				"fd2", iter->second->n_candidates_info[i].sock);
+			if (iter->second->n_candidates_info[i].sock == sock) {
+				map_mysession_candidates_iter = iter;
+				peer_info_ptr = &iter->second->p_candidates_info[i];
+				_log_ptr->timerGet(&(iter->second->p_candidates_info[i].time_end));
+				transmisstion_time = _log_ptr->diff_TimerGet_ms(&(iter->second->p_candidates_info[i].time_start), &(iter->second->p_candidates_info[i].time_end)) / 2;
+			}
+		}
+	}
+	if (map_mysession_candidates_iter == _peer_communication_ptr->map_mysession_candidates.end()) {
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "[DEBUG] Not found map_udpfd_NonBlockIO", sock);
+		return ;		// 關閉這條 socket
+	}
+
+	if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.ctl_state == READY) {
+
+		map<int, int>::iterator map_fd_flag_iter;
+		map<int, unsigned long>::iterator map_fd_session_id_iter;		//must be store before connect
+		map<int, unsigned long>::iterator map_peer_com_fd_pid_iter;		//must be store before connect
+		map<unsigned long, struct peer_com_info *>::iterator session_id_candidates_set_iter;
+
+		int send_byte;
+
+		role_protocol_ptr->header.rsv_1 = REPLY;
+		if (role_protocol_ptr->flag == PARENT_PEER) {
+			role_protocol_ptr->PS_class = _peer_communication_ptr->_pk_mgr_ptr->GetPSClass();
+			role_protocol_ptr->parent_src_delay = _peer_communication_ptr->_pk_mgr_ptr->ss_table[_peer_communication_ptr->_pk_mgr_ptr->manifestToSubstreamID(map_mysession_candidates_iter->second->manifest)]->data.avg_src_delay;
+			role_protocol_ptr->queueing_time = _peer_communication_ptr->_pk_mgr_ptr->GetQueueTime();
+			//role_protocol_ptr->transmission_time = transmisstion_time + 100;
+		}
+		role_protocol_ptr->flag = map_mysession_candidates_iter->second->myrole == CHILD_PEER ? PARENT_PEER : CHILD_PEER;
+
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.offset = 0;
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.total_len = sizeof(struct role_struct);
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.expect_len = sizeof(struct role_struct);
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.buffer = (char *)role_protocol_ptr;
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.chunk_ptr = (chunk_t *)role_protocol_ptr;
+		Nonblocking_Send_Ctrl_ptr->recv_ctl_info.serial_num = role_protocol_ptr->header.sequence_number;
+
+		_send_byte = _net_udp_ptr->nonblock_send(sock, &(Nonblocking_Send_Ctrl_ptr->recv_ctl_info));
+		_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "Send", _send_byte, "bytes to sock", sock);
+
+		if (_send_byte < 0) {
+			_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[DEBUG] Send bytes", _send_byte, sock);
+		}
+		return;
+	}
 }
 
 int io_nonblocking_udp::handle_pkt_out(int sock)

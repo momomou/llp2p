@@ -24,7 +24,7 @@ io_connect_udp::io_connect_udp(network_udp *net_udp_ptr, logger *log_ptr,configu
 
 io_connect_udp::~io_connect_udp()
 {
-	printf("==============deldet io_connect_udp success==========\n");
+	debug_printf("Have deleted io_connect_udp \n");
 }
 
 int io_connect_udp::handle_pkt_in(int sock)
@@ -65,6 +65,10 @@ int io_connect_udp::handle_pkt_out_udp(int sock)
 	in this part means the fd is built. it finds its role and sends protocol to another to tell its role.
 	bind to peer_com~ for handle_pkt_in/out.
 	*/
+	UINT32 transmisstion_time = 0;
+	struct timerStruct new_timer;
+	_log_ptr->timerGet(&new_timer);
+	_log_ptr->write_log_format("s(u) s d s d s d \n", __FUNCTION__, __LINE__, "sock", sock, "clocktime", new_timer.clockTime, "ticktime", new_timer.tickTime);
 
 	_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "sock", sock, "state", UDT::getsockstate(sock));
 
@@ -99,12 +103,15 @@ int io_connect_udp::handle_pkt_out_udp(int sock)
 		for (int i = 0; i != iter->second->candidates_num; i++) {
 			_log_ptr->write_log_format("s(u) s u s u s u s u \n", __FUNCTION__, __LINE__, 
 				"my_session", iter->first, 
-				"peer_pid", iter->second->p_candidates_info[i].pid, 
+				"peer_pid", iter->second->p_candidates_info[i].pid,
 				"fd1", iter->second->p_candidates_info[i].sock, 
 				"fd2", iter->second->n_candidates_info[i].sock);
 			if (iter->second->p_candidates_info[i].sock == sock) {
 				map_mysession_candidates_iter = iter;
 				peer_info_ptr = &iter->second->p_candidates_info[i];
+				_log_ptr->timerGet(&(iter->second->p_candidates_info[i].time_end));
+				transmisstion_time = _log_ptr->diff_TimerGet_ms(&(iter->second->p_candidates_info[i].time_start), &(iter->second->p_candidates_info[i].time_end)) / 2;
+				//_log_ptr->write_log_format("s(u) u u \n", __FUNCTION__, __LINE__, _log_ptr->diff_TimerGet_ms(&(iter->second->p_candidates_info[i].time_start), &(iter->second->p_candidates_info[i].time_end)), _log_ptr->diff_TimerGet_ms(&(iter->second->p_candidates_info[i].time_start), &(iter->second->p_candidates_info[i].time_end)) / 2);
 			}
 		}
 	}
@@ -137,6 +144,12 @@ int io_connect_udp::handle_pkt_out_udp(int sock)
 		role_protocol_ptr->manifest = map_mysession_candidates_iter->second->manifest;
 		role_protocol_ptr->send_pid = _peer_mgr_ptr->self_pid;
 		role_protocol_ptr->peercomm_session = peer_info_ptr->peercomm_session;
+		if (map_mysession_candidates_iter->second->myrole == PARENT_PEER) {
+			role_protocol_ptr->PS_class = _pk_mgr_ptr->GetPSClass();
+			role_protocol_ptr->parent_src_delay = _pk_mgr_ptr->ss_table[_pk_mgr_ptr->manifestToSubstreamID(map_mysession_candidates_iter->second->manifest)]->data.avg_src_delay;
+			role_protocol_ptr->queueing_time = _pk_mgr_ptr->GetQueueTime();
+			role_protocol_ptr->transmission_time = transmisstion_time;
+		}
 
 		Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.offset = 0;
 		Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.total_len = sizeof(struct role_struct);

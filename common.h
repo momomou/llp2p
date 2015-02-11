@@ -48,7 +48,7 @@
 #define SS_STABLE2		1	// The substream is in normal state
 #define SS_CONNECTING2	2
 #define SS_RESCUE2		3	// The substream is in rescue state
-#define SS_TEST2		4	// The substream is in test state
+#define SS_TEST2		4	// The substream is in test state (一旦進入此狀態，必定待 TEST_DELAY_TIME 這段時間)
 
 // Type of peer-list
 #define RESCUE_OP		0
@@ -60,22 +60,25 @@
 #define ADD_OP			0x11
 #define MINUS_OP		0x12
 
-#define FD_SETSIZE		2048
+#define FD_SETSIZE		64
 
 #define PK_PID			999999
 #define STUNT_PID		999998
 #define BIG_CHUNK		8192
 
+// Parent Selection
+#define PS_HISTORY_NUM	101				// 會看過去多少次 queue 的歷史為依據
+
 ////resuce PARAMETER////
 #define PARAMETER_X		4				// chunk packets per (1000/PARAMETER_X) ms
-#define MAX_DELAY 		5000			// source delay PARAMETER ms
-#define SOURCE_DELAY_CONTINUOUS 3		// The maximal permissive times that souce-delay is bigger than MAX_DELAY. SOURCE_DELAY_CONTINUOUS * x(packets/s) / substream
+#define MAX_DELAY 		2000			// source delay PARAMETER ms
+#define SOURCE_DELAY_CONTINUOUS 2		// The maximal permissive times that souce-delay is bigger than MAX_DELAY. SOURCE_DELAY_CONTINUOUS * x(packets/s) / substream
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue(頻寬檢查)
 #define PARAMETER_M		16		// 8
 #define PARAMETER_N		10		// 5
 #define PARAMETER_P		6		// 3
 
-#define TEST_DELAY_TIME	6				// Test delay 的時間不能少於或接近一個 session 存活的時間(2s)，否則在 test delay 成功的那一刻可能會誤判 parent，
+#define TEST_DELAY_TIME	4000			// Test delay 的時間不能少於或接近一個 session 存活的時間(2s)，否則在 test delay 成功的那一刻可能會誤判 parent，
 										// 因為 parent 收到 PARENT_PEER 時會直接更新 child_table
 
 // LOG SERVER
@@ -87,18 +90,21 @@
 #define NETWORK_TIMEOUT			5000		// Period of check peer's unnormal disconnection
 #define DATA_TIMEOUT			5000		// Timeout for rescue type 3
 #define BASE_RESYN_TIME			20000
-#define NAT_WAITING_TIME		1000			// waiting time for NAT traversal
+#define NAT_WAITING_TIME		200			// waiting time before build connection (等待一段時間給 PK 送的 CMD 能到達雙方)
 #define DELAY_BUILD_CONN_TIME	500			// 給一個時間緩衝，確保 child 和 parent 都收有到 list
 #define BLOCK_RESCUE_TIME		5000		// waiting time for block_rescue
 #define BLOCK_RESCUE_INTERVAL	2000		// Time interval between sending block_rescue
+#define RTT_CMD_TIMEOUT			3000
 
 #define NEEDSOURCE_THRESHOLD	0.96		// substream在stable或有duplicate source狀態的數目 / 全部substream數目, 超過這個threshold可以不必向pk要source
+
+#define MAX_RTT_TEST_PEER_LIST	5
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
 // BUFF_SIZE sec
 #define BUFF_SIZE		10
 //CHUNK_LOSE sec, mean lose about CHUNK_LOSE sec packet
-#define CHUNK_LOSE		5
+#define CHUNK_LOSE		1
 
 // Child Priority
 #define PRIORITY_QUEUE_THRESHOLD	10	// Priority x 的 child 必須等到 priority x-1 的 child 的 queue size 小於 PRIORITY_QUEUE_THRESHOLD 才可以塞給 sending buffer
@@ -329,6 +335,12 @@ using std::bitset;
 #define SESSION_SELECTING			0x22
 #define SESSION_END					0x23
 
+// Parent Selection classes
+#define PS_STABLE					0x01
+#define PS_WARNING					0x02
+#define PS_DANGEROUS				0x03
+#define PS_OVERLOADING				0x04
+
 #define CHNK_CMD_PEER_REG				0x01	// register
 //#define CHNK_CMD_RESCUE_LIST			0x02	// recv rescue list
 //#define CHNK_CMD_PEER_RSC				0x03	// rescue cmd
@@ -363,7 +375,7 @@ using std::bitset;
 //#define CHNK_CMD_PEER_START_DELAY_UPDATE			0X1C
 //#define CHNK_CMD_PEER_PARENT_CHILDREN	0xF0	//暫時不用
 #define CHNK_CMD_TOPO_INFO				0x1E
-#define CHNK_CMD_ROLE					0x1F	// Determine stream direction
+#define CHNK_CMD_ROLE					0x1F	// Determine stream direction. If parent receives this message, responses to child
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 #define CHNK_CMD_LOG					0x20	// Send to log-server for data
 #define CHNK_CMD_LOG_DEBUG 				0X21	// Send to log-server for debug
@@ -371,8 +383,11 @@ using std::bitset;
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
 #define CHNK_CMD_KICK_PEER				0x23
 #define CHNK_CMD_PARENT_TEST_INFO       0x24	// Send to PK whether test success or fail
+#define CHNK_CMD_RTT_TEST_REQUEST       0x25
+#define CHNK_CMD_RTT_TEST_RESPONSE      0x26
 
 #define CHNK_CMD_PEER_BLOCK_RESCUE		0x31
+#define CHNK_CMD_PEER_RTT				0x32
 #define CHNK_CMD_PEER_UNKNOWN			0xFF	// 1 B cmd => 0xFF is reserved for unknown cmd
 
 
@@ -384,8 +399,8 @@ using std::bitset;
 
 #define RTP_PKT_BUF_MAX	30000	// This value defines the max rtp packet size
 #define RTP_PKT_BUF_PAY_SIZE	(RTP_PKT_BUF_MAX - sizeof(struct chunk_header_t) - sizeof(struct rtp_hdr_t))	// This value defines the max rtp packet size
-#define MAXFDS 			2048
-#define EVENTSIZE 		2048
+#define MAXFDS 			64
+#define EVENTSIZE 		64
 #define MAX_POLL_EVENT 	64
 #define HTML_SIZE 		8192
 //#define BUCKET_SIZE		2048/4
@@ -521,6 +536,11 @@ struct peer_info_t {
 	UINT32 peercomm_session;
 	UINT32 priority;					// 值越低權重越高，等於 my_session
 	UINT32 connection_state;
+	UINT32 PS_class;
+	struct timerStruct time_start;		// 這條 socket 開始 connect 的時間
+	struct timerStruct time_end;		// 這條 socket 成功建立連線的時間. Transmission time = time_end - time_start
+	INT32 rtt;							// 只用在 CHNK_CMD_RTT_TEST_REQUEST. 如果只用一個封包來測 RTT, 就用 time_end - time_start 來 assign, 如果可以送很多封包來找出 RTT, 就用 UDT 計算的 RTT (因為 UDT 有 Congestion Control, RTT 只用一個封包測會不精準)
+	UINT32 estimated_delay;				// 用來估算這個 parent 的 delay
 };
 
 
@@ -918,6 +938,18 @@ struct update_test_info {
 	UINT32 success_parent[0];
 };
 
+struct chunk_rtt_request {
+	struct chunk_header_t header;
+	UINT32 pid;
+	struct level_info_t test_peer_info[MAX_RTT_TEST_PEER_LIST];
+};
+
+struct chunk_rtt_response {
+	struct chunk_header_t header;
+	UINT32 pid;
+	UINT32 targetPid;
+	INT32 rtt;
+};
 
 //////////////////////////////////////////////////////////////////////////////////measure start delay
 //////////////////////////////////////////////////////////////////////////////////SYN PROTOCOL
@@ -969,6 +1001,7 @@ struct substream_data {
 	INT32 isTesting;					//int				isTesting;
 	UINT32 testing_count;				//unsigned int	testing_count;	//用來測試rescue 的計數器
 	UINT32 previousParentPID;			//unsigned		previousParentPID;
+	UINT32 avg_src_delay;
 };
 
 struct substream_state {
@@ -982,8 +1015,15 @@ struct substream_state {
 struct substream_timer {
 	struct timerStruct timer;			// timer refresh if this data packet of this substream has received
 	bool timeout_flag;
-	struct timerStruct inTest_timer;	// timer start when substream starts in SS_TEST state
-	bool inTest_flag;					// if inTest_timer timeout, flag = true; otherwise false. 如果完成6秒的測試，flag = true，任何測試中途失敗就不會設
+	//struct timerStruct inTest_timer;	// timer start when substream starts in SS_TEST state
+	//bool inTest_flag;					// if inTest_timer timeout, flag = true; otherwise false. 如果完成6秒的測試，flag = true，任何測試中途失敗就不會設
+};
+
+struct substream_inTest {
+	UINT32 pkt_count;						// 累加測試的那個 peer 的封包量
+	UINT32 overdelay_count;				// 超出 MAX_DELAY 的次數
+	UINT32 inTest_success;				// 當 substream 進入 SS_TEST 狀態，預設是 1，當測試過程中處發 RESCUE，變成 0，直到 timer timeout，根據此結果決定測試成功或失敗
+	struct timerStruct timer;			// timer start when substream starts being in SS_TEST state
 };
 
 struct substream_info {
@@ -998,9 +1038,11 @@ struct substream_info {
 	struct source_delay source_delay_table;
 	struct substream_timer timer;				// Record the time(for rescue type 3)
 	struct substream_data data;
+	struct substream_inTest inTest;
 	INT32 lost_packet_count;
 	UINT32 current_parent_pid;					// The current parent pid
 	UINT32 previous_parent_pid;					// The previous parent pid
+	UINT32 testing_parent_pid;					// 在 SS_TEST 狀態下所測試的 parent 是誰，加這個參數是為了區分在 MOVE 時有兩個非 PK 的 parent(原先穩定的 peer 記錄在 current_parent_pid)
 	// Block Rescue
 	INT32 block_rescue;							// Block the rescue action when receive a control message from parent-peer
 	INT32 can_send_block_rescue;				// A flag that determine can send block_rescue or not (for time-based rescue detection)
@@ -1017,6 +1059,20 @@ struct delay_build_connection {
 	UINT32 my_session;
 	UINT32 peercomm_session;
 	struct timerStruct timer;
+};
+
+struct queue_history {
+	UINT32 total_bits[PS_HISTORY_NUM];
+	INT32 current_index;		// 目前 index, 未被記錄
+};
+
+/************************************************************/
+/*		Structures of Sock Priority Queue	(2014/12/26)	*/
+/************************************************************/
+struct queue_info {
+	INT32 length;			// Current length of queue
+	INT32 lambda;		// Input rate
+	INT32 mu;			// Output rate
 };
 
 /****************************************************/
@@ -1046,7 +1102,7 @@ struct rescue_peer_capacity_measurement{
 struct seed_notify{
 	struct chunk_header_t header;
 	UINT32 manifest;							//unsigned int manifest;
-
+	UINT32 targetSubStreamId;
 };
 
 struct chunk_rescue_list {
@@ -1101,6 +1157,16 @@ struct role_struct{
 	UINT32 send_pid;
 	UINT32 recv_pid;
 	UINT32 peercomm_session;
+	// For Parent Selection
+	UINT32 PS_class;
+	UINT32 parent_src_delay;
+	UINT32 queueing_time;
+	UINT32 transmission_time;					// 由 Connect 的一方到 writable 的時間差
+};
+
+struct rtt_struct {
+	struct chunk_header_t header;
+	INT32 padding;
 };
 
 struct peer_com_info{
