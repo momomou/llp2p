@@ -394,6 +394,7 @@ int peer::handle_connect_request(int sock, struct level_info_t *level_info_ptr, 
 }
 
 // Create the table relating this peer
+// 注意如果與此 peer 已有連線存在，就不開新的 table
 void peer::InitPeerInfo(int peer_fd, UINT32 peer_pid, UINT32 manifest, UINT32 my_role)
 {
 	queue_out_ctrl_ptr = new std::queue<struct chunk_t *>;
@@ -410,7 +411,7 @@ void peer::InitPeerInfo(int peer_fd, UINT32 peer_pid, UINT32 manifest, UINT32 my
 		if (map_in_pid_udpfd.find(peer_pid) == map_in_pid_udpfd.end()) {
 			map_in_pid_udpfd[peer_pid] = peer_fd;
 		}
-		map_udpfd_nonblocking_ctl[peer_fd] = Nonblocking_Buff_ptr;
+		map_udpfd_nonblocking_ctl.insert(pair<int, Nonblocking_Buff*>(peer_fd, Nonblocking_Buff_ptr));	// 用 insert, 避免蓋掉已存在的資料
 		map_udpfd_pid[peer_fd] = peer_pid;
 		map_udpfd_queue[peer_fd] = queue_info_ptr;
 		map_udpfd_out_ctrl[peer_fd] = queue_out_ctrl_ptr;
@@ -1108,6 +1109,8 @@ int peer::handle_pkt_in_udp(int sock)
 	
 	if (map_udpfd_nonblocking_ctl.find(sock) != map_udpfd_nonblocking_ctl.end()) {
 		Nonblocking_Recv_ptr = &(map_udpfd_nonblocking_ctl[sock]->nonBlockingRecv);
+		// 會發生: 從 recv_packet_state 從 READ_HEADER_RUNNING 離開，下次卻是從 recv_packet_state == 0 的情況進來，造成程式當掉
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "recv_packet_state", Nonblocking_Recv_ptr->recv_packet_state);
 		if (Nonblocking_Recv_ptr ->recv_packet_state == 0) {
 			Nonblocking_Recv_ptr ->recv_packet_state = READ_HEADER_READY ;
 		}
@@ -1137,6 +1140,11 @@ int peer::handle_pkt_in_udp(int sock)
 		else if (Nonblocking_Recv_ptr->recv_packet_state == READ_HEADER_OK) {
 			buf_len = sizeof(chunk_header_t) + ((chunk_t *)(Nonblocking_Recv_ptr->recv_ctl_info.buffer))->header.length;
 			
+			if (buf_len > 200000) {
+				debug_printf("[DEBUG] buf_len %d %u  cmd %d \n", buf_len, buf_len, ((chunk_t *)(Nonblocking_Recv_ptr->recv_ctl_info.buffer))->header.cmd);
+			}
+
+			// buf_len 曾發生錯誤(過大), 導致程式當掉, (當網路壅塞時 parent 塞的 header 會錯誤?)
 			chunk_ptr = (struct chunk_t *)new unsigned char[buf_len];
 			if (!chunk_ptr) {
 				_pk_mgr_ptr->handle_error(MALLOC_ERROR, "[ERROR] peer::chunk_ptr  new error", __FUNCTION__, __LINE__);
@@ -1196,6 +1204,7 @@ int peer::handle_pkt_in_udp(int sock)
 	}
 	else {
 		//other stats
+		_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "recv_packet_state", Nonblocking_Recv_ptr->recv_packet_state);
 		return RET_OK;
 	}
 	/*Recieve done*/  
@@ -2222,10 +2231,31 @@ int peer::handle_pkt_out_udp(int sock)
 		else if (queue_out_data_ptr->size() != 0) {
 			
 			bool can_send = true;
-			_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "sock", sock, "state", UDT::getsockstate(sock));
+			int total_pendingpkt = 0;
+			//_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "sock", sock, "state", UDT::getsockstate(sock));
 			//debug_printf("queue_out_data_ptr->size() = %d \n", queue_out_data_ptr->size());
 			
 			// Scheduling: 如果網路通暢, 是 FIFO；如果網路阻塞, 是 priority scheduling
+			for (map<unsigned long, struct peer_info_t *>::iterator iter = _pk_mgr_ptr->map_pid_child.begin(); iter != _pk_mgr_ptr->map_pid_child.end(); iter++) {
+				struct peer_info_t *child_info = _pk_mgr_ptr->GetChildFromPid(iter->first);
+				if (child_info != NULL) {
+					if (child_info->connection_state == PEER_SELECTED) {
+						if (map_out_pid_udpfd.find(iter->first) != map_out_pid_udpfd.end()) {
+							int32_t pendingpkt_size = 0;
+							int len = sizeof(pendingpkt_size);
+							UDT::getsockopt(child_info->sock, 0, UDT_SNDDATA, &pendingpkt_size, &len);
+							total_pendingpkt += pendingpkt_size;
+						}
+					}
+				}
+			}
+			_log_ptr->write_log_format("s(u) s d s u s d \n", __FUNCTION__, __LINE__, "sock", sock, "state", UDT::getsockstate(sock), "pending", total_pendingpkt);
+			// 控制 pending packets 的總數量(MTU = 1500 bytes)，最多就 1500 * 100 bytes
+			if (total_pendingpkt > 100) {
+				//_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "sock", sock, "pendingpkt_size", pendingpkt_size);
+				return RET_OK;
+			}
+			/*
 			// 控制 pending packets in udt queue 的數量 (MTU = 1500 bytes)，最多就 1500*50 bytes
 			int32_t pendingpkt_size = 0;
 			int len = sizeof(pendingpkt_size);
@@ -2234,7 +2264,8 @@ int peer::handle_pkt_out_udp(int sock)
 				//_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "sock", sock, "pendingpkt_size", pendingpkt_size);
 				return RET_OK;
 			}
-			
+			*/
+
 			// 檢查 priority 比自己高一級的那個 child 的 queue 是否 empty, 不是 empty 的話就不發送
 			for (list<unsigned long>::reverse_iterator iter = priority_children.rbegin(); iter != priority_children.rend(); iter++) {
 				//_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__, __LINE__, "*iter", *iter, "size", priority_children.size());
@@ -2604,6 +2635,8 @@ void peer::data_close(int cfd, const char *reason ,int type)
 				}
 
 				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[ERASE CHILD]", map_pid_child1_iter->first);
+				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s u \n", "my_pid", _pk_mgr_ptr->my_pid, "[ERASE CHILD] child", map_pid_child1_iter->first, "size", _pk_mgr_ptr->map_pid_child.size());
+
 				delete peerInfoPtr;
 				_pk_mgr_ptr ->map_pid_child.erase(map_pid_child1_iter);
 				priority_children.remove(pid);
@@ -2675,6 +2708,7 @@ void peer::data_close(int cfd, const char *reason ,int type)
 				_log_ptr->write_log_format("s =>u s s u s u\n", __FUNCTION__,__LINE__,"CLOSE PARENT","PID=",pid_peerDown_info_iter->first,"manifest",peerDownInfoPtr->peerInfo.manifest);
 
 				_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[ERASE PARENT]", pid_peerDown_info_iter->first);
+				_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s u \n", "my_pid", _pk_mgr_ptr->my_pid, "[ERASE PARENT] parent", pid_peerDown_info_iter->first, "size", _pk_mgr_ptr->map_pid_child.size());
 				delete peerDownInfoPtr;
 				_pk_mgr_ptr ->map_pid_parent.erase(pid_peerDown_info_iter);
 			}
@@ -2872,6 +2906,8 @@ void peer::CloseParentTCP(unsigned long pid, int sock, const char *reason)
 		_pk_mgr_ptr->ResetDetection();
 
 		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[ERASE PARENT]", pid_peerDown_info_iter->first);
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s u \n", "my_pid", _pk_mgr_ptr->my_pid, "[ERASE PARENT] parent", pid_peerDown_info_iter->first, "size", _pk_mgr_ptr->map_pid_child.size());
+
 		delete peerDownInfoPtr;
 		_pk_mgr_ptr ->map_pid_parent.erase(pid_peerDown_info_iter);
 	}
@@ -3019,6 +3055,7 @@ void peer::CloseParentUDP(unsigned long pid, int sock, const char *reason)
 	if (pid_peerDown_info_iter != _pk_mgr_ptr ->map_pid_parent.end()) {
 		//_pk_mgr_ptr->ResetDetection();
 		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[ERASE PARENT]", pid_peerDown_info_iter->first);
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s u \n", "my_pid", _pk_mgr_ptr->my_pid, "[ERASE PARENT] parent", pid_peerDown_info_iter->first, "size", _pk_mgr_ptr->map_pid_child.size());
 		delete pid_peerDown_info_iter->second;
 		_pk_mgr_ptr ->map_pid_parent.erase(pid_peerDown_info_iter);
 	}
@@ -3195,6 +3232,7 @@ void peer::CloseChildTCP(unsigned long pid, int sock, const char *reason)
 		}
 
 		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[ERASE CHILD]", map_pid_child1_iter->first);
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s u \n", "my_pid", _pk_mgr_ptr->my_pid, "[ERASE CHILD] child", map_pid_child1_iter->first, "size", _pk_mgr_ptr->map_pid_child.size());
 		delete peerInfoPtr;
 		_pk_mgr_ptr ->map_pid_child.erase(map_pid_child1_iter);
 		priority_children.remove(pid);
@@ -3364,6 +3402,7 @@ void peer::CloseChildUDP(unsigned long pid, int sock, const char *reason)
 	map_pid_child_iter =_pk_mgr_ptr ->map_pid_child.find(pid);
 	if (map_pid_child_iter != _pk_mgr_ptr ->map_pid_child.end()) {
 		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "[ERASE CHILD]", map_pid_child_iter->first);
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s u \n", "my_pid", _pk_mgr_ptr->my_pid, "[ERASE CHILD] child", map_pid_child_iter->first, "size", _pk_mgr_ptr->map_pid_child.size());
 		delete map_pid_child_iter->second;
 		_pk_mgr_ptr ->map_pid_child.erase(map_pid_child_iter);
 		priority_children.remove(pid);

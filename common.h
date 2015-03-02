@@ -927,15 +927,23 @@ struct peer_latency_measure {
 	struct peer_timestamp_info_t peer_timestamp_info[0];
 };
 
-struct update_test_info {
+struct ConnectInfo
+{
+	unsigned int pid;///parent pid
+	int connectSuccess;///0: not able to connect //1: able to connect
+	int ableToSupport; ///0: not able ///1: able
+};
+
+
+struct update_test_info{
 	struct chunk_header_t header;
-	UINT32 pid;
-	UINT32 substream_id;
-	UINT32 sub_num;
-	UINT32 operation;							// 0:rescue, 1:merge, 2:move
-	UINT32 choose_parent_pid;
-	UINT32 test_success_parent_num;
-	UINT32 success_parent[0];
+	unsigned int pid;
+	unsigned int substream_id;
+	unsigned int sub_num;
+	unsigned int operation;
+	unsigned int choose_parent_pid;
+	unsigned int total_parent_num;
+	struct ConnectInfo info[0];////all the parent in the rescue_peer_list,pk-server excluded
 };
 
 struct chunk_rtt_request {
@@ -1181,6 +1189,7 @@ struct mysession_candidates{
 	UINT32 mypid;
 	UINT32 myrole;
 	UINT32 manifest;
+	UINT32 operation;
 	INT32 candidates_num;
 	UINT32 session_state;
 	UINT32 all_behind_nat;

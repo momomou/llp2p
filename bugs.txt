@@ -111,3 +111,10 @@ peer::1405 bug
 
 /* 2015.02.03 */
 UDT struct CPerfMon 需要對成員做補齊動作
+
+/* 2015.02.27 */
+當沒收完全 expected len 長度的封包時，recv_packet_state 會由 READ_HEADER_RUNNING 狀態離開，下次再從 READ_HEADER_RUNNING 狀態繼續收；但有時候會變成從 recv_packet_state == 0 的狀態進來，造成收封包實錯誤
+
+/* 2015.03.01 */
+雖然有限定連線時間不超過3秒，但仍然發生"2014.12.21"遇到的問題
+解決方式: 參考http://www.paobuke.com/develop/pbk1393.html。單元測試OK

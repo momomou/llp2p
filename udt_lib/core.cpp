@@ -979,7 +979,7 @@ void CUDT::close()
       m_bListening = false;
       m_pRcvQueue->removeListener(this);
    }
-   else if (m_bConnecting)
+   //else if (m_bConnecting)		// 參考這篇文章 www.paobuke.com/develop/pbk1393.html，解決"在 CONNECTING 狀態下被刪除時會當掉"的 bug
    {
       m_pRcvQueue->removeConnector(m_SocketID);
    }

@@ -28,7 +28,7 @@ public:
 	~peer_communication();
 
 	void set_self_info(unsigned long public_ip);
-	void set_candidates_handler(struct chunk_level_msg_t *testing_info, int candidates_num, int caller, UINT32 my_session, UINT32 peercomm_session);	//parameter candidates_num may be zero 
+	void set_candidates_handler(struct chunk_level_msg_t *testing_info, int candidates_num, int caller, UINT32 my_session, UINT32 peercomm_session, UINT32 operation = 0);	//parameter candidates_num may be zero 
 	void stop_attempt_connect(unsigned long stop_session_id);
 	void clear_fd_in_peer_com(int sock);
 	void clear_udpfd_in_peer_com(int sock);
