@@ -5,6 +5,12 @@ VisualStudioVersion = 12.0.21005.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "P2P_Client_vs2013", "P2P_Client_vs2013\P2P_Client_vs2013.vcxproj", "{F55E8F77-85B3-4524-B503-2F4447A79027}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "llp2pDll", "llp2pDll\llp2pDll.vcxproj", "{018FAC8E-CE80-48B3-A9D4-C7E208DE3A8C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "llp2pdlltest", "llp2pdlltest\llp2pdlltest.vcxproj", "{0D630255-F0B1-43D5-A183-F2C4CCB9110F}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AccessRegistry", "AccessRegistry\AccessRegistry.vcxproj", "{3A974431-CCCC-4591-AC51-3B559DC29588}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -15,6 +21,18 @@ Global
 		{F55E8F77-85B3-4524-B503-2F4447A79027}.Debug|Win32.Build.0 = Debug|Win32
 		{F55E8F77-85B3-4524-B503-2F4447A79027}.Release|Win32.ActiveCfg = Release|Win32
 		{F55E8F77-85B3-4524-B503-2F4447A79027}.Release|Win32.Build.0 = Release|Win32
+		{018FAC8E-CE80-48B3-A9D4-C7E208DE3A8C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{018FAC8E-CE80-48B3-A9D4-C7E208DE3A8C}.Debug|Win32.Build.0 = Debug|Win32
+		{018FAC8E-CE80-48B3-A9D4-C7E208DE3A8C}.Release|Win32.ActiveCfg = Release|Win32
+		{018FAC8E-CE80-48B3-A9D4-C7E208DE3A8C}.Release|Win32.Build.0 = Release|Win32
+		{0D630255-F0B1-43D5-A183-F2C4CCB9110F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{0D630255-F0B1-43D5-A183-F2C4CCB9110F}.Debug|Win32.Build.0 = Debug|Win32
+		{0D630255-F0B1-43D5-A183-F2C4CCB9110F}.Release|Win32.ActiveCfg = Release|Win32
+		{0D630255-F0B1-43D5-A183-F2C4CCB9110F}.Release|Win32.Build.0 = Release|Win32
+		{3A974431-CCCC-4591-AC51-3B559DC29588}.Debug|Win32.ActiveCfg = Debug|Win32
+		{3A974431-CCCC-4591-AC51-3B559DC29588}.Debug|Win32.Build.0 = Debug|Win32
+		{3A974431-CCCC-4591-AC51-3B559DC29588}.Release|Win32.ActiveCfg = Release|Win32
+		{3A974431-CCCC-4591-AC51-3B559DC29588}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

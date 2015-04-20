@@ -166,7 +166,7 @@ void peer_mgr::clear_ouput_buffer(unsigned long pid)
 		}
 	}
 	
-	debug_printf("clear_ouput_buffer size = %d \n",queue_out_data_ptr->size());
+	debug_printf("clear_ouput_buffer size = %lu \n",queue_out_data_ptr->size());
 	_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"clear_ouput_buffer size =",queue_out_data_ptr->size());
 
 
@@ -343,7 +343,7 @@ int peer_mgr::handle_test_delay(int session_id)
 													"map_pid_parent_temp.size() =", _pk_mgr_ptr->map_pid_parent_temp.size(),
 													"pid", pid_peer_info_iter->first,
 													"manifest", pid_peer_info_iter ->second->manifest );
-		if (pid_peer_info_iter->second->priority == session_id) {
+		if (pid_peer_info_iter->second->priority == (UINT32)session_id) {
 			pid = pid_peer_info_iter->second->pid;
 			manifest = pid_peer_info_iter->second->manifest;
 			list_num++;
@@ -418,6 +418,7 @@ int peer_mgr::handle_test_delay(int session_id)
 // Called by parent-peer, send "Block Rescue" to all children relating to this substream
 void peer_mgr::SendBlockRescue(int ss_id, int type)
 {
+#ifdef BLOCK_RESCUE
 	for (map<unsigned long, struct peer_info_t *>::iterator iter = _pk_mgr_ptr->map_pid_child.begin(); iter != _pk_mgr_ptr->map_pid_child.end(); iter++) {
 		unsigned long child_pid;
 		int child_sock;
@@ -474,6 +475,7 @@ void peer_mgr::SendBlockRescue(int ss_id, int type)
 			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u u \n", "CHNK_CMD_PEER_BLOCK_RESCUE", self_pid, "to", child_pid, 0);
 		}
 	}
+#endif
 }
 
 // Call by child-peer when receive the message, and relay to the children

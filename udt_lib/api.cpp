@@ -1490,7 +1490,8 @@ void CUDTUnited::updateMux(CUDTSocket* s, const CUDTSocket* ls)
 
          pthread_cond_timedwait(&self->m_GCStopCond, &self->m_GCStopLock, &timeout);
       #else
-         WaitForSingleObject(self->m_GCStopCond, 1000);
+         //WaitForSingleObject(self->m_GCStopCond, 1000);
+		 WaitForSingleObject(self->m_GCStopCond, 100);
       #endif
    }
 

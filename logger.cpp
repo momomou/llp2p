@@ -83,8 +83,8 @@ void logger::start_log_record(int time)
 	}
 	
 #else
-	log_path = "C:\\";
-	
+	//log_path = "C:\\";
+	log_path = "./";
 #endif
 
 	for (int logNumber = 0; logNumber < 1000; logNumber++) {

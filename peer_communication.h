@@ -6,6 +6,7 @@
 #include "stunt_mgr.h"
 #include <iostream>
 #include <map>
+#include <algorithm>
 
 class network;
 class network_udp;

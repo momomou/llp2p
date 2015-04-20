@@ -95,8 +95,11 @@ void register_mgr::build_connect(int channel_id)
 			got_pk = true;
 			return ;
 		}
-
+#ifdef _WIN32
 		Sleep(1);
+#else
+		usleep(1000);
+#endif
 	}
 }
 

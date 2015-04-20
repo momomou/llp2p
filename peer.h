@@ -81,14 +81,14 @@ public:
 	//  
 	///////////////////////////////////////////
 	void data_close(int cfd, const char *reason ,int type); 
-	void peer::CloseParent(unsigned long pid, int sock, bool care, const char *reason);
-	void peer::CloseParentTCP(unsigned long pid, int sock, const char *reason);
-	void peer::CloseParentUDP(unsigned long pid, int sock, const char *reason);
-	void peer::CloseChild(unsigned long pid, int sock, bool care, const char *reason);
-	void peer::CloseChildTCP(unsigned long pid, int sock, const char *reason);
-	void peer::CloseChildUDP(unsigned long pid, int sock, const char *reason);
-	void peer::CloseSocketTCP(int sock, bool care, const char *reason);
-	void peer::CloseSocketUDP(int sock, bool care, const char *reason);
+	void CloseParent(unsigned long pid, int sock, bool care, const char *reason);
+	void CloseParentTCP(unsigned long pid, int sock, const char *reason);
+	void CloseParentUDP(unsigned long pid, int sock, const char *reason);
+	void CloseChild(unsigned long pid, int sock, bool care, const char *reason);
+	void CloseChildTCP(unsigned long pid, int sock, const char *reason);
+	void CloseChildUDP(unsigned long pid, int sock, const char *reason);
+	void CloseSocketTCP(int sock, bool care, const char *reason);
+	void CloseSocketUDP(int sock, bool care, const char *reason);
 private:
 	
 	int _fd;

@@ -135,6 +135,7 @@ void network::epoll_waiter(int timeout, list<int> *fd_list)
 	nfds = epoll_wait(epfd, events, EVENTSIZE, timeout, fd_list, &epollVar);
 #else
 	nfds = epoll_wait(epfd, events, EVENTSIZE, timeout, fd_list);
+	//debug_printf("fd_lise size = %d \n", fd_list->size());
 #endif
 
 	
@@ -188,12 +189,18 @@ void network::epoll_dispatcher(void)
 			int addrLen=sizeof(struct sockaddr_in),
 				aa;
 			//aa=getsockname(cfd, (struct sockaddr *)&addr, &addrLen);
-			//printf("  aa:%2d  cfd: %2d , SrcAddr: %s:%d \n", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+			//printf("  aa:%2d  cfd: %2d , SrcAddr: %s:%d ", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 			aa=getpeername(cfd, (struct sockaddr *)&addr, (socklen_t *)&addrLen);
-			//printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d  ", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+			//printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d \n", aa, cfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 			
 
 			if (events[i].events & (EPOLLRDHUP | EPOLLERR)) {
+#ifdef _WIN32
+				int socketErr = WSAGetLastError();
+#else
+				int socketErr = errno;
+#endif
+				debug_printf("fd %d  error %d  event %d \n", cfd, socketErr, events[i].events);
 				if (cfd == pk_fd) {
 					// TODO: handle pk socket
 					debug_printf("pk socket error");
@@ -220,7 +227,7 @@ void network::epoll_dispatcher(void)
 						_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
 						PAUSE
 					}
-					//debug_printf("something wrong: fd = %d  error: %d \n", cfd, socketErr);
+					debug_printf("something wrong: fd = %d  error: %d \n", cfd, socketErr);
 					//_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
 					//PAUSE
 					continue;
@@ -229,11 +236,13 @@ void network::epoll_dispatcher(void)
 			
 			if(events[i].events & EPOLLIN) {
 				if (ntohs(addr.sin_port) == 8856) {
+#ifdef _WIN32
 					u_long n = -1;
 					ioctlsocket(cfd, FIONREAD, &n);
 					//if (n > 8000) {
 						//debug_printf("fd = %d  %d  %d \n", cfd, n, ++nin);
 					//}
+#endif
 				}
 				
 				if (bc_ptr->handle_pkt_in(cfd) == RET_SOCK_ERROR) {
@@ -283,7 +292,7 @@ void network::epoll_dispatcher(void)
 				}
 			}
 			if(events[i].events & ~(EPOLLIN | EPOLLOUT)) {
-				//printf("%d error\n",cfd);
+				printf("%d error\n",cfd);
 				bc_ptr->handle_pkt_error(cfd);		// error
 				PAUSE
 			}
@@ -435,7 +444,7 @@ void network::log_set(logger *log_ptr)
 //shutdown socket and close socket
 int network::close(int sock) 
 {
-	debug_printf("before close socket %d, _map_fd_bc_tbl.size() = %d \n", sock, _map_fd_bc_tbl.size());
+	debug_printf("before close socket %d, _map_fd_bc_tbl.size() = %lu \n", sock, _map_fd_bc_tbl.size());
 	for (std::map<int, basic_class *>::iterator iter = _map_fd_bc_tbl.begin(); iter != _map_fd_bc_tbl.end(); iter++) {
 		struct sockaddr_in src_addr;
 		struct sockaddr_in dst_addr;
@@ -657,7 +666,8 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 			int socketErr = WSAGetLastError();
 			if (socketErr == WSAEWOULDBLOCK) {
 #else
-			if (errno == EINTR || errno == EAGAIN) {
+			int socketErr = errno;
+			if (socketErr == EINTR || socketErr == EAGAIN) {
 #endif
 				send_info->ctl_state = RUNNING;
 				return RET_OK;

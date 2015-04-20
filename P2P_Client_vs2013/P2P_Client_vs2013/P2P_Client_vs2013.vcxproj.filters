@@ -120,15 +120,6 @@
     <ClCompile Include="..\..\stunt_mgr.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\json_lib\json_reader.cpp">
-      <Filter>原始程式檔\json_lib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\json_lib\json_value.cpp">
-      <Filter>原始程式檔\json_lib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\json_lib\json_writer.cpp">
-      <Filter>原始程式檔\json_lib</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\libBitStream\bit_stream_out.cpp">
       <Filter>原始程式檔\libBitStream</Filter>
     </ClCompile>
@@ -204,14 +195,23 @@
     <ClCompile Include="..\..\stunt\tcp_punch.cpp">
       <Filter>原始程式檔\stunt</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\stund\stun.cxx">
-      <Filter>原始程式檔\stund</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\stund\udp.cxx">
-      <Filter>原始程式檔\stund</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\io_connect_udp_ctrl.cpp">
       <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\stund\stun.cpp">
+      <Filter>原始程式檔\stund</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\stund\udp.cpp">
+      <Filter>原始程式檔\stund</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\json_lib\json_reader.cpp">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\json_lib\json_value.cpp">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\json_lib\json_writer.cpp">
+      <Filter>原始程式檔\json_lib</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -295,39 +295,6 @@
     </ClInclude>
     <ClInclude Include="..\..\stunt_mgr.h">
       <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\json_lib\assertions.h">
-      <Filter>原始程式檔\json_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\json_lib\autolink.h">
-      <Filter>原始程式檔\json_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\json_lib\config.h">
-      <Filter>原始程式檔\json_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\json_lib\features.h">
-      <Filter>原始程式檔\json_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\json_lib\forwards.h">
-      <Filter>原始程式檔\json_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\json_lib\json.h">
-      <Filter>原始程式檔\json_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\json_lib\json_batchallocator.h">
-      <Filter>原始程式檔\json_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\json_lib\json_tool.h">
-      <Filter>原始程式檔\json_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\json_lib\reader.h">
-      <Filter>原始程式檔\json_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\json_lib\value.h">
-      <Filter>原始程式檔\json_lib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\json_lib\writer.h">
-      <Filter>原始程式檔\json_lib</Filter>
     </ClInclude>
     <ClInclude Include="..\..\libBitStream\bit_stream_out.h">
       <Filter>原始程式檔\libBitStream</Filter>
@@ -446,17 +413,39 @@
     <ClInclude Include="..\..\io_connect_udp_ctrl.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\json_lib\json_internalarray.inl">
+    <ClInclude Include="..\..\json_lib\assertions.h">
       <Filter>原始程式檔\json_lib</Filter>
-    </None>
-    <None Include="..\..\json_lib\json_internalmap.inl">
+    </ClInclude>
+    <ClInclude Include="..\..\json_lib\autolink.h">
       <Filter>原始程式檔\json_lib</Filter>
-    </None>
-    <None Include="..\..\json_lib\json_valueiterator.inl">
+    </ClInclude>
+    <ClInclude Include="..\..\json_lib\config.h">
       <Filter>原始程式檔\json_lib</Filter>
-    </None>
+    </ClInclude>
+    <ClInclude Include="..\..\json_lib\features.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\json_lib\forwards.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\json_lib\json.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\json_lib\reader.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\json_lib\value.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\json_lib\version.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\json_lib\writer.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\json_lib\json_tool.h">
+      <Filter>原始程式檔\json_lib</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\irc\libircclient.lib">

@@ -41,12 +41,13 @@ logger_client::logger_client(logger *log_ptr)
 	memset(chunk_buffer,0x00,(CHUNK_BUFFER_SIZE + sizeof(struct chunk_header_t)));
 	memset(&non_log_recv_struct,0x00,sizeof(Nonblocking_Buff));
 
-	memset(&start_out_bw_record,0x00,sizeof(start_out_bw_record));
-	memset(&end_out_bw_record,0x00,sizeof(end_out_bw_record));
-	memset(&start_in_bw_record,0x00,sizeof(struct log_in_bw_struct));
-	memset(&end_in_bw_record,0x00,sizeof(struct log_in_bw_struct));
+	//memset(&start_out_bw_record,0x00,sizeof(start_out_bw_record));
+	//memset(&end_out_bw_record,0x00,sizeof(end_out_bw_record));
+	//memset(&start_in_bw_record,0x00,sizeof(struct log_in_bw_struct));
+	//memset(&end_in_bw_record,0x00,sizeof(struct log_in_bw_struct));
 	memset(&log_period_bw_start,0x00,sizeof(log_period_bw_start));
 	memset(&log_period_source_delay_start,0x00,sizeof(log_period_source_delay_start));
+	memset(&message_bw_analysis, 0, sizeof(message_bw_analysis));
 	log_timer_init();
 }
 
@@ -288,8 +289,8 @@ void logger_client::bw_in_struct_init(unsigned long timestamp,unsigned long pkt_
 	accumulated_packet_size_in = 0;
 	pre_in_pkt_size = 0;
 
-	start_in_bw_record.time_stamp = timestamp;
-	_log_ptr->timerGet(&(start_in_bw_record.client_time));
+	//start_in_bw_record.time_stamp = timestamp;
+	//_log_ptr->timerGet(&(start_in_bw_record.client_time));
 	_log_ptr->timerGet(&log_period_bw_start);
 	accumulated_packet_size_in += pkt_size;
 	pre_in_pkt_size = pkt_size;
@@ -299,23 +300,60 @@ void logger_client::bw_out_struct_init(unsigned long pkt_size){
 	pre_out_pkt_size = 0;
 	accumulated_packet_size_out = 0;
 
-	_log_ptr->timerGet(&start_out_bw_record);
+	//_log_ptr->timerGet(&start_out_bw_record);
 	accumulated_packet_size_out += pkt_size;
 	pre_out_pkt_size = pkt_size;
 }
 
-void logger_client::set_out_bw(unsigned long pkt_size){
-	_log_ptr->timerGet(&end_out_bw_record);
+void logger_client::set_out_bw(unsigned long pkt_size)
+{
+	//_log_ptr->timerGet(&end_out_bw_record);
 	accumulated_packet_size_out += pkt_size*8;
 	pre_out_pkt_size = pkt_size;
 }
 
+void logger_client::set_out_message_bw(UINT32 pkt_header_size, UINT32 pkt_payload_size, INT32 pkt_type)
+{
+	switch (pkt_type) {
+	case PKT_CONTROL:
+		message_bw_analysis.out_control_bw.header += pkt_header_size;
+		message_bw_analysis.out_control_bw.payload += pkt_payload_size;
+		break;
+	case PKT_DATA:
+		message_bw_analysis.out_data_bw.header += pkt_header_size;
+		message_bw_analysis.out_data_bw.payload += pkt_payload_size;
+		break;
+	case PKT_LOGGER:
+		message_bw_analysis.out_logger_bw.header += pkt_header_size;
+		message_bw_analysis.out_logger_bw.payload += pkt_payload_size;
+		break;
+	}
+}
+
 void logger_client::set_in_bw(unsigned long timestamp, unsigned long pkt_size)
 {
-	end_in_bw_record.time_stamp = timestamp;
-	_log_ptr->timerGet(&(end_in_bw_record.client_time));
+	//end_in_bw_record.time_stamp = timestamp;
+	//_log_ptr->timerGet(&(end_in_bw_record.client_time));
 	accumulated_packet_size_in += pkt_size*8;
 	pre_in_pkt_size = pkt_size;
+}
+
+void logger_client::set_in_message_bw(UINT32 pkt_header_size, UINT32 pkt_payload_size, INT32 pkt_type)
+{
+	switch (pkt_type) {
+	case PKT_CONTROL:
+		message_bw_analysis.in_control_bw.header += pkt_header_size;
+		message_bw_analysis.in_control_bw.payload += pkt_payload_size;
+		break;
+	case PKT_DATA:
+		message_bw_analysis.in_data_bw.header += pkt_header_size;
+		message_bw_analysis.in_data_bw.payload += pkt_payload_size;
+		break;
+	case PKT_RE_DATA:
+		message_bw_analysis.in_redundant_data_bw.header += pkt_header_size;
+		message_bw_analysis.in_redundant_data_bw.payload += pkt_payload_size;
+		break;
+	}
 }
 
 void logger_client::send_bw()
@@ -327,8 +365,11 @@ void logger_client::send_bw()
 	double quality_result = 0.0;
 	double nat_success_ratio = 0.0;
 
+	struct timerStruct new_timer;
+	_log_ptr->timerGet(&new_timer);
+
 	// Calculate bandwidth-in
-	period_msec = _log_ptr->diff_TimerGet_ms(&start_in_bw_record.client_time, &end_in_bw_record.client_time);
+	period_msec = _log_ptr->diff_TimerGet_ms(&log_period_bw_start, &new_timer);
 	if (period_msec < 1) {
 		period_msec = 1;
 	}
@@ -337,17 +378,11 @@ void logger_client::send_bw()
 	bitrate = 0.5*bitrate + 0.5*static_cast<int>(real_in_bw);
 
 	// Calculate bandwidth-out
-	if(log_bw_out_init_flag == 1){
-		period_msec = _log_ptr->diff_TimerGet_ms(&start_out_bw_record,&end_out_bw_record);
-		if (period_msec < 1) {
-			real_out_bw = 1;
-		}
+	if (log_bw_out_init_flag == 1) {
 		real_out_bw = 1000 * (double)accumulated_packet_size_out / (double)period_msec;
 		accumulated_packet_size_out = 0;
 	}
-	else {
-		real_out_bw = 0;
-	}
+	
 	
 	// Calculate delay-quality. delay-quality = 0.5*(1-packet_loss_rate) + 0.5*(delay_quality_average)
 	if (quality_struct_ptr->total_chunk != 0) {
@@ -376,8 +411,12 @@ void logger_client::send_bw()
 	//																																		quality_struct_ptr->accumulated_quality,
 	//																																		quality_struct_ptr->average_quality,
 	//																																		quality_struct_ptr->lost_pkt);
-	
+	log_to_server(LOG_WRITE_STRING, 0, "s u s u d d d d d d \n", "my_pid", _pk_mgr_ptr->my_pid, "[DATA]", quality_struct_ptr->lost_pkt, quality_struct_ptr->redundatnt_pkt, quality_struct_ptr->expired_pkt, quality_struct_ptr->total_chunk, _pk_mgr_ptr->pkt_count, _pk_mgr_ptr->pkt_rate, _pk_mgr_ptr->Xcount);
+	log_to_server(LOG_WRITE_STRING, 0, "s u s d d d d d d d d d d d d d \n", "my_pid", _pk_mgr_ptr->my_pid, "[DATA_BW]", message_bw_analysis.in_control_bw.header, message_bw_analysis.in_control_bw.payload, message_bw_analysis.in_data_bw.header, message_bw_analysis.in_data_bw.payload, message_bw_analysis.in_redundant_data_bw.header, message_bw_analysis.in_redundant_data_bw.payload, message_bw_analysis.out_control_bw.header, message_bw_analysis.out_control_bw.payload, message_bw_analysis.out_data_bw.header, message_bw_analysis.out_data_bw.payload, message_bw_analysis.out_logger_bw.header, message_bw_analysis.out_logger_bw.payload, period_msec);
+
 	quality_struct_ptr->lost_pkt = 0;
+	quality_struct_ptr->redundatnt_pkt = 0;
+	quality_struct_ptr->expired_pkt = 0;
 	quality_struct_ptr->accumulated_quality = 0.0;
 	quality_struct_ptr->total_chunk = 0;
 
@@ -385,27 +424,32 @@ void logger_client::send_bw()
 	log_to_server(LOG_DATA_BANDWIDTH, 0, should_in_bw, real_in_bw,real_out_bw, quality_result, nat_success_ratio);
 	debug_printf("in_bw: %.2lf Mb/s  out_bw: %.2lf Mb/s \n", real_in_bw/1000000, real_out_bw/1000000);
 	_log_ptr->write_log_format("s(u) s f s f \n", __FUNCTION__, __LINE__, "in_bw", real_in_bw/1000000, "out_bw", real_out_bw/1000000);
+
+	_log_ptr->write_log_format("s(u) d d d d d d d d d d d d d \n", __FUNCTION__, __LINE__, message_bw_analysis.in_control_bw.header, message_bw_analysis.in_control_bw.payload, message_bw_analysis.in_data_bw.header, message_bw_analysis.in_data_bw.payload, message_bw_analysis.in_redundant_data_bw.header, message_bw_analysis.in_redundant_data_bw.payload, message_bw_analysis.out_control_bw.header, message_bw_analysis.out_control_bw.payload, message_bw_analysis.out_data_bw.header, message_bw_analysis.out_data_bw.payload, message_bw_analysis.out_logger_bw.header, message_bw_analysis.out_logger_bw.payload, period_msec);
+	memset(&message_bw_analysis, 0, sizeof(message_bw_analysis));
+
 	if (real_in_bw != 0) {
 		debug_printf("Capacity: %.1lf, RescueNum: %d \n", real_out_bw / real_in_bw, _pk_mgr_ptr->rescueNumAccumulate());
 	}
 	debug_printf("quality: %.4lf \n", quality_result);
 	debug_printf("nat_success_ratio: %.3lf \n", nat_success_ratio);
 
-	start_in_bw_record.client_time = end_in_bw_record.client_time;
-	start_out_bw_record = end_out_bw_record;
+	//start_in_bw_record.client_time = end_in_bw_record.client_time;
+	//start_out_bw_record = end_out_bw_record;
+	
 }
 
 void logger_client::send_topology(unsigned long* parents, int sub_stream_number)
 {
 	double max_delay = 0;
 
-	for (unsigned long i = 0; i < sub_stream_number; i++) {
+	for (int i = 0; i < sub_stream_number; i++) {
 		parent_list[i] = parents[i];
 	}
 
 	//cout << "max_delay = " << max_delay << endl;
 	debug_printf("Parent list: ");
-	for (unsigned long i = 0; i < sub_stream_number; i++) {
+	for (int i = 0; i < sub_stream_number; i++) {
 		debug_printf("%u  ", static_cast<int>(parent_list[i]));
 	}
 	debug_printf("\n");
@@ -1192,7 +1236,7 @@ void logger_client::log_to_server(int log_mode, ...){
 			handle_error(MALLOC_ERROR, "[ERROR] inttostr loggerClien new error", __FUNCTION__, __LINE__);
 		}
 		const char *fmt = NULL;
-		unsigned int str_buffer_offset = 0;
+		int str_buffer_offset = 0;
 		int d;
 		unsigned int u;
 		char *s;
@@ -1206,7 +1250,7 @@ void logger_client::log_to_server(int log_mode, ...){
 			switch(*fmt) {
 				case 's':           /* string */
 					s = va_arg(ap, char *);
-					if((str_buffer_offset + strlen(s))>=str_buffer_size){
+					if((str_buffer_offset + (int)strlen(s))>=str_buffer_size){
 						break;
 					}
 					memcpy((char*)str_buffer + str_buffer_offset,s,strlen(s));
@@ -1723,6 +1767,7 @@ int logger_client::handle_pkt_out(int sock)
 					//PAUSE
 					*(_net_ptr->_errorRestartFlag) = RESTART;
 				}
+				set_out_message_bw(0, _send_byte, PKT_LOGGER);
 			}
 		//}
 	}
@@ -1783,7 +1828,7 @@ void logger_client::handle_error(int err_code, const char *err_msg, const char *
 	_log_ptr->write_log_format("s(u) s  (s:u) \n", func, line, err_msg, func, line);
 	log_to_server(LOG_WRITE_STRING, 0, "s(u) s \n", func, line, err_msg);
 	log_exit();
-	PAUSE
+	//PAUSE
 	
 	*(_net_ptr->_errorRestartFlag) = RESTART;
 }

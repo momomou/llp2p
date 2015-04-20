@@ -1,6 +1,11 @@
 /*
 #ifndef _FIRE_BREATH_MOD_
-#define _FIRE_BREATH_MOD_ 
+#define _FIRE_BREATH_MOD_
+#endif
+*/
+/*
+#ifndef _FLASH_AIR_MODE_
+#define _FLASH_AIR_MODE_
 #endif
 */
 #ifndef __COMMON_H__
@@ -39,6 +44,11 @@
 #define STUNT_FUNC	// Allow to record received message
 #endif
 */
+/*
+#ifndef BLOCK_RESCUE
+#define BLOCK_RESCUE	// Allow to record received message
+#endif
+*/
 // Role of function caller
 #define CHILD_PEER		0	// the function caller is child
 #define PARENT_PEER		1	// the function caller is parent
@@ -71,15 +81,15 @@
 
 ////resuce PARAMETER////
 #define PARAMETER_X		4				// chunk packets per (1000/PARAMETER_X) ms
-#define MAX_DELAY 		2000			// source delay PARAMETER ms
-#define SOURCE_DELAY_CONTINUOUS 2		// The maximal permissive times that souce-delay is bigger than MAX_DELAY. SOURCE_DELAY_CONTINUOUS * x(packets/s) / substream
+#define MAX_DELAY 		5000			// source delay PARAMETER ms
+#define SOURCE_DELAY_CONTINUOUS 1		// The maximal permissive times that souce-delay is bigger than MAX_DELAY. SOURCE_DELAY_CONTINUOUS * x(packets/s) / substream
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue(頻寬檢查)
 #define PARAMETER_M		16		// 8
 #define PARAMETER_N		10		// 5
 #define PARAMETER_P		6		// 3
 
-#define TEST_DELAY_TIME	4000			// Test delay 的時間不能少於或接近一個 session 存活的時間(2s)，否則在 test delay 成功的那一刻可能會誤判 parent，
-										// 因為 parent 收到 PARENT_PEER 時會直接更新 child_table
+#define TEST_DELAY_TIME	6000			// Test delay 的時間不能少於或接近一個 session 存活的時間(2s)，否則在 test delay 成功的那一刻可能會誤判 parent，
+// 因為 parent 收到 PARENT_PEER 時會直接更新 child_table
 
 // LOG SERVER
 #define LOGPORT		8754
@@ -88,8 +98,10 @@
 //ms
 #define CONNECT_TIME_OUT		2000		// Session timer
 #define NETWORK_TIMEOUT			5000		// Period of check peer's unnormal disconnection
-#define DATA_TIMEOUT			5000		// Timeout for rescue type 3
+#define DATA_TIMEOUT			2000		// Timeout for rescue type 3
 #define BASE_RESYN_TIME			20000
+#define MIN_RESYN_TIME			10000
+#define MAX_RESYN_TIME			40000
 #define NAT_WAITING_TIME		200			// waiting time before build connection (等待一段時間給 PK 送的 CMD 能到達雙方)
 #define DELAY_BUILD_CONN_TIME	500			// 給一個時間緩衝，確保 child 和 parent 都收有到 list
 #define BLOCK_RESCUE_TIME		5000		// waiting time for block_rescue
@@ -102,7 +114,7 @@
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
 // BUFF_SIZE sec
-#define BUFF_SIZE		10
+#define BUFF_SIZE		5
 //CHUNK_LOSE sec, mean lose about CHUNK_LOSE sec packet
 #define CHUNK_LOSE		1
 
@@ -271,14 +283,14 @@ using std::bitset;
 // Defined Macro
 #define PAUSE for (;;) { cout << "PAUSE , Press any key to continue..." << __FUNCTION__ << ":" << __LINE__ << endl; fgetc(stdin); }
 #ifdef DEBUG
-    #define debug_printf(...) do { printf("(%d)\t", __LINE__); printf(__VA_ARGS__); } while (0)
+#define debug_printf(...) do { printf("(%d)\t", __LINE__); printf(__VA_ARGS__); } while (0)
 #else
 #	define debug_printf(...) do {  } while (0)
 #endif
 #ifdef DEBUG2
-    #define debug_printf2(str, ...) do { printf("(%d)\t", __LINE__); printf(str, __VA_ARGS__); } while (0)
+#define debug_printf2(str, ...) do { printf("(%d)\t", __LINE__); printf(str, __VA_ARGS__); } while (0)
 #else
-    #define debug_printf2(str, ...)
+#define debug_printf2(str, ...)
 #endif 
 
 /****************************************************/
@@ -286,19 +298,19 @@ using std::bitset;
 /****************************************************/
 #ifdef _WIN32
 #else
-	typedef int8_t      INT8;
-	typedef int16_t     INT16;
-	typedef int32_t     INT32;
-	typedef int64_t     INT64;
-	typedef uint8_t     UINT8;
-	typedef uint16_t    UINT16;
-	typedef uint32_t    UINT32;
-	typedef uint64_t    UINT64;
-	typedef char 		CHAR;
-	typedef int			SOCKET;
-	#define	FALSE		0
-	#define TRUE		1
-	#define MAX_PATH	260
+typedef int8_t      INT8;
+typedef int16_t     INT16;
+typedef int32_t     INT32;
+typedef int64_t     INT64;
+typedef uint8_t     UINT8;
+typedef uint16_t    UINT16;
+typedef uint32_t    UINT32;
+typedef uint64_t    UINT64;
+typedef char 		CHAR;
+typedef int			SOCKET;
+#define	FALSE		0
+#define TRUE		1
+#define MAX_PATH	260
 #endif
 
 
@@ -450,10 +462,15 @@ struct timerStruct{
 #define REQ_ACK				1
 #define ACK					2
 
+#define PKT_CONTROL			0			// control message type
+#define PKT_DATA			1			// data message type
+#define PKT_RE_DATA			2			// redundant data message type
+#define PKT_LOGGER			3			// log message type
+
 #define SYNC_UNINIT			0			// Not initialize sync data yet
 #define SYNC_ONGOING		1			// sent sync token to pk and not yet receive the response
 #define SYNC_FINISH			2			// sync finish
-	
+
 #define FREE				0
 #define LOCK				1
 #define MAIN_LOCKER			2
@@ -478,9 +495,9 @@ struct timerStruct{
 #ifdef DBG_MODE
 
 #define DBG_PRINTF( ...) do {	\
-									printf("[%s](Line:%d):", __FILE__, __LINE__);\
-									printf(__VA_ARGS__);\
-								} while (0);
+	printf("[%s](Line:%d):", __FILE__, __LINE__); \
+	printf(__VA_ARGS__); \
+} while (0);
 #else
 #define DBG_PRINTF 
 #endif
@@ -501,12 +518,12 @@ struct peer_info_t_nat {
 	UINT32 private_ip;					//unsigned long private_ip;
 	UINT16 tcp_port;					//unsigned short tcp_port;
 	UINT16 udp_port;					//unsigned short udp_port;
-//////////NAT////////////
+	//////////NAT////////////
 	UINT16 public_port;					//unsigned short public_port;
 	UINT16 private_port;				//unsigned short private_port;
 	UINT32 upnp_acess;					//unsigned long upnp_acess;		// Yes:1, No:0 
 	UINT32 NAT_type;					//unsigned long NAT_type;		// From 1 to 4 (4 cannot punch)
-//////////NAT////////////
+	//////////NAT////////////
 	// My information
 	UINT32 manifest;					//unsigned long manifest;
 	UINT32 session_id;					//unsigned long session_id;
@@ -525,12 +542,12 @@ struct peer_info_t {
 	UINT32 private_ip;					//unsigned long private_ip;
 	UINT16 tcp_port;					//unsigned short tcp_port;
 	UINT16 udp_port;					//unsigned short udp_port;
-//////////NAT////////////
+	//////////NAT////////////
 	UINT16 public_port;					//unsigned short public_port;
 	UINT16 private_port;				//unsigned short private_port;
 	UINT32 upnp_acess;					//unsigned long upnp_acess;	//yes1 no0 
 	UINT32 NAT_type;					//unsigned long NAT_type;	//from 1 to 4 (4 cannot punch)
-//////////NAT////////////
+	//////////NAT////////////
 	INT32 sock;							// 連線成功的時候會更新，同時 connection_state 變成 PEER_CONNECTED
 	UINT32 manifest;					//unsigned long manifest;
 	UINT32 peercomm_session;
@@ -579,20 +596,20 @@ struct ts_block_t {		//--!!0124
 	UINT32 pid;							//unsigned long pid;
 	UINT32 time_stamp;					//unsigned long time_stamp;
 	UINT32 								//unsigned long
-		rsv:31,
-		isDST:1;
+	rsv : 31,
+	  isDST : 1;
 };
 
 ///P2P  main  header
 struct chunk_header_t {
 	UINT8 cmd;							//unsigned char cmd;
-	unsigned char 
-		stream:3,
-		payload_type:5;
-	unsigned char 
-		rsv_1:2,
-		mf:1,
-		part_seq:5;
+	unsigned char
+	stream : 3,
+		 payload_type : 5;
+	unsigned char
+	rsv_1 : 2,
+		mf : 1,
+		 part_seq : 5;
 	unsigned char stream_id;
 	UINT32 sequence_number;				//unsigned int sequence_number;
 	UINT32 timestamp;					//unsigned int timestamp;
@@ -626,13 +643,13 @@ struct detectionInfo{
 
 struct rtp_hdr_t {
 	UINT8								//unsigned char
-		csrc_cnt:4, 	// The CSRC count contains the number of CSRC identifiers that follow the fixed header
-		extension:1, 	// set to indicate that fixed header MUST be followed by exactly one header extension
-		padding:1,		// set to indicate that there exist padding
-		ver:2;
+csrc_cnt : 4, 	// The CSRC count contains the number of CSRC identifiers that follow the fixed header
+	   extension : 1, 	// set to indicate that fixed header MUST be followed by exactly one header extension
+			   padding : 1,		// set to indicate that there exist padding
+					 ver : 2;
 	UINT8								//unsigned char 
-		pay_type:7, 	// payload type
-		marker:1;
+	pay_type : 7, 	// payload type
+		   marker : 1;
 	UINT16 seq_num;						//unsigned short seq_num;
 	UINT32 timestamp;					//unsigned long timestamp;
 	UINT32 ssrc;						//unsigned long ssrc;// identifies the synchronization source		
@@ -662,15 +679,15 @@ struct chunk_rtmp_t{
 
 /*
 struct chunk_bitstream_t{
-	struct chunk_header_t header;
-	unsigned char buf[RTMP_PKT_BUF_PAY_SIZE];
+struct chunk_header_t header;
+unsigned char buf[RTMP_PKT_BUF_PAY_SIZE];
 };
 */
 
 /*
 struct chunk_bitstream_t{
-	struct chunk_header_t header;
-	unsigned char buf[0];
+struct chunk_header_t header;
+unsigned char buf[0];
 };
 */
 
@@ -741,7 +758,7 @@ struct rescue_pkt_from_server{
 	UINT32 manifest;							//unsigned long manifest;
 	UINT32 operation;							// 0:rescue, 1:merge, 2:move
 	UINT32 rescue_seq_start;					//unsigned int rescue_seq_start;
-	UINT32 need_source;	
+	UINT32 need_source;
 };
 
 struct chunk_block_rescue_t{
@@ -773,8 +790,8 @@ struct chunk_register_reply_t {
 
 /*
 struct chunk_bandwidth_t {
-	struct chunk_header_t header;
-	unsigned long bandwidth;
+struct chunk_header_t header;
+unsigned long bandwidth;
 };
 */
 
@@ -814,11 +831,11 @@ enum pkg_nonblocking_ctl_state {
 	READ_CHUNK_FINISH = 6,
 
 	READ_HEADER_READY = 7,
-	READ_HEADER_RUNNING =8,
-	READ_HEADER_OK=9,
-	READ_PAYLOAD_READY =10,
-	READ_PAYLOAD_RUNNING =11,
-	READ_PAYLOAD_OK=12
+	READ_HEADER_RUNNING = 8,
+	READ_HEADER_OK = 9,
+	READ_PAYLOAD_READY = 10,
+	READ_PAYLOAD_RUNNING = 11,
+	READ_PAYLOAD_OK = 12
 };
 
 enum session_ctl_state {
@@ -890,8 +907,8 @@ struct chunk_rt_latency_t {   //--!!0124
 };
 
 struct web_control_info {
-    INT32 type;									//int type;
-    INT32 stream_id;							//int stream_id;
+	INT32 type;									//int type;
+	INT32 stream_id;							//int stream_id;
 	INT8 user_name[64];							//char user_name[64];
 };
 
@@ -910,7 +927,7 @@ struct channel_chunk_size_info_t {
 struct channel_stream_notify {
 	struct chunk_header_t header;
 	UINT32 total_num;							//unsigned long total_num;
-	struct channel_stream_map_info_t *channel_stream_map_info[0];	
+	struct channel_stream_map_info_t *channel_stream_map_info[0];
 };
 
 struct peer_timestamp_info_t {
@@ -1036,7 +1053,7 @@ struct substream_inTest {
 
 struct substream_info {
 	bool first_pkt_received;
-	bool timeout_flag;					
+	bool timeout_flag;
 	UINT32 first_pkt_seq;						// Record the first packet
 	UINT32 latest_pkt_seq;						// The latest packet received so far
 	struct timerStruct latest_pkt_client_time;	// The time when the latest packet received in local time
@@ -1220,7 +1237,7 @@ struct chunk_child_info {
 	UINT32 pid;									//unsigned long pid;
 	UINT32 manifest;							//unsigned long manifest;	//rescue peer
 	UINT32 session;
-	struct level_info_t child_level_info;	
+	struct level_info_t child_level_info;
 };
 
 struct fd_information {
@@ -1269,7 +1286,7 @@ struct peer_exit {
 
 /*
 1. LOG_REGISTER: send register info to get register back
-2. LOG_REG_LIST: from recive reg list to timeout(start testing) 
+2. LOG_REG_LIST: from recive reg list to timeout(start testing)
 3. LOG_REG_LIST_TESTING: from timeout(start testing) to setmanifest
 4. LOG_REG_LIST_DETECTION_TESTING: from setmanifest to cut pk stream.
 5. LOG_REG_LIST_TESTING_FAIL: from timeout(start testing) to send topology to pk.
@@ -1277,7 +1294,7 @@ struct peer_exit {
 7. LOG_REG_DATA_COME: data come.
 #define LOG_REGISTER	0x01
 #define LOG_REG_LIST	0x02
-#define LOG_REG_LIST_TESTING	0x03	
+#define LOG_REG_LIST_TESTING	0x03
 #define LOG_REG_LIST_DETECTION_TESTING	0x04
 #define LOG_REG_LIST_TESTING_FAIL	0x05
 #define LOG_REG_CUT_PK	0x06
@@ -1290,7 +1307,7 @@ struct peer_exit {
 5. LOG_RESCUE_LIST_TESTING_FAIL: from timeout(start testing) to send topology to pk.
 6. LOG_RESCUE_CUT_PK: send pk cut.
 7. LOG_RESCUE_DATA_COME: data come.
-#define LOG_RESCUE_TRIGGER	0x08	
+#define LOG_RESCUE_TRIGGER	0x08
 #define LOG_RESCUE_LIST	0x09
 #define LOG_RESCUE_TESTING	0x0a
 #define LOG_RESCUE_DETECTION_TESTING	0x0b
@@ -1302,7 +1319,7 @@ the peer's condition
 #define LOG_START_DELAY	0x0f
 #define LOG_PERIOD_SOURCE_DELAY	0x10
 #define LOG_RESCUE_SUB_STREAM	0x11
-#define LOG_PEER_LEAVE	0x12	
+#define LOG_PEER_LEAVE	0x12
 #define LOG_WRITE_STRING	0x13
 #define LOG_BEGINE 0x14
 
@@ -1444,13 +1461,29 @@ struct log_source_delay_struct{
 
 struct log_in_bw_struct{
 	UINT32 time_stamp;							//unsigned long time_stamp;
-//	LARGE_INTEGER client_time; 
-	struct timerStruct client_time; 
+	//	LARGE_INTEGER client_time; 
+	struct timerStruct client_time;
+};
+
+struct packet_bw {
+	UINT32 header;
+	UINT32 payload;
+};
+
+struct message_bw_analysis_struct {
+	struct packet_bw in_control_bw;						// Control message 的流量
+	struct packet_bw in_data_bw;						// CHNK_CMD_PEER_DATA 封包的流量 (不包括 redundant)
+	struct packet_bw in_redundant_data_bw;				// 重覆封包的流量
+	struct packet_bw out_control_bw;					// Control message 的流量
+	struct packet_bw out_data_bw;						// CHNK_CMD_PEER_DATA 封包的流量 (不包括 redundant)
+	struct packet_bw out_logger_bw;						// 送 log message 的流量
 };
 
 // Structure of delay-quality
 struct quality_struct{
 	UINT32 lost_pkt;							//unsigned long lost_pkt;	// Number of lost chunks in one calculation
+	UINT32 redundatnt_pkt;
+	UINT32 expired_pkt;
 	double accumulated_quality;		// Accumulated quality values in one calculation
 	double average_quality;			// Average quality value in one calculation, this value would be sent to PK
 	UINT32 total_chunk;							//unsigned long total_chunk;	// Number of chunks in one calculation
@@ -1459,10 +1492,10 @@ struct quality_struct{
 // Structure of log peer's data
 struct log_data_peer_info {
 	struct log_header_t log_header;
-	UINT32 public_ip;	
-	UINT16 public_port;	
-	UINT32 private_ip;	
-	UINT16 private_port;	
+	UINT32 public_ip;
+	UINT16 public_port;
+	UINT32 private_ip;
+	UINT16 private_port;
 };
 struct log_data_start_delay {
 	struct log_header_t log_header;
@@ -1479,7 +1512,7 @@ struct log_data_bw {
 struct log_data_source_delay {
 	struct log_header_t log_header;
 	double max_delay;
-	UINT32 sub_num;	
+	UINT32 sub_num;
 	double av_delay[0];
 };
 struct log_data_topology {
@@ -1536,7 +1569,7 @@ typedef struct {
 #define LOG_SOCKET_CLOSED	0x3C	// connection with log-server socket has been closed
 #define LOG_BUFFER_ERROR	0x3D	// The buffer stores messages sent to log-server is error
 #define PK_TIMEOUT			0x3E	// no streams received from pk, it may happen when peer's network doesn't work 
-#define SOCKET_ERROR		0x3F
+#define LLP2P_SOCKET_ERROR	0x3F
 #define LOGICAL_ERROR		0x50	// Logical error, which imply mechanisms or algorithms are wrong
 #define	UNKNOWN				0xFF	// Others not defined
 

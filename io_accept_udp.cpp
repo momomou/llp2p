@@ -52,7 +52,7 @@ int io_accept_udp::handle_pkt_in_udp(int sock)
 	
 
 	offset = 0;
-	int new_fd = UDT::accept(sock, (struct sockaddr *)&_cin, &sin_len);
+	int new_fd = UDT::accept(sock, (struct sockaddr *)&_cin, (int *)&sin_len);
 	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Accept fd", new_fd);
 	
 	if (new_fd < 0) {

@@ -93,8 +93,8 @@ INT32 tcp_punch::XInit(const char* pchIP1, const char* pchIP2, SOCKET* psServerL
 	SOCKET sock_logr = *psServerLog;
 	/////////////////////////////////////////////////////////////
 	printf("haha\n");
-	printf("%s  %d\n", pchIP1, strlen(pchIP1));
-	printf("%s  %d\n", pchIP2, strlen(pchIP2));
+	printf("%s  %lu\n", pchIP1, strlen(pchIP1));
+	printf("%s  %lu\n", pchIP2, strlen(pchIP2));
 	//printf("%s  %d\n", pchIP1, strlen(g_szServerIP1));
 	//printf("%s  %d\n", pchIP2, strlen(g_szServerIP2));
 	

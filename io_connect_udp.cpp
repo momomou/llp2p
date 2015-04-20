@@ -68,8 +68,9 @@ int io_connect_udp::handle_pkt_out_udp(int sock)
 	UINT32 transmisstion_time = 0;
 	struct timerStruct new_timer;
 	_log_ptr->timerGet(&new_timer);
+#ifdef _WIN32
 	_log_ptr->write_log_format("s(u) s d s d s d \n", __FUNCTION__, __LINE__, "sock", sock, "clocktime", new_timer.clockTime, "ticktime", new_timer.tickTime);
-
+#endif
 	_log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "sock", sock, "state", UDT::getsockstate(sock));
 
 	// Check the connection is successful or not
@@ -167,7 +168,7 @@ int io_connect_udp::handle_pkt_out_udp(int sock)
 					_peer_communication_ptr->_pk_mgr_ptr->map_pid_parent.find(peer_info_ptr->pid)->second->peerInfo.connection_state = PEER_CONNECTED;
 				}
 				else {
-					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s d \n", "[DEBUG] Duplicate connection to parent? ", peer_info_ptr->pid);
+					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s d \n", "my_pid", _pk_mgr_ptr->my_pid, "[DEBUG] Duplicate connection to parent? ", peer_info_ptr->pid);
 				}
 			}
 			else {

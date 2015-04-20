@@ -174,12 +174,12 @@ void peer::handle_connect(int sock, struct chunk_t *chunk_ptr, struct sockaddr_i
 		map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
 		map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
 		for(temp_map_pid_fd_out_iter = map_out_pid_fd.begin();temp_map_pid_fd_out_iter != map_out_pid_fd.end();temp_map_pid_fd_out_iter++){
-			debug_printf("map_out_pid_fd  pid : %u fd :%d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
+			debug_printf("map_out_pid_fd  pid : %lu fd :%d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
 			_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_fd  pid : ",temp_map_pid_fd_out_iter->first," fd :",temp_map_pid_fd_out_iter->second);
 
 		}
 		for(temp_map_pid_fd_in_iter = map_in_pid_fd.begin();temp_map_pid_fd_in_iter != map_in_pid_fd.end();temp_map_pid_fd_in_iter++){
-			debug_printf("map_in_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
+			debug_printf("map_in_pid_fd pid : %lu fd : %d\n",temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
 			_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_fd  pid : ",temp_map_pid_fd_in_iter->first," fd :",temp_map_pid_fd_in_iter->second);
 
 		}
@@ -853,7 +853,7 @@ int peer::handle_pkt_in(int sock)
 					firstReplyPid = map_fd_pid_iter->second;
 
 					//在這裡面sequence_number 裡面塞的是manifest
-					debug_printf("first_reply_peer=%d  manifest =%d \n",firstReplyPid,replyManifest);
+					debug_printf("first_reply_peer=%lu  manifest =%lu \n",firstReplyPid,replyManifest);
 					_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "first_reply_peer =", firstReplyPid, "manifest =", replyManifest);
 
 					pid_peer_info_iter = _pk_mgr_ptr ->map_pid_parent_temp.find(firstReplyPid);
@@ -951,14 +951,14 @@ int peer::handle_pkt_in(int sock)
 
 						
 						for (pid_peer_info_iter = _pk_mgr_ptr ->map_pid_parent_temp.begin(); pid_peer_info_iter != _pk_mgr_ptr->map_pid_parent_temp.end(); pid_peer_info_iter++) {
-							debug_printf("_pk_mgr_ptr ->map_pid_parent_temp  pid : %d \n", pid_peer_info_iter->first);
+							debug_printf("_pk_mgr_ptr ->map_pid_parent_temp  pid : %lu \n", pid_peer_info_iter->first);
 							_log_ptr->write_log_format("s =>u s u \n", __FUNCTION__,__LINE__,"_pk_mgr_ptr ->map_pid_parent_temp  pid : ", pid_peer_info_iter->first);
 						}
-						debug_printf("_pk_mgr_ptr ->map_pid_parent_temp.size(): %d \n", _pk_mgr_ptr ->map_pid_parent_temp.size());
+						debug_printf("_pk_mgr_ptr ->map_pid_parent_temp.size(): %lu \n", _pk_mgr_ptr ->map_pid_parent_temp.size());
 						
 						for (pid_peer_info_iter = _pk_mgr_ptr ->map_pid_parent_temp.begin(); pid_peer_info_iter != _pk_mgr_ptr->map_pid_parent_temp.end(); ) {
-							debug_printf("_pk_mgr_ptr ->map_pid_parent_temp.size(): %d \n", _pk_mgr_ptr ->map_pid_parent_temp.size());
-							debug_printf("_pk_mgr_ptr ->map_pid_parent_temp  pid : %d \n", pid_peer_info_iter->first);
+							debug_printf("_pk_mgr_ptr ->map_pid_parent_temp.size(): %lu \n", _pk_mgr_ptr ->map_pid_parent_temp.size());
+							debug_printf("_pk_mgr_ptr ->map_pid_parent_temp  pid : %lu \n", pid_peer_info_iter->first);
 							peerInfoPtr = pid_peer_info_iter->second;
 							_log_ptr->write_log_format("s(u) s u s u s u s u \n", __FUNCTION__, __LINE__,
 																			"pid =", peerInfoPtr->pid,
@@ -1141,7 +1141,7 @@ int peer::handle_pkt_in_udp(int sock)
 			buf_len = sizeof(chunk_header_t) + ((chunk_t *)(Nonblocking_Recv_ptr->recv_ctl_info.buffer))->header.length;
 			
 			if (buf_len > 200000) {
-				debug_printf("[DEBUG] buf_len %d %u  cmd %d \n", buf_len, buf_len, ((chunk_t *)(Nonblocking_Recv_ptr->recv_ctl_info.buffer))->header.cmd);
+				debug_printf("[DEBUG] buf_len %lu %lu  cmd %d \n", buf_len, buf_len, ((chunk_t *)(Nonblocking_Recv_ptr->recv_ctl_info.buffer))->header.cmd);
 			}
 
 			// buf_len 曾發生錯誤(過大), 導致程式當掉, (當網路壅塞時 parent 塞的 header 會錯誤?)
@@ -1213,10 +1213,12 @@ int peer::handle_pkt_in_udp(int sock)
 
 	if (chunk_ptr->header.cmd == CHNK_CMD_PEER_DATA) {
 		//不刪除 chunk_ptr 全權由handle_stream處理
+		_logger_client_ptr->set_in_message_bw(sizeof(struct chunk_header_t), chunk_ptr->header.length, PKT_DATA);
 		_pk_mgr_ptr->HandleStream(chunk_ptr, sock);
 		return RET_OK;
 	}
 	else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_TEST_DELAY ) {
+		_logger_client_ptr->set_in_message_bw(sizeof(struct chunk_header_t), chunk_ptr->header.length, PKT_CONTROL);
 		// CHNK_CMD_PEER_TEST_DELAY: 透過送出一個大封包來找出最適合的 parent。
 		// 因為目前是"以最快建好連線的 parent 視為最適合的 parent"，所以 CHNK_CMD_PEER_TEST_DELAY 只會送給一個 parent
 		if (chunk_ptr->header.rsv_1 == REQ) {
@@ -1379,6 +1381,7 @@ int peer::handle_pkt_in_udp(int sock)
 		}
 	}
 	else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_SET_MANIFEST) {
+		_logger_client_ptr->set_in_message_bw(sizeof(struct chunk_header_t), chunk_ptr->header.length, PKT_CONTROL);
 		unsigned long manifest = ((struct chunk_manifest_set_t *)chunk_ptr)->manifest;
 		_log_ptr->write_log_format("s(u) s u s u \n", __FUNCTION__, __LINE__, "Recv CHNK_CMD_PEER_SET_MANIFEST pid", pid, "manifest", manifest);
 		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s(u) s u s u \n", "my_pid", _pk_mgr_ptr->my_pid, "Recv CHNK_CMD_PEER_SET_MANIFEST", __LINE__, "child", pid, "manifest", manifest);
@@ -1392,10 +1395,12 @@ int peer::handle_pkt_in_udp(int sock)
 		_pk_mgr_ptr->SendCapacityToPK();
 	} 
 	else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_BLOCK_RESCUE) {
+		_logger_client_ptr->set_in_message_bw(sizeof(struct chunk_header_t), chunk_ptr->header.length, PKT_CONTROL);
 		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_PEER_BLOCK_RESCUE");
 		_peer_mgr_ptr->HandleBlockRescue((struct chunk_block_rescue_t *)chunk_ptr);
 	}
 	else if (chunk_ptr->header.cmd == CHNK_CMD_PEER_CON) {
+		_logger_client_ptr->set_in_message_bw(sizeof(struct chunk_header_t), chunk_ptr->header.length, PKT_CONTROL);
 		_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "CHNK_CMD_PEER_CON");
 		// 會發生這情況: child 已經有向 parent 拿 substream，過一段時間後收到 peer-list 又再次選中此 parent
 		// 此時情況是 child::peer_communication 發送 CHNK_CMD_PEER_CON 給 parent::peer 
@@ -1503,7 +1508,7 @@ int peer::handle_pkt_out(int sock)
 
 		if (queue_out_ctrl_ptr->size() != 0 && chunk_ptr == NULL) {
 			_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "queue_out_ctrl_ptr->size() =", queue_out_ctrl_ptr->size());
-			debug_printf("queue_out_ctrl_ptr->size() = %d \n", queue_out_ctrl_ptr->size());
+			debug_printf("queue_out_ctrl_ptr->size() = %lu \n", queue_out_ctrl_ptr->size());
 			
 			if (Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.ctl_state == READY ) {
 
@@ -1630,7 +1635,7 @@ int peer::handle_pkt_out(int sock)
 		// DATA
 		else if (queue_out_data_ptr->size() != 0) {
 			_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "queue_out_data_ptr->size() =", queue_out_data_ptr->size());
-			debug_printf("queue_out_data_ptr->size() = %d \n", queue_out_data_ptr->size());
+			debug_printf("queue_out_data_ptr->size() = %lu \n", queue_out_data_ptr->size());
 		
 			if (queue_out_data_ptr->size() > 100) {
 				//debug_printf("queue_out_data_ptr->size() = %d \n", queue_out_data_ptr->size());
@@ -2199,6 +2204,7 @@ int peer::handle_pkt_out_udp(int sock)
 					}
 					else if (Nonblocking_Send_Ctrl_ptr->recv_ctl_info.ctl_state == READY) {
 						queue_out_ctrl_ptr->pop();
+						_logger_client_ptr->set_out_message_bw(0, _send_byte, PKT_CONTROL);
 						if (chunk_ptr) {
 							delete chunk_ptr;
 						}
@@ -2255,6 +2261,7 @@ int peer::handle_pkt_out_udp(int sock)
 				//_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "sock", sock, "pendingpkt_size", pendingpkt_size);
 				return RET_OK;
 			}
+			
 			/*
 			// 控制 pending packets in udt queue 的數量 (MTU = 1500 bytes)，最多就 1500*50 bytes
 			int32_t pendingpkt_size = 0;
@@ -2345,6 +2352,7 @@ int peer::handle_pkt_out_udp(int sock)
 					}
 					else {
 						_logger_client_ptr->set_out_bw(_send_byte);
+						_logger_client_ptr->set_out_message_bw(sizeof(struct chunk_header_t), _send_byte - sizeof(struct chunk_header_t), PKT_DATA);
 					}
 					queue_out_data_ptr->pop();
 					chunk_ptr = NULL;
@@ -2502,11 +2510,11 @@ void peer::data_close(int cfd, const char *reason ,int type)
 	map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
 	map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
 	for(temp_map_pid_fd_out_iter = map_out_pid_fd.begin();temp_map_pid_fd_out_iter != map_out_pid_fd.end();temp_map_pid_fd_out_iter++){
-		debug_printf("map_out_pid_fd  pid : %d fd :%d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
+		debug_printf("map_out_pid_fd  pid : %lu fd :%d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_fd  pid : ",temp_map_pid_fd_out_iter->first," fd :",temp_map_pid_fd_out_iter->second);
 	}
 	for(temp_map_pid_fd_in_iter = map_in_pid_fd.begin();temp_map_pid_fd_in_iter != map_in_pid_fd.end();temp_map_pid_fd_in_iter++){
-		debug_printf("map_in_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
+		debug_printf("map_in_pid_fd pid : %lu fd : %d\n",temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_fd  pid : ",temp_map_pid_fd_in_iter->first," fd :",temp_map_pid_fd_in_iter->second);
 
 	}
@@ -2645,10 +2653,10 @@ void peer::data_close(int cfd, const char *reason ,int type)
 			map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
 			map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
 			for(temp_map_pid_fd_out_iter = map_out_pid_fd.begin();temp_map_pid_fd_out_iter != map_out_pid_fd.end();temp_map_pid_fd_out_iter++){
-				debug_printf("map_out_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
+				debug_printf("map_out_pid_fd pid : %lu fd : %d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
 			}
 			for(temp_map_pid_fd_in_iter = map_in_pid_fd.begin();temp_map_pid_fd_in_iter != map_in_pid_fd.end();temp_map_pid_fd_in_iter++){
-				debug_printf("map_in_pid_fd pid : %d fd : %d\n",temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
+				debug_printf("map_in_pid_fd pid : %lu fd : %d\n",temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
 			}
 		}
 		//CLOSE  PARENT
@@ -2737,12 +2745,12 @@ void peer::data_close(int cfd, const char *reason ,int type)
 			map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
 			map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
 			for(temp_map_pid_fd_out_iter = map_out_pid_fd.begin();temp_map_pid_fd_out_iter != map_out_pid_fd.end();temp_map_pid_fd_out_iter++){
-				debug_printf("map_out_pid_fd  pid : %d fd :%d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
+				debug_printf("map_out_pid_fd  pid : %lu fd :%d\n",temp_map_pid_fd_out_iter->first,temp_map_pid_fd_out_iter->second);
 				_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_fd  pid : ",temp_map_pid_fd_out_iter->first," fd :",temp_map_pid_fd_out_iter->second);
 
 			}
 			for(temp_map_pid_fd_in_iter = map_in_pid_fd.begin();temp_map_pid_fd_in_iter != map_in_pid_fd.end();temp_map_pid_fd_in_iter++){
-				debug_printf("map_in_pid_fd pid : %d fd : %d\n", temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
+				debug_printf("map_in_pid_fd pid : %lu fd : %d\n", temp_map_pid_fd_in_iter->first,temp_map_pid_fd_in_iter->second);
 				_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_fd  pid : ",temp_map_pid_fd_in_iter->first," fd :",temp_map_pid_fd_in_iter->second);
 			}
 			debug_printf("test1 \n");
@@ -2806,26 +2814,26 @@ void peer::CloseParentTCP(unsigned long pid, int sock, const char *reason)
 	_log_ptr->write_log_format("s =>u s \n", __FUNCTION__, __LINE__, reason);
 	debug_printf("PEER DATA CLOSE  colse fd = %d  %s \n", fd, reason);
 	
-	debug_printf("Before close parent %d. Table information: \n", pid);
+	debug_printf("Before close parent %lu. Table information: \n", pid);
 	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Before close parent", pid);
 	map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
 	map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
 	map<unsigned long, int>::iterator temp_map_pid_udpfd_in_iter;
 	map<unsigned long, int>::iterator temp_map_pid_udpfd_out_iter;
 	for (map<unsigned long, int>::iterator iter = map_out_pid_fd.begin(); iter != map_out_pid_fd.end(); iter++) {
-		debug_printf("map_out_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_out_pid_fd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_fd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_in_pid_fd.begin(); iter != map_in_pid_fd.end(); iter++) {
-		debug_printf("map_in_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_in_pid_fd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_fd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_out_pid_udpfd.begin(); iter != map_out_pid_udpfd.end(); iter++) {
-		debug_printf("map_out_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_out_pid_udpfd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_udpfd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_in_pid_udpfd.begin(); iter != map_in_pid_udpfd.end(); iter++) {
-		debug_printf("map_in_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_in_pid_udpfd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_udpfd  pid : ", iter->first," fd :", iter->second);
 	}
 	
@@ -2927,22 +2935,22 @@ void peer::CloseParentTCP(unsigned long pid, int sock, const char *reason)
 		_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] Not found in map_fd_pid", __FUNCTION__, __LINE__);
 	}
 	
-	debug_printf("After close parent %d. Table information: \n", pid);
+	debug_printf("After close parent %lu. Table information: \n", pid);
 	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "After close parent", pid);
 	for (map<unsigned long, int>::iterator iter = map_out_pid_fd.begin(); iter != map_out_pid_fd.end(); iter++) {
-		debug_printf("map_out_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_out_pid_fd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_fd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_in_pid_fd.begin(); iter != map_in_pid_fd.end(); iter++) {
-		debug_printf("map_in_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_in_pid_fd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_fd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_out_pid_udpfd.begin(); iter != map_out_pid_udpfd.end(); iter++) {
-		debug_printf("map_out_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_out_pid_udpfd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_udpfd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_in_pid_udpfd.begin(); iter != map_in_pid_udpfd.end(); iter++) {
-		debug_printf("map_in_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_in_pid_udpfd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_udpfd  pid : ", iter->first," fd :", iter->second);
 	}
 }
@@ -2981,19 +2989,19 @@ void peer::CloseParentUDP(unsigned long pid, int sock, const char *reason)
 	map<unsigned long, int>::iterator temp_map_pid_udpfd_in_iter;
 	map<unsigned long, int>::iterator temp_map_pid_udpfd_out_iter;
 	for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = _pk_mgr_ptr->map_pid_parent.begin(); iter != _pk_mgr_ptr->map_pid_parent.end(); iter++) {
-		debug_printf("map_pid_parent  pid %d sock %d UDT::state %d manifest %d \n", iter->first, iter->second->peerInfo.sock, UDT::getsockstate(iter->second->peerInfo.sock), iter->second->peerInfo.manifest);
+		debug_printf("map_pid_parent  pid %lu sock %d UDT::state %d manifest %d \n", iter->first, iter->second->peerInfo.sock, UDT::getsockstate(iter->second->peerInfo.sock), iter->second->peerInfo.manifest);
 		_log_ptr->write_log_format("s(u) s u s d s d s d \n", __FUNCTION__, __LINE__, "map_pid_parent  pid", iter->first, "fd", iter->second->peerInfo.sock, "UDT::state", UDT::getsockstate(iter->second->peerInfo.sock), "manifest", iter->second->peerInfo.manifest);
 	}
 	for (map<unsigned long, struct peer_info_t *>::iterator iter = _pk_mgr_ptr->map_pid_child.begin(); iter != _pk_mgr_ptr->map_pid_child.end(); iter++) {
-		debug_printf("map_pid_child  pid %d sock %d UDT::state %d manifest %d \n", iter->first, iter->second->sock, UDT::getsockstate(iter->second->sock), iter->second->manifest);
+		debug_printf("map_pid_child  pid %lu sock %d UDT::state %d manifest %d \n", iter->first, iter->second->sock, UDT::getsockstate(iter->second->sock), iter->second->manifest);
 		_log_ptr->write_log_format("s(u) s u s d s d s d \n", __FUNCTION__, __LINE__, "map_pid_child  pid", iter->first, "fd", iter->second->sock, "UDT::state", UDT::getsockstate(iter->second->sock), "manifest", iter->second->manifest);
 	}
 	for (map<unsigned long, int>::iterator iter = map_out_pid_udpfd.begin(); iter != map_out_pid_udpfd.end(); iter++) {
-		debug_printf("map_out_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_out_pid_udpfd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_udpfd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_in_pid_udpfd.begin(); iter != map_in_pid_udpfd.end(); iter++) {
-		debug_printf("map_in_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_in_pid_udpfd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_udpfd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<int, queue<struct chunk_t *> *>::iterator iter = map_udpfd_out_ctrl.begin(); iter != map_udpfd_out_ctrl.end(); iter++) {
@@ -3009,7 +3017,7 @@ void peer::CloseParentUDP(unsigned long pid, int sock, const char *reason)
 		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "map_udpfd_nonblocking_ctl  fd : ", iter->first);
 	}
 	for (map<int, unsigned long>::iterator iter = map_udpfd_pid.begin(); iter != map_udpfd_pid.end(); iter++) {
-		debug_printf("map_udpfd_pid  fd : %d  pid : %d \n", iter->first, iter->second);
+		debug_printf("map_udpfd_pid  fd : %d  pid : %lu \n", iter->first, iter->second);
 		_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "map_udpfd_pid  fd :", iter->first, "pid :", iter->second);
 	}
 
@@ -3114,26 +3122,26 @@ void peer::CloseChildTCP(unsigned long pid, int sock, const char *reason)
 	_log_ptr->write_log_format("s =>u s \n", __FUNCTION__, __LINE__, reason);
 	debug_printf("PEER DATA CLOSE  colse fd = %d  %s \n", fd, reason);
 	
-	debug_printf("Before close parent %d. Table information: \n", pid);
+	debug_printf("Before close parent %lu. Table information: \n", pid);
 	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Before close parent", pid);
 	map<unsigned long, int>::iterator temp_map_pid_fd_in_iter;
 	map<unsigned long, int>::iterator temp_map_pid_fd_out_iter;
 	map<unsigned long, int>::iterator temp_map_pid_udpfd_in_iter;
 	map<unsigned long, int>::iterator temp_map_pid_udpfd_out_iter;
 	for (map<unsigned long, int>::iterator iter = map_out_pid_fd.begin(); iter != map_out_pid_fd.end(); iter++) {
-		debug_printf("map_out_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_out_pid_fd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_fd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_in_pid_fd.begin(); iter != map_in_pid_fd.end(); iter++) {
-		debug_printf("map_in_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_in_pid_fd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_fd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_out_pid_udpfd.begin(); iter != map_out_pid_udpfd.end(); iter++) {
-		debug_printf("map_out_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_out_pid_udpfd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_udpfd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_in_pid_udpfd.begin(); iter != map_in_pid_udpfd.end(); iter++) {
-		debug_printf("map_in_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_in_pid_udpfd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_udpfd  pid : ", iter->first," fd :", iter->second);
 	}
 	
@@ -3253,22 +3261,22 @@ void peer::CloseChildTCP(unsigned long pid, int sock, const char *reason)
 		_pk_mgr_ptr->handle_error(MACCESS_ERROR, "[ERROR] Not found in map_fd_pid", __FUNCTION__, __LINE__);
 	}
 	
-	debug_printf("After close parent %d. Table information: \n", pid);
+	debug_printf("After close parent %lu. Table information: \n", pid);
 	_log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "After close parent", pid);
 	for (map<unsigned long, int>::iterator iter = map_out_pid_fd.begin(); iter != map_out_pid_fd.end(); iter++) {
-		debug_printf("map_out_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_out_pid_fd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_fd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_in_pid_fd.begin(); iter != map_in_pid_fd.end(); iter++) {
-		debug_printf("map_in_pid_fd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_in_pid_fd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_fd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_out_pid_udpfd.begin(); iter != map_out_pid_udpfd.end(); iter++) {
-		debug_printf("map_out_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_out_pid_udpfd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_udpfd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_in_pid_udpfd.begin(); iter != map_in_pid_udpfd.end(); iter++) {
-		debug_printf("map_in_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_in_pid_udpfd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s =>u s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_udpfd  pid : ", iter->first," fd :", iter->second);
 	}
 }
@@ -3322,19 +3330,19 @@ void peer::CloseChildUDP(unsigned long pid, int sock, const char *reason)
 	map<unsigned long, int>::iterator temp_map_pid_udpfd_in_iter;
 	map<unsigned long, int>::iterator temp_map_pid_udpfd_out_iter;
 	for (map<unsigned long, struct peer_connect_down_t *>::iterator iter = _pk_mgr_ptr->map_pid_parent.begin(); iter != _pk_mgr_ptr->map_pid_parent.end(); iter++) {
-		debug_printf("map_pid_parent  pid %d sock %d UDT::state %d manifest %d \n", iter->first, iter->second->peerInfo.sock, UDT::getsockstate(iter->second->peerInfo.sock), iter->second->peerInfo.manifest);
+		debug_printf("map_pid_parent  pid %lu sock %d UDT::state %d manifest %u \n", iter->first, iter->second->peerInfo.sock, UDT::getsockstate(iter->second->peerInfo.sock), iter->second->peerInfo.manifest);
 		_log_ptr->write_log_format("s(u) s u s d s d s d \n", __FUNCTION__, __LINE__, "map_pid_parent  pid", iter->first, "fd", iter->second->peerInfo.sock, "UDT::state", UDT::getsockstate(iter->second->peerInfo.sock), "manifest", iter->second->peerInfo.manifest);
 	}
 	for (map<unsigned long, struct peer_info_t *>::iterator iter = _pk_mgr_ptr->map_pid_child.begin(); iter != _pk_mgr_ptr->map_pid_child.end(); iter++) {
-		debug_printf("map_pid_child  pid %d sock %d UDT::state %d manifest %d \n", iter->first, iter->second->sock, UDT::getsockstate(iter->second->sock), iter->second->manifest);
+		debug_printf("map_pid_child  pid %lu sock %d UDT::state %d manifest %u \n", iter->first, iter->second->sock, UDT::getsockstate(iter->second->sock), iter->second->manifest);
 		_log_ptr->write_log_format("s(u) s u s d s d s d \n", __FUNCTION__, __LINE__, "map_pid_child  pid", iter->first, "fd", iter->second->sock, "UDT::state", UDT::getsockstate(iter->second->sock), "manifest", iter->second->manifest);
 	}
 	for (map<unsigned long, int>::iterator iter = map_out_pid_udpfd.begin(); iter != map_out_pid_udpfd.end(); iter++) {
-		debug_printf("map_out_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_out_pid_udpfd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_out_pid_udpfd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<unsigned long, int>::iterator iter = map_in_pid_udpfd.begin(); iter != map_in_pid_udpfd.end(); iter++) {
-		debug_printf("map_in_pid_udpfd  pid : %d fd :%d\n", iter->first, iter->second);
+		debug_printf("map_in_pid_udpfd  pid : %lu fd :%d\n", iter->first, iter->second);
 		_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__,__LINE__,"map_in_pid_udpfd  pid : ", iter->first," fd :", iter->second);
 	}
 	for (map<int, queue<struct chunk_t *> *>::iterator iter = map_udpfd_out_ctrl.begin(); iter != map_udpfd_out_ctrl.end(); iter++) {
@@ -3350,7 +3358,7 @@ void peer::CloseChildUDP(unsigned long pid, int sock, const char *reason)
 		_log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "map_udpfd_nonblocking_ctl  fd : ", iter->first);
 	}
 	for (map<int, unsigned long>::iterator iter = map_udpfd_pid.begin(); iter != map_udpfd_pid.end(); iter++) {
-		debug_printf("map_udpfd_pid  fd : %d  pid : %d \n", iter->first, iter->second);
+		debug_printf("map_udpfd_pid  fd : %d  pid : %lu \n", iter->first, iter->second);
 		_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "map_udpfd_pid  fd :", iter->first, "pid :", iter->second);
 	}
 

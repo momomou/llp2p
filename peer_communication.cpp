@@ -14,7 +14,7 @@
 #include "io_nonblocking.h"
 #include "io_nonblocking_udp.h"
 
-#include "udt_lib/udt.h"
+#include "./udt_lib/udt.h"
 
 using namespace UDT;
 using namespace std;
@@ -73,14 +73,14 @@ peer_communication::~peer_communication(){
 	_io_nonblocking_ptr=NULL;
 
 	for (map<unsigned long, struct mysession_candidates *>::iterator iter = map_mysession_candidates.begin(); iter != map_mysession_candidates.end(); iter++) {
-		for (int i = 0; i < iter->second->candidates_num; i++) {
+		//for (int i = 0; i < iter->second->candidates_num; i++) {
 			if (iter->second->p_candidates_info) {
 				delete iter->second->p_candidates_info;
 			}
 			if (iter->second->n_candidates_info) {
 				delete iter->second->n_candidates_info;
 			}
-		}
+		//}
 		delete iter->second;
 	}
 	map_mysession_candidates.clear();
@@ -166,7 +166,7 @@ void peer_communication::set_candidates_handler(struct chunk_level_msg_t *testin
 			memset(map_mysession_candidates[my_session]->n_candidates_info, 0, size);
 			_log_ptr->timerGet(&(map_mysession_candidates[my_session]->timer));
 
-			for (unsigned int i = 0; i < candidates_num; i++) {
+			for (int i = 0; i < candidates_num; i++) {
 				// 先初始化 map_mysession_candidates table
 				memcpy(&map_mysession_candidates[my_session]->p_candidates_info[i], testing_info->level_info[i], sizeof(struct level_info_t));
 				map_mysession_candidates[my_session]->p_candidates_info[i].manifest = manifest;
@@ -209,7 +209,7 @@ void peer_communication::set_candidates_handler(struct chunk_level_msg_t *testin
 				_logger_client_ptr->add_nat_total_times();
 			}
 			
-			for (unsigned int i = 0; i < candidates_num; i++) {
+			for (int i = 0; i < candidates_num; i++) {
 				char public_IP[16] = {0};
 				char private_IP[16] = {0};
 				memcpy(public_IP, inet_ntoa(*(struct in_addr *)&testing_info->level_info[0]->public_ip), strlen(inet_ntoa(*(struct in_addr *)&testing_info->level_info[0]->public_ip)));
@@ -226,11 +226,12 @@ void peer_communication::set_candidates_handler(struct chunk_level_msg_t *testin
 
 					// 防止同一台電腦互連
 					if (self_info->private_ip == testing_info->level_info[i]->private_ip && self_info->public_ip == testing_info->level_info[i]->public_ip) {
-						continue;
+						//continue;
 					}
 					if (testing_info->level_info[i]->pid != 1) {
 						//continue;
 					}
+					
 					
 					struct peer_connect_down_t *parent_info_ptr = new struct peer_connect_down_t;
 					if (!parent_info_ptr) {
@@ -329,7 +330,7 @@ void peer_communication::set_candidates_handler(struct chunk_level_msg_t *testin
 				memset(map_mysession_candidates[my_session]->n_candidates_info, 0, size);
 				_log_ptr->timerGet(&(map_mysession_candidates[my_session]->timer));
 
-				for (unsigned int i = 0; i < candidates_num; i++) {
+				for (int i = 0; i < candidates_num; i++) {
 					memcpy(&map_mysession_candidates[my_session]->p_candidates_info[i], testing_info->level_info[i], sizeof(struct level_info_t));
 					map_mysession_candidates[my_session]->p_candidates_info[i].manifest = manifest;
 					map_mysession_candidates[my_session]->p_candidates_info[i].peercomm_session = peercomm_session;
@@ -673,7 +674,7 @@ int peer_communication::non_blocking_build_connection(struct level_info_t *level
 #endif
 		debug_printf("[ERROR] Create socket failed %d %d \n", _sock, socketErr);
 		_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[ERROR] Create socket failed", _sock, socketErr);
-		_pk_mgr_ptr->handle_error(SOCKET_ERROR, "[ERROR] Create socket failed", __FUNCTION__, __LINE__);
+		_pk_mgr_ptr->handle_error(LLP2P_SOCKET_ERROR, "[ERROR] Create socket failed", __FUNCTION__, __LINE__);
 		
 		_net_ptr->set_nonblocking(_sock);
 
@@ -862,7 +863,7 @@ int peer_communication::non_blocking_build_connection_udp_now(struct peer_info_t
 #endif
 		debug_printf("[ERROR] Create socket failed %d %d \n", _sock, socketErr);
 		_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[ERROR] Create socket failed", _sock, socketErr);
-		_pk_mgr_ptr->handle_error(SOCKET_ERROR, "[ERROR] Create socket failed", __FUNCTION__, __LINE__);
+		_pk_mgr_ptr->handle_error(LLP2P_SOCKET_ERROR, "[ERROR] Create socket failed", __FUNCTION__, __LINE__);
 		return RET_OK;
 	}
 
@@ -880,7 +881,7 @@ int peer_communication::non_blocking_build_connection_udp_now(struct peer_info_t
 
 	if (UDT::bind(_sock, (struct sockaddr *)&sin, sizeof(struct sockaddr_in)) == UDT::ERROR) {
 		debug_printf("ErrCode: %d  ErrMsg: %s \n", UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
-		_pk_mgr_ptr->handle_error(SOCKET_ERROR, "[ERROR] Bind socket failed", __FUNCTION__, __LINE__);
+		_pk_mgr_ptr->handle_error(LLP2P_SOCKET_ERROR, "[ERROR] Bind socket failed", __FUNCTION__, __LINE__);
 		//log_ptr->write_log_format("s(u) s d s s \n", __FUNCTION__, __LINE__, "ErrCode:", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage());
 		PAUSE
 	}
@@ -888,13 +889,15 @@ int peer_communication::non_blocking_build_connection_udp_now(struct peer_info_t
 	_log_ptr->timerGet(&(candidates_info->time_start));
 	if (UDT::ERROR == UDT::connect(_sock, (struct sockaddr*)&peer_saddr, sizeof(peer_saddr))) {
 		cout << "connect: " << UDT::getlasterror().getErrorMessage() << "  " << UDT::getlasterror().getErrorCode();
-		_pk_mgr_ptr->handle_error(SOCKET_ERROR, "[ERROR] Connect failed", __FUNCTION__, __LINE__);
+		_pk_mgr_ptr->handle_error(LLP2P_SOCKET_ERROR, "[ERROR] Connect failed", __FUNCTION__, __LINE__);
 		PAUSE
 	}
 
 	struct timerStruct new_timer;
 	_log_ptr->timerGet(&new_timer);
+#ifdef _WIN32
 	_log_ptr->write_log_format("s(u) s d s d s d \n", __FUNCTION__, __LINE__, "sock", _sock, "clocktime", new_timer.clockTime, "ticktime", new_timer.tickTime, new_timer.tickTime.QuadPart);
+#endif
 
 	if (UDT::getsockstate(_sock) == CONNECTING || UDT::getsockstate(_sock) == CONNECTED) {
 		_net_udp_ptr->epoll_control(_sock, EPOLL_CTL_ADD, UDT_EPOLL_IN | UDT_EPOLL_OUT);
@@ -994,7 +997,7 @@ int peer_communication::fake_conn_udp(struct level_info_t *level_info_ptr, int c
 #endif
 		debug_printf("[ERROR] Create socket failed %d %d \n", _sock, socketErr);
 		_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[ERROR] Create socket failed", _sock, socketErr);
-		_pk_mgr_ptr->handle_error(SOCKET_ERROR, "[ERROR] Create socket failed", __FUNCTION__, __LINE__);
+		_pk_mgr_ptr->handle_error(LLP2P_SOCKET_ERROR, "[ERROR] Create socket failed", __FUNCTION__, __LINE__);
 
 		_net_ptr->set_nonblocking(_sock);
 
@@ -1056,7 +1059,7 @@ int peer_communication::non_blocking_build_connectionNAT_udp(struct level_info_t
 #endif
 		debug_printf("[ERROR] Create socket failed %d %d \n", _sock, socketErr);
 		_log_ptr->write_log_format("s(u) s d d \n", __FUNCTION__, __LINE__, "[ERROR] Create socket failed", _sock, socketErr);
-		_pk_mgr_ptr->handle_error(SOCKET_ERROR, "[ERROR] Create socket failed", __FUNCTION__, __LINE__);
+		_pk_mgr_ptr->handle_error(LLP2P_SOCKET_ERROR, "[ERROR] Create socket failed", __FUNCTION__, __LINE__);
 
 		_net_ptr->set_nonblocking(_sock);
 
@@ -1606,11 +1609,12 @@ void peer_communication::SelectStrategy(UINT32 my_session)
 	// 1. 先從 stable_list 中挑選 parent (找 estimated_delay 最低的)
 	for (list<UINT32>::iterator iter = stable_list.begin(); iter != stable_list.end(); iter++) {
 		for (int i = 0; i < map_mysession_candidates_iter->second->candidates_num; i++) {
-			int peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
-			int peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
-			int peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
-			int peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
-
+			UINT32 peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
+			INT32 peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
+			INT32 peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
+			UINT32 peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
+			_log_ptr->write_log_format("s(u) s d s u s u s u s u \n", __FUNCTION__, __LINE__, "peer_pid", peer_pid, "*iter", *iter, "selected_est_delay", selected_est_delay, "estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, "connection_state", map_mysession_candidates_iter->second->p_candidates_info[i].connection_state);
+			
 			if (peer_pid == *iter) {
 				if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED) {
 					if (selected_est_delay > map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay) {
@@ -1653,10 +1657,11 @@ void peer_communication::SelectStrategy(UINT32 my_session)
 	if (selection_done == false) {
 		for (list<UINT32>::iterator iter = warning_list.begin(); iter != warning_list.end(); iter++) {
 			for (int i = 0; i < map_mysession_candidates_iter->second->candidates_num; i++) {
-				int peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
-				int peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
-				int peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
-				int peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
+				UINT32 peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
+				INT32 peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
+				INT32 peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
+				UINT32 peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
+				_log_ptr->write_log_format("s(u) s d s u s u s u s u \n", __FUNCTION__, __LINE__, "peer_pid", peer_pid, "*iter", *iter, "selected_est_delay", selected_est_delay, "estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, "connection_state", map_mysession_candidates_iter->second->p_candidates_info[i].connection_state);
 
 				if (peer_pid == *iter) {
 					if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED) {
@@ -1685,10 +1690,11 @@ void peer_communication::SelectStrategy(UINT32 my_session)
 	if (selection_done == false) {
 		for (list<UINT32>::iterator iter = dangerous_list.begin(); iter != dangerous_list.end(); iter++) {
 			for (int i = 0; i < map_mysession_candidates_iter->second->candidates_num; i++) {
-				int peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
-				int peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
-				int peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
-				int peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
+				UINT32 peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
+				INT32 peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
+				INT32 peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
+				UINT32 peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
+				_log_ptr->write_log_format("s(u) s d s u s u s u s u \n", __FUNCTION__, __LINE__, "peer_pid", peer_pid, "*iter", *iter, "selected_est_delay", selected_est_delay, "estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, "connection_state", map_mysession_candidates_iter->second->p_candidates_info[i].connection_state);
 
 				if (peer_pid == *iter) {
 					if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED) {
@@ -1714,10 +1720,10 @@ void peer_communication::SelectStrategy(UINT32 my_session)
 
 	_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "select parent", selected_pid, "in my_session", my_session);
 	for (int i = 0; i < map_mysession_candidates_iter->second->candidates_num; i++) {
-		int peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
-		int peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
-		int peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
-		int peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
+		UINT32 peer_pid = map_mysession_candidates_iter->second->p_candidates_info[i].pid;
+		INT32 peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
+		INT32 peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
+		UINT32 peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
 
 		if (selected_pid == peer_pid) {
 			if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED) {

@@ -658,7 +658,7 @@ int  bit_stream_httpout::getStreamID_FromHTTP_Request(int sock, char *httpBuffer
 #ifdef _WIN32
 		_itoa((sizeof(crossdomain)-1),conten_length,10);
 #else
-		sprintf(conten_length, "%d", sizeof(crossdomain)-1);
+		sprintf(conten_length, "%lu", sizeof(crossdomain)-1);
 #endif
 		int len =0 ;	
 		while(crossdomainHeaderSize){

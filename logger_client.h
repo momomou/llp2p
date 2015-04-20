@@ -75,6 +75,7 @@ public:
 	set in bw
 	*/
 	void set_in_bw(unsigned long timestamp,unsigned long pkt_size);
+	void set_in_message_bw(UINT32 pkt_header_size, UINT32 pkt_payload_size, INT32 pkt_type);
 
 	/*
 	send qualtiy and bandwidth to PK
@@ -95,6 +96,7 @@ public:
 	set out bw
 	*/
 	void set_out_bw(unsigned long pkt_size);
+	void set_out_message_bw(UINT32 pkt_header_size, UINT32 pkt_payload_size, INT32 pkt_type);
 
 	/*
 	write the log info to log buffer 
@@ -159,11 +161,12 @@ public:
 	unsigned long sub_stream_number;
 	int log_source_delay_init_flag;
 
-	struct log_in_bw_struct start_in_bw_record,end_in_bw_record;
+	//struct log_in_bw_struct start_in_bw_record,end_in_bw_record;
 //	LARGE_INTEGER start_out_bw_record,end_out_bw_record;
 //	LARGE_INTEGER log_period_bw_start;
-	struct timerStruct start_out_bw_record,end_out_bw_record;
-	struct timerStruct log_period_bw_start;
+	//struct timerStruct start_out_bw_record,end_out_bw_record;
+	struct timerStruct log_period_bw_start;			// Timer for periodically send bw messages
+	struct message_bw_analysis_struct message_bw_analysis;
 	unsigned long accumulated_packet_size_in;		// Accumulate total size of packets in
 	unsigned long accumulated_packet_size_out;		// Accumulate total size of packets out
 	unsigned long pre_in_pkt_size;

@@ -21,6 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{F55E8F77-85B3-4524-B503-2F4447A79027}</ProjectGuid>
     <RootNamespace>P2P_Client_vs2013</RootNamespace>
+    <ProjectName>P2P_Client_vs2013</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -77,6 +78,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
+      <Profile>true</Profile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -87,6 +89,7 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <Profile>true</Profile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -164,8 +167,8 @@
     <ClCompile Include="..\..\stream_handler.cpp" />
     <ClCompile Include="..\..\stream_handler_udp.cpp" />
     <ClCompile Include="..\..\stream_udp.cpp" />
-    <ClCompile Include="..\..\stund\stun.cxx" />
-    <ClCompile Include="..\..\stund\udp.cxx" />
+    <ClCompile Include="..\..\stund\stun.cpp" />
+    <ClCompile Include="..\..\stund\udp.cpp" />
     <ClCompile Include="..\..\stunt\tcp_punch.cpp" />
     <ClCompile Include="..\..\stunt_mgr.cpp" />
     <ClCompile Include="..\..\udt_lib\api.cpp" />
@@ -209,10 +212,10 @@
     <ClInclude Include="..\..\json_lib\features.h" />
     <ClInclude Include="..\..\json_lib\forwards.h" />
     <ClInclude Include="..\..\json_lib\json.h" />
-    <ClInclude Include="..\..\json_lib\json_batchallocator.h" />
     <ClInclude Include="..\..\json_lib\json_tool.h" />
     <ClInclude Include="..\..\json_lib\reader.h" />
     <ClInclude Include="..\..\json_lib\value.h" />
+    <ClInclude Include="..\..\json_lib\version.h" />
     <ClInclude Include="..\..\json_lib\writer.h" />
     <ClInclude Include="..\..\libBitStreamHTTP\bit_stream_httpout.h" />
     <ClInclude Include="..\..\libBitStream\bit_stream_out.h" />
@@ -260,11 +263,6 @@
     <ClInclude Include="..\..\udt_lib\queue.h" />
     <ClInclude Include="..\..\udt_lib\udt.h" />
     <ClInclude Include="..\..\udt_lib\window.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\json_lib\json_internalarray.inl" />
-    <None Include="..\..\json_lib\json_internalmap.inl" />
-    <None Include="..\..\json_lib\json_valueiterator.inl" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\irc\libircclient.lib" />

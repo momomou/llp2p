@@ -1932,7 +1932,7 @@ int
 rtmp::non_block_readpkg(network * net_ptr, RTMP * r, RTMPPacket * packet, Nonblocking_Ctl * recv_pkg_info)
 {
 	static char hbuf[RTMP_MAX_HEADER_SIZE];
-	int header_size;
+	int header_size = 0;
 	int nToRead, nChunk;
 	//cout << "recv_ctl_info.ctl_state = " << recv_pkg_info->recv_ctl_info.ctl_state << ", recv_packet_state = " << recv_pkg_info->recv_packet_state << endl;
 	if (recv_pkg_info->recv_ctl_info.ctl_state == READY) {

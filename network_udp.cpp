@@ -26,7 +26,7 @@ void network_udp::setall_fd_epollout()
 void network_udp::garbage_collection() 
 {
 	for (std::map<int, basic_class *>::iterator iter = _map_fd_bc_tbl.begin(); iter != _map_fd_bc_tbl.end(); iter++) {
-		debug_printf("size = %d, fd = %d \n", _map_fd_bc_tbl.size(), iter->first);
+		debug_printf("size = %lu, fd = %d \n", _map_fd_bc_tbl.size(), iter->first);
 	}
 	for (std::map<int, basic_class *>::iterator iter = _map_fd_bc_tbl.begin(); iter != _map_fd_bc_tbl.end(); ) {
 		close(iter->first);
@@ -121,7 +121,7 @@ void network_udp::epoll_waiter(int timeout, list<int> *fd_list)
 	nfds = UDT::epoll_wait(epfd, &readfds, &writefds, timeout, NULL);
 #else
 	//_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "2");
-	nfds = UDT::epoll_wait(epfd, &readfds, &writefds, timeout, NULL);
+	nfds = UDT::epoll_wait(epfd, &readfds, &writefds, timeout, NULL, NULL);
 #endif
 	//_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "3");
 	
@@ -151,10 +151,46 @@ void network_udp::epoll_waiter(int timeout, list<int> *fd_list)
 	}
 }
 #else
-void network_udp::epoll_waiter(int timeout) 
+void network_udp::epoll_waiter(int timeout, list<int> *fd_list)
 {
-	nfds = epoll_wait(epfd, events, EVENTSIZE, timeout);
+	int cfd;
+	basic_class *bc_ptr;
+	//_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "1");
+#ifdef _FIRE_BREATH_MOD_
+	//nfds = epoll_wait(epfd, events, EVENTSIZE, timeout, fd_list, &epollVar);
+	nfds = UDT::epoll_wait(epfd, &readfds, &writefds, timeout, NULL);
+#else
+	//_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "2");
+	nfds = UDT::epoll_wait(epfd, &readfds, &writefds, timeout, NULL, NULL);
+#endif
+	//_log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "3");
+
+	if (nfds == -1){
+		//printf("epoll_wait failed\n");
+		if (_error_cfd->size() == 0){ return; }
+		cfd = _error_cfd->front();
+		_error_cfd->pop();
+		if (cfd != 0){
+			_map_fd_bc_tbl_iter = _map_fd_bc_tbl.find(cfd);
+			if (_map_fd_bc_tbl_iter != _map_fd_bc_tbl.end()) {
+				//printf("handle sock error\n");
+				bc_ptr = _map_fd_bc_tbl_iter->second;
+				_map_fd_bc_tbl[cfd]->handle_sock_error(cfd, bc_ptr);
+			}
+		}
+
+		struct sockaddr_in addr;
+		int addrLen = sizeof(struct sockaddr_in);
+		int	aa;
+		aa = getsockname(pk_fd, (struct sockaddr *)&addr, &addrLen);
+		debug_printf("  aa:%2d  cfd: %2d , SrcAddr: %s:%d \n", aa, pk_fd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+		aa = getpeername(pk_fd, (struct sockaddr *)&addr, &addrLen);
+		debug_printf("  aa:%2d  cfd: %2d , DstAddr: %s:%d \n", aa, pk_fd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+
+		PAUSE
+	}
 }
+
 #endif
 
 void network_udp::epoll_dispatcher(void) 
@@ -781,6 +817,7 @@ int network_udp::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 						return RET_OK;
 					}
 					else {
+						debug_printf("Send %d(expected:%d) bytes to sock %d, state: %d, ErrCode: %d, ErrMsg: %s \n", send_rt_val, send_info->expect_len, sock, sock_state, UDT::getlasterror().getErrorCode(), UDT::getlasterror().getErrorMessage());
 						PAUSE
 					}
 					break;

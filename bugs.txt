@@ -118,3 +118,16 @@ UDT struct CPerfMon 需要對成員做補齊動作
 /* 2015.03.01 */
 雖然有限定連線時間不超過3秒，但仍然發生"2014.12.21"遇到的問題
 解決方式: 參考http://www.paobuke.com/develop/pbk1393.html。單元測試OK
+
+解決經常發生 RESCUE_TYPE 5 的問題，原因是 parent pk_mgr::GetQueueTime 取得的 queue_time 有時候是負的，會導致 child 計算 estimated_delay 時會錯誤 
+
+/* 2015.03.25 */
+Flash Builder 的 Debugger 是從 sdks/bin 裡抓的，如果有額外的 dll，必須放在 sdks/bin 底下；否則只能 export release built 後直接執行了
+
+/* 2015.03.25 */
+UDT::m_iMSS 1500->1430
+
+/* 2015.03.31 */
+llp2pDll.dll 編譯好後也要放在以下目錄:
+1. C:\Program Files (x86)\Adobe\Adobe Flash Builder 4.6\sdks\4.6.0 _withair17\bin
+2. D:\Adobe Flash Builder 4.6\TestApp\src

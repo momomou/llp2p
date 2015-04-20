@@ -38,14 +38,14 @@ public:
 #ifdef _WIN32
 	void epoll_waiter(int timeout, list<int> *fd_list); 
 #else
-	void epoll_waiter(int timeout);
+	void epoll_waiter(int timeout, list<int> *fd_list); 
 #endif
 	void epoll_dispatcher(void);
 	void epoll_control(int sock, int op, unsigned int event);
 
 	void handle_rtmp_error(int sock);
 
-	int network_udp::GetSockState(int sock);
+	int GetSockState(int sock);
 	void set_nonblocking(int sock);	// I/O function
 	void set_blocking(int sock);
 	void set_rendezvous(int sock);

@@ -10,6 +10,7 @@
 //#include "irc/keyboard.h"
 */
 
+
 #include "common.h"
 #ifdef _WIN32
 #include "EpollFake.h"
@@ -46,6 +47,10 @@
 #include <stdlib.h>
 #include <time.h>
 
+#ifdef _FLASH_AIR_MODE_
+#include "llp2pmain.h"
+#endif
+
 using namespace std;
 using namespace UDT;
 
@@ -56,8 +61,7 @@ using namespace UDT;
 
 const char version[] = "1.0.0.0";
 
-
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
 
 typedef struct {
 	volatile sig_atomic_t handle_sig_alarm;
@@ -87,7 +91,37 @@ typedef struct {
 map<int, GlobalVars*> map_channelID_globalVar;
 void launchThread(void * arg);
 void launch_irc_cli_thread(void *arg);
-int mainFunction(int chid);
+int FBmainFunction(int chid);
+int connect_irc(int thread_key);
+//string ssss;
+int set_config_done = 0;
+
+#elif defined(_FLASH_AIR_MODE_)
+
+typedef struct {
+	volatile sig_atomic_t handle_sig_alarm;
+	volatile sig_atomic_t srv_shutdown;
+	int errorRestartFlag;
+	//static logger_client *logger_client_ptr = NULL;
+	volatile unsigned short streamingPort;
+	list<int> *fd_list;
+	list<int> *udp_fd_list;
+	map<string, string> *map_config;
+	pk_mgr *pk_mgr_ptr_copy;
+	volatile sig_atomic_t is_Pk_mgr_ptr_copy_delete;
+	volatile sig_atomic_t http_srv_ready;
+	volatile sig_atomic_t thread_num;    // 0 can open thread  ,1 cant open
+	volatile sig_atomic_t is_init;		// 0: This object is not initialized, 1: This object is initialized and can be launched as threads
+	unsigned char exit_code;		// Peer exit error code
+	HANDLE hThread;
+	unsigned int threadID;
+} GlobalVars;
+
+//map<string, string> map_config;
+map<int, GlobalVars*> map_channelID_globalVar;
+void launchThread(void * arg);
+void launch_irc_cli_thread(void *arg);
+int FlashAirmainFunction(int chid);
 int connect_irc(int thread_key);
 //string ssss;
 int set_config_done = 0;
@@ -106,8 +140,8 @@ list<int> udp_fd_list;		// Store udp socket fd
 #endif
 //};
 
-
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
+#elif defined(_FLASH_AIR_MODE_)
 #else
 
 void signal_handler(int sig)
@@ -535,7 +569,7 @@ int llp2pFBAPI::is_set_config_done()
 void launchThread(void * arg)
 {
 	int a = (int)arg;
-	mainFunction(a);
+	FBmainFunction(a);
 }
 
 void launch_irc_cli_thread(void *arg)
@@ -545,7 +579,6 @@ void launch_irc_cli_thread(void *arg)
 }
 
 #endif
-
 
 void send_error_to_web(int thread_key, const std::string& msg)
 {
@@ -558,6 +591,198 @@ void send_error_to_web(int thread_key, const std::string& msg)
 #endif
 }
 
+#ifdef _FLASH_AIR_MODE_
+
+double LLP2P::Add(double a, double b)
+{
+	return a + b;
+}
+
+string LLP2P::echo(string msg)
+{
+	string echo = msg + "from llp2pDll";
+	return echo;
+}
+
+// Read-only property version
+string LLP2P::getVersion()
+{
+	string ver("0.0.0.0");
+	return ver;
+}
+
+int LLP2P::getThreadKey()
+{
+	static int thread_key(0);
+	thread_key++;
+	return thread_key;
+}
+
+// This function is called by javascript so that an object is created before initialization
+int LLP2P::createObj(int thread_key)
+{
+	// Check whether the object of this channel is in the plugin or not
+
+	if (map_channelID_globalVar.count(thread_key) == 0) {
+		GlobalVars *temp = new GlobalVars;
+		temp->handle_sig_alarm = 0;
+		temp->srv_shutdown = 0;
+		temp->errorRestartFlag = 0;
+		temp->streamingPort = -1;
+		temp->fd_list = new list<int>;
+		temp->udp_fd_list = new list<int>;
+		temp->map_config = NULL;
+		temp->pk_mgr_ptr_copy = NULL;
+		temp->is_Pk_mgr_ptr_copy_delete = TRUE;
+		temp->http_srv_ready = 0;
+		temp->thread_num = 0;
+		temp->exit_code = PEER_ALIVE;
+		//  irc related
+		//memset(temp->irc_arg.channel, 0, sizeof(temp->irc_arg.channel));
+		//memcpy(temp->irc_arg.channel, "#p2ptv_game", 11);
+		//memset(temp->irc_arg.ip, 0, sizeof(temp->irc_arg.ip));
+		//memcpy(temp->irc_arg.ip, "140.114.71.174", 14);
+		//memset(temp->irc_arg.nick, 0, sizeof(temp->irc_arg.nick));
+		//memcpy(temp->irc_arg.nick, "USER1", 5);
+		//
+
+		map_channelID_globalVar[thread_key] = temp;
+
+		return 0;
+	}
+	else {
+		return -1;
+	}
+
+}
+
+int LLP2P::start(int thread_key)
+{
+	map<int, GlobalVars*>::iterator iter = map_channelID_globalVar.find(thread_key);
+	if (iter == map_channelID_globalVar.end()) {
+		return -1;
+	}
+	if (iter->second->is_init == 0) {
+		return -2;
+	}
+
+	iter->second->thread_num++;
+	_beginthread(launchThread, 0, (void *)thread_key);
+
+	return 0;
+}
+
+void LLP2P::stop(int thread_key)
+{
+	map_channelID_globalVar[thread_key]->thread_num--;
+	if (map_channelID_globalVar[thread_key]->thread_num <= 0)
+	{
+		map_channelID_globalVar[thread_key]->srv_shutdown = 1;
+	}
+
+}
+
+int LLP2P::isReady(int channel_id)
+{
+	map<int, GlobalVars*>::iterator iter;
+	iter = map_channelID_globalVar.find(channel_id);
+	if (iter != map_channelID_globalVar.end()) {
+		return map_channelID_globalVar[channel_id]->http_srv_ready;
+	}
+	else {
+		return -1;
+	}
+}
+
+int LLP2P::isStreamInChannel(int stream_id, int channel_id)
+{
+	if (map_channelID_globalVar[channel_id]->is_Pk_mgr_ptr_copy_delete == FALSE){
+		map<int, struct update_stream_header *>::iterator  map_streamID_header_iter;
+		map_streamID_header_iter = map_channelID_globalVar[channel_id]->pk_mgr_ptr_copy->map_streamID_header.find(stream_id);
+		//		return TRUE;
+		if (map_streamID_header_iter != map_channelID_globalVar[channel_id]->pk_mgr_ptr_copy->map_streamID_header.end()){
+			return TRUE;
+		}
+		else{
+			return FALSE;
+		}
+	}
+	else{
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+unsigned short LLP2P::getLocalStreamPort(int channel_id)
+{
+	return map_channelID_globalVar[channel_id]->streamingPort;
+}
+
+// Set up configuration and store in map_config
+int LLP2P::setConfig(int thread_key, const std::string msg)
+{
+	std::string input = msg;
+	Json::Reader reader;
+	Json::Value value;
+	if (reader.parse(input, value)) {
+
+		map<int, GlobalVars*>::iterator iter = map_channelID_globalVar.find(thread_key);
+		if (iter == map_channelID_globalVar.end()) {
+			return -1;
+		}
+		if (iter->second->map_config != NULL) {
+			return -1;
+		}
+
+		iter->second->map_config = new map<string, string>;
+
+		iter->second->map_config->insert(pair<string, string>("bucket_size", value["BUCKET_SIZE"].asString()));
+		iter->second->map_config->insert(pair<string, string>("channel_id", value["CHANNEL_ID"].asString()));
+		iter->second->map_config->insert(pair<string, string>("html_size", value["HTML_SIZE"].asString()));
+		iter->second->map_config->insert(pair<string, string>("lane_depth", value["LANE_DEPTH"].asString()));
+		iter->second->map_config->insert(pair<string, string>("max_lane", value["MAX_LANE"].asString()));
+		iter->second->map_config->insert(pair<string, string>("min_lane", value["MIN_LANE"].asString()));
+		iter->second->map_config->insert(pair<string, string>("pk_ip", value["PK_SERVER"]["IP"].asString()));
+		iter->second->map_config->insert(pair<string, string>("pk_port", value["PK_SERVER"]["PORT"].asString()));
+		iter->second->map_config->insert(pair<string, string>("reg_ip", value["REG_SERVER"]["IP"].asString()));
+		iter->second->map_config->insert(pair<string, string>("reg_port", value["REG_SERVER"]["PORT"].asString()));
+		iter->second->map_config->insert(pair<string, string>("log_ip", value["LOG_SERVER"]["IP"].asString()));
+		iter->second->map_config->insert(pair<string, string>("log_port", value["LOG_SERVER"]["PORT"].asString()));
+		iter->second->map_config->insert(pair<string, string>("stun_ip", value["STUN_SERVER"]["IP"].asString()));
+		iter->second->map_config->insert(pair<string, string>("stream_local_port", value["STREAM"]["PORT"].asString()));
+		iter->second->map_config->insert(pair<string, string>("svc_tcp_port", value["P2P_TCP_PORT"].asString()));
+		iter->second->map_config->insert(pair<string, string>("svc_tcp_port", value["P2P_UDP_PORT"].asString()));
+
+		iter->second->is_init = 1;
+	}
+	return 0;
+}
+
+string LLP2P::getConfig(int channel_id)
+{
+	map<int, GlobalVars*>::iterator iter = map_channelID_globalVar.find(channel_id);
+	if (iter == map_channelID_globalVar.end()) {
+		return "The object is not created";
+	}
+	if (iter->second->is_init == 0) {
+		return "Initialization of the object is not finished";
+	}
+
+	string ret_msg("");
+	for (map<string, string>::iterator iter_temp = iter->second->map_config->begin(); iter_temp != iter->second->map_config->end(); iter_temp++) {
+		ret_msg += iter_temp->first + ":" + iter_temp->second + "\n";
+	}
+	return ret_msg;
+}
+
+void launchThread(void * arg)
+{
+	int a = (int)arg;
+	FlashAirmainFunction(a);
+}
+
+#endif
 
 
 // Once restart flag is set, leave while loop. 
@@ -625,21 +850,26 @@ void handle_restart(int thread_key, int pk_exit_code, int log_exit_code, int *sh
 	}
 }
 
-#ifdef _FIRE_BREATH_MOD_
-int mainFunction(int thread_key){
+#if defined(_FIRE_BREATH_MOD_)
+int FBmainFunction(int thread_key){
+#elif defined(_FLASH_AIR_MODE_)
+int FlashAirmainFunction(int thread_key){
 #else
 int main(int argc, char **argv){
 #endif
-	
+
 	//cout << UDT::stunRandomPort() << endl;
 
-	cout << "tst_speed_svr " << version << " (Compiled Time: "__DATE__ << " "__TIME__")" << endl << endl;
+
+	cout << "tst_speed_svr " << version << " (Compiled Time: "<< __DATE__ << " "<< __TIME__")" << endl << endl;
 
 	FILE *record_file_fp2 = NULL;
 #ifdef RECORD_FILE
 	record_file_fp2 = fopen("file", "wb");
 #endif
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
+	while (!map_channelID_globalVar[thread_key]->srv_shutdown) {
+#elif defined(_FLASH_AIR_MODE_)
 	while (!map_channelID_globalVar[thread_key]->srv_shutdown) {
 #else
 	while (!srv_shutdown) {
@@ -685,7 +915,15 @@ int main(int argc, char **argv){
 
 
 
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
+		prep = new configuration(config_file);
+		for (map<string, string>::iterator iter = map_channelID_globalVar[thread_key]->map_config->begin(); iter != map_channelID_globalVar[thread_key]->map_config->end(); iter++) {
+			//prep->map_table.insert(pair<string, string>(iter->first, iter->second));
+			prep->map_table[iter->first] = iter->second;
+		}
+		net_ptr = new network(&(map_channelID_globalVar[thread_key]->errorRestartFlag), map_channelID_globalVar[thread_key]->fd_list);
+		net_udp_ptr = new network_udp(&(map_channelID_globalVar[thread_key]->errorRestartFlag), map_channelID_globalVar[thread_key]->fd_list);
+#elif defined(_FLASH_AIR_MODE_)
 		prep = new configuration(config_file);
 		for (map<string, string>::iterator iter = map_channelID_globalVar[thread_key]->map_config->begin(); iter != map_channelID_globalVar[thread_key]->map_config->end(); iter++) {
 			//prep->map_table.insert(pair<string, string>(iter->first, iter->second));
@@ -733,9 +971,11 @@ int main(int argc, char **argv){
 			printf("[ERROR] logger_client_ptr new error \n");
 			PAUSE
 		}
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
 		peer_mgr_ptr = new peer_mgr(map_channelID_globalVar[thread_key]->fd_list);
 		//stunt_mgr_ptr = new stunt_mgr(map_channelID_globalVar[thread_key]->fd_list);
+#elif defined(_FLASH_AIR_MODE_)
+		peer_mgr_ptr = new peer_mgr(map_channelID_globalVar[thread_key]->fd_list);
 #else
 
 		peer_mgr_ptr = new peer_mgr(&fd_list);
@@ -758,23 +998,16 @@ int main(int argc, char **argv){
 		}
 #endif
 
-
-
-
-
-#ifdef _FIRE_BREATH_MOD_
-		char s[64];
-		sprintf(s, "%d", thread_key);
-#endif
-
 		// Connect to register server
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
 		string channel_id_tmp = map_channelID_globalVar.find(thread_key)->second->map_config->find("channel_id")->second;
 		register_mgr_ptr->build_connect(atoi(channel_id_tmp.c_str()));
+#elif defined(_FLASH_AIR_MODE_)
+		//string channel_id_tmp = map_channelID_globalVar.find(thread_key)->second->map_config->find("channel_id")->second;
+		//register_mgr_ptr->build_connect(atoi(channel_id_tmp.c_str()));
 #else
 		//register_mgr_ptr->build_connect(1);
 #endif		
-
 
 		if (register_mgr_ptr->got_pk) {
 			prep->map_table["pk_ip"] = register_mgr_ptr->pk_ip;
@@ -790,7 +1023,9 @@ int main(int argc, char **argv){
 		prep->read_key("svc_udp_port", svc_udp_port);
 		prep->read_key("stream_local_port", stream_local_port);
 
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
+		pk_mgr_ptr = new pk_mgr(html_size, map_channelID_globalVar[thread_key]->fd_list, net_ptr, net_udp_ptr, log_ptr, prep, logger_client_ptr, stunt_mgr_ptr);
+#elif defined(_FLASH_AIR_MODE_)
 		pk_mgr_ptr = new pk_mgr(html_size, map_channelID_globalVar[thread_key]->fd_list, net_ptr, net_udp_ptr, log_ptr, prep, logger_client_ptr, stunt_mgr_ptr);
 #else
 		pk_mgr_ptr = new pk_mgr(html_size, &fd_list, net_ptr, net_udp_ptr, log_ptr, prep, logger_client_ptr, stunt_mgr_ptr);
@@ -827,7 +1062,8 @@ int main(int argc, char **argv){
 
 
 
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
+#elif defined(_FLASH_AIR_MODE_)
 #else
 		signal(SIGTERM, signal_handler);
 		signal(SIGINT, signal_handler);
@@ -870,7 +1106,9 @@ int main(int argc, char **argv){
 		else if (MODE == MODE_BitStream || MODE == MODE_HTTP) {
 			debug_printf("MODE_BitStream \n");
 
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
+			bit_stream_server_ptr = new bit_stream_server(net_ptr, log_ptr, logger_client_ptr, pk_mgr_ptr, map_channelID_globalVar[thread_key]->fd_list);
+#elif defined(_FLASH_AIR_MODE_)
 			bit_stream_server_ptr = new bit_stream_server(net_ptr, log_ptr, logger_client_ptr, pk_mgr_ptr, map_channelID_globalVar[thread_key]->fd_list);
 #else
 			bit_stream_server_ptr = new bit_stream_server(net_ptr, log_ptr, logger_client_ptr, pk_mgr_ptr, &fd_list);
@@ -883,10 +1121,13 @@ int main(int argc, char **argv){
 			unsigned short port_tcp;
 			ss_tmp << stream_local_port;
 			ss_tmp >> port_tcp;
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
 			map_channelID_globalVar[thread_key]->streamingPort = bit_stream_server_ptr->init(0, port_tcp);
 			log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "Create bit_stream_server success. port =", map_channelID_globalVar[thread_key]->streamingPort);
 			debug_printf("Create bit_stream_server success. port = %u", map_channelID_globalVar[thread_key]->streamingPort);
+#elif defined(_FLASH_AIR_MODE_)
+			map_channelID_globalVar[thread_key]->streamingPort = bit_stream_server_ptr->init(0, port_tcp);
+			log_ptr->write_log_format("s(u) s u \n", __FUNCTION__, __LINE__, "Create bit_stream_server success. port =", map_channelID_globalVar[thread_key]->streamingPort);
 #else
 			streamingPort = bit_stream_server_ptr->init(0, port_tcp);
 			log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "Create bit_stream_server success. port =", streamingPort);
@@ -1034,7 +1275,10 @@ int main(int argc, char **argv){
 		net_udp_ptr->epoll_control(svc_fd_udp, EPOLL_CTL_ADD, UDT_EPOLL_IN);
 		net_udp_ptr->set_fd_bcptr_map(svc_fd_udp, dynamic_cast<basic_class *>(io_accept_udp_ptr));
 
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
+		(map_channelID_globalVar[thread_key]->fd_list)->push_back(svc_fd_tcp);
+		(map_channelID_globalVar[thread_key]->udp_fd_list)->push_back(svc_fd_udp);
+#elif defined(_FLASH_AIR_MODE_)
 		(map_channelID_globalVar[thread_key]->fd_list)->push_back(svc_fd_tcp);
 		(map_channelID_globalVar[thread_key]->udp_fd_list)->push_back(svc_fd_udp);
 #else
@@ -1044,7 +1288,7 @@ int main(int argc, char **argv){
 		pk_mgr_ptr->init(tcp_port, udp_port_ext, udp_port_int);
 		logger_client_ptr->log_init();
 
-
+#ifdef _WIN32
 		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "bit_stream_server", *bit_stream_server_ptr);
 		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "io_accept_udp", *io_accept_udp_ptr);
 		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "io_connect_udp", peer_communication_ptr->_io_connect_udp_ptr);
@@ -1054,15 +1298,16 @@ int main(int argc, char **argv){
 		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "peer", peer_communication_ptr->_peer_ptr);
 		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "logger_client", *logger_client_ptr);
 		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "pk_mgr", *pk_mgr_ptr);
+#endif
 
-#ifdef _FIRE_BREATH_MOD_
+		struct timerStruct new_timer;
+		struct timerStruct base_timer;
+		log_ptr->timerGet(&new_timer);
 
+#if defined(_FIRE_BREATH_MOD_)
 		// Invoke jwplayer in javascript
 		FB::JSObjectPtr obj = map_channelID_globalVar[thread_key]->window->getProperty<FB::JSObjectPtr>("window");
 		obj->Invoke("start_jwplayer", FB::variant_list_of(map_channelID_globalVar[thread_key]->streamingPort));
-
-
-
 
 		map_channelID_globalVar[thread_key]->pk_mgr_ptr_copy = pk_mgr_ptr;
 		map_channelID_globalVar[thread_key]->http_srv_ready = 1;
@@ -1076,45 +1321,85 @@ int main(int argc, char **argv){
 			log_ptr->write_log_format("s(u) -- s s \n", __FUNCTION__, __LINE__, (iter->first).c_str(), (iter->second).c_str());
 		}
 		log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "Before PAUSE");
-		//PAUSE
 		log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "After PAUSE");
-		debug_printf("\n");
-		while (!map_channelID_globalVar[thread_key]->srv_shutdown && !map_channelID_globalVar[thread_key]->errorRestartFlag) {
-#else
-		while (!srv_shutdown && !errorRestartFlag) {
+#elif defined(_FLASH_AIR_MODE_)
+		// Invoke jwplayer in javascript
+		map_channelID_globalVar[thread_key]->pk_mgr_ptr_copy = pk_mgr_ptr;
+		map_channelID_globalVar[thread_key]->http_srv_ready = 1;
+		map_channelID_globalVar[thread_key]->is_Pk_mgr_ptr_copy_delete = FALSE;
 #endif
 
 #ifdef _WIN32
-			for (int i = 0; i < 2; i++) {
-#ifdef _FIRE_BREATH_MOD_
-				net_ptr->epoll_waiter(1000, map_channelID_globalVar[thread_key]->fd_list);
-#else
-				net_ptr->epoll_waiter(1000, &fd_list);
-#endif
-
-#else
-				net_ptr->epoll_waiter(1000);
-#endif
-				net_ptr->epoll_dispatcher();
+	#if defined(_FIRE_BREATH_MOD_)
+		while (!map_channelID_globalVar[thread_key]->srv_shutdown && !map_channelID_globalVar[thread_key]->errorRestartFlag) {
+			for (int i = 0; i < 5; i++) {
+				for (int j = 0; j < 5; j++) {
+					net_ptr->epoll_waiter(1, map_channelID_globalVar[thread_key]->fd_list);
+					net_ptr->epoll_dispatcher();
+				}
+				net_udp_ptr->epoll_waiter(1, map_channelID_globalVar[thread_key]->udp_fd_list);
+				net_udp_ptr->epoll_dispatcher();
+				if (*(net_ptr->_errorRestartFlag) == RESTART) {
+					log_ptr->write_log_format("s(u) s \n\n\n", __FUNCTION__, __LINE__, "Program Restart");
+					break;
+				}
 			}
 			pk_mgr_ptr->time_handle();
-#ifdef _FIRE_BREATH_MOD_
-			net_udp_ptr->epoll_waiter(5, map_channelID_globalVar[thread_key]->udp_fd_list);
-#else
-			//log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "1");
-			net_udp_ptr->epoll_waiter(10, &udp_fd_list);
-#endif
-			//log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "2");
-			net_udp_ptr->epoll_dispatcher();
-			//log_ptr->write_log_format("s(u) s \n", __FUNCTION__, __LINE__, "---");
-			if (*(net_ptr->_errorRestartFlag) == RESTART) {
-				log_ptr->write_log_format("s(u) s \n\n\n", __FUNCTION__, __LINE__, "Program Restart");
-				break;
-			}
 			Sleep(1);	// 避免過度使用CPU, 不休息的話它的頻率會衝到 10k次/s
-
-
 		}
+	#elif defined(_FLASH_AIR_MODE_)
+		while (!map_channelID_globalVar[thread_key]->srv_shutdown && !map_channelID_globalVar[thread_key]->errorRestartFlag) {
+			for (int i = 0; i < 5; i++) {
+				for (int j = 0; j < 5; j++) {
+					net_ptr->epoll_waiter(1, map_channelID_globalVar[thread_key]->fd_list);
+					net_ptr->epoll_dispatcher();
+				}
+				net_udp_ptr->epoll_waiter(1, map_channelID_globalVar[thread_key]->udp_fd_list);
+				net_udp_ptr->epoll_dispatcher();
+				if (*(net_ptr->_errorRestartFlag) == RESTART) {
+					log_ptr->write_log_format("s(u) s \n\n\n", __FUNCTION__, __LINE__, "Program Restart");
+					break;
+				}
+			}
+			pk_mgr_ptr->time_handle();
+			Sleep(1);	// 避免過度使用CPU, 不休息的話它的頻率會衝到 10k次/s
+		}
+	#else
+		while (!srv_shutdown && !errorRestartFlag) {
+			for (int i = 0; i < 5; i++) {
+				for (int j = 0; j < 5; j++) {
+					net_ptr->epoll_waiter(1, &fd_list);
+					net_ptr->epoll_dispatcher();
+				}
+				net_udp_ptr->epoll_waiter(1, &udp_fd_list);
+				net_udp_ptr->epoll_dispatcher();
+				if (*(net_ptr->_errorRestartFlag) == RESTART) {
+					log_ptr->write_log_format("s(u) s \n\n\n", __FUNCTION__, __LINE__, "Program Restart");
+					break;
+				}
+			}
+			pk_mgr_ptr->time_handle();
+			Sleep(1);	// 避免過度使用CPU, 不休息的話它的頻率會衝到 10k次/s
+		}
+	#endif
+#else
+		while (!srv_shutdown && !errorRestartFlag) {
+			for (int i = 0; i < 5; i++) {
+				for (int j = 0; j < 5; j++) {
+					net_ptr->epoll_waiter(1000);
+					net_ptr->epoll_dispatcher();
+				}
+				net_udp_ptr->epoll_waiter(1, &udp_fd_list);
+				net_udp_ptr->epoll_dispatcher();
+				if (*(net_ptr->_errorRestartFlag) == RESTART) {
+					log_ptr->write_log_format("s(u) s \n\n\n", __FUNCTION__, __LINE__, "Program Restart");
+					break;
+				}
+			}
+			pk_mgr_ptr->time_handle();
+			usleep(1000);	// 避免過度使用CPU, 不休息的話它的頻率會衝到 10k次/s
+		}
+#endif
 
 		pk_exit_code = pk_mgr_ptr->exit_code;
 		log_exit_code = logger_client_ptr->exit_code;
@@ -1122,18 +1407,22 @@ int main(int argc, char **argv){
 
 		log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "pk_exit_code =", pk_exit_code, "log_exit_code =", log_exit_code);
 		debug_printf("pk_exit_code = %d, log_exit_code = %d \n", pk_exit_code, log_exit_code);
+		
 
-
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
+		handle_restart(thread_key, pk_exit_code, log_exit_code, (int *)&(map_channelID_globalVar[thread_key]->srv_shutdown));
+#elif defined(_FLASH_AIR_MODE_)
 		handle_restart(thread_key, pk_exit_code, log_exit_code, (int *)&(map_channelID_globalVar[thread_key]->srv_shutdown));
 #else
 		handle_restart(0, pk_exit_code, log_exit_code, (int *)&srv_shutdown);
 #endif
+		
 
 
-
-
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
+		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "exit_code =", map_channelID_globalVar[thread_key]->exit_code);
+		log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "srv_shutdown", map_channelID_globalVar[thread_key]->srv_shutdown, "errorRestartFlag", map_channelID_globalVar[thread_key]->errorRestartFlag);
+#elif defined(_FLASH_AIR_MODE_)
 		log_ptr->write_log_format("s(u) s d \n", __FUNCTION__, __LINE__, "exit_code =", map_channelID_globalVar[thread_key]->exit_code);
 		log_ptr->write_log_format("s(u) s d s d \n", __FUNCTION__, __LINE__, "srv_shutdown", map_channelID_globalVar[thread_key]->srv_shutdown, "errorRestartFlag", map_channelID_globalVar[thread_key]->errorRestartFlag);
 #else
@@ -1181,7 +1470,11 @@ int main(int argc, char **argv){
 		}
 		net_udp_ptr = NULL;
 
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
+		map_channelID_globalVar[thread_key]->is_Pk_mgr_ptr_copy_delete = TRUE;
+		map_channelID_globalVar[thread_key]->pk_mgr_ptr_copy = NULL;
+		map_channelID_globalVar[thread_key]->http_srv_ready = 0;
+#elif defined(_FLASH_AIR_MODE_)
 		map_channelID_globalVar[thread_key]->is_Pk_mgr_ptr_copy_delete = TRUE;
 		map_channelID_globalVar[thread_key]->pk_mgr_ptr_copy = NULL;
 		map_channelID_globalVar[thread_key]->http_srv_ready = 0;
@@ -1218,15 +1511,19 @@ int main(int argc, char **argv){
 
 		//srv_shutdown = 1;
 		debug_printf("Client Restart \n");
-		PAUSE
-
+		//PAUSE
+#ifdef _WIN32
 		WSACleanup();
-
 		srand(time(NULL));
-		Sleep(rand() % 3 + 1);
+		Sleep(rand() % 100 + 100);
+#else
+		srand(time(NULL));
+		usleep(rand() % 100000 + 100000);
+#endif
 
-
-#ifdef _FIRE_BREATH_MOD_
+#if defined(_FIRE_BREATH_MOD_)
+		map_channelID_globalVar[thread_key]->errorRestartFlag = 0;
+#elif defined(_FLASH_AIR_MODE_)
 		map_channelID_globalVar[thread_key]->errorRestartFlag = 0;
 #else
 		errorRestartFlag = 0;
@@ -1234,9 +1531,19 @@ int main(int argc, char **argv){
 
 		//PAUSE
 		debug_printf("addr %d %s  port %d \n", stunServerAddr.addr, inet_ntoa(*(struct in_addr *)&stunServerAddr), stunServerAddr.port);
+		//return 0;
 	}
 
-#ifdef _FIRE_BREATH_MOD_
+
+#if defined(_FIRE_BREATH_MOD_)
+	map_channelID_globalVar[thread_key]->streamingPort = 0;
+	map_channelID_globalVar[thread_key]->handle_sig_alarm = 0;
+	map_channelID_globalVar[thread_key]->srv_shutdown = 0;
+	map_channelID_globalVar[thread_key]->errorRestartFlag = 0;
+	delete map_channelID_globalVar[thread_key]->fd_list;
+	free(map_channelID_globalVar[thread_key]);
+	map_channelID_globalVar.erase(thread_key);
+#elif defined(_FLASH_AIR_MODE_)
 	map_channelID_globalVar[thread_key]->streamingPort = 0;
 	map_channelID_globalVar[thread_key]->handle_sig_alarm = 0;
 	map_channelID_globalVar[thread_key]->srv_shutdown = 0;
@@ -1358,91 +1665,3 @@ int connect_irc(int thread_key)
 	return 1;
 
 }
-
-/**********************************************************\
-
-Auto-generated llp2pFBAPI.cpp
-
-\**********************************************************/
-/*
-#include "JSObject.h"
-#include "variant_list.h"
-#include "DOM/Document.h"
-#include "DOM/Window.h"
-#include "global/config.h"
-
-#include "llp2pFBAPI.h"
-
-///////////////////////////////////////////////////////////////////////////////
-/// @fn FB::variant llp2pFBAPI::echo(const FB::variant& msg)
-///
-/// @brief  Echos whatever is passed from Javascript.
-///         Go ahead and change it. See what happens!
-///////////////////////////////////////////////////////////////////////////////
-FB::variant llp2pFBAPI::echo(const FB::variant& msg)
-{
-static int n(0);
-fire_echo("So far, you clicked this many times: ", n++);
-
-// return "foobar";
-return msg;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// @fn llp2pFBPtr llp2pFBAPI::getPlugin()
-///
-/// @brief  Gets a reference to the plugin that was passed in when the object
-///         was created.  If the plugin has already been released then this
-///         will throw a FB::script_error that will be translated into a
-///         javascript exception in the page.
-///////////////////////////////////////////////////////////////////////////////
-llp2pFBPtr llp2pFBAPI::getPlugin()
-{
-llp2pFBPtr plugin(m_plugin.lock());
-if (!plugin) {
-throw FB::script_error("The plugin is invalid");
-}
-return plugin;
-}
-
-// Read/Write property testString
-std::string llp2pFBAPI::get_testString()
-{
-return m_testString;
-}
-
-void llp2pFBAPI::set_testString(const std::string& val)
-{
-m_testString = val;
-}
-
-// Read-only property version
-std::string llp2pFBAPI::get_version()
-{
-return FBSTRING_PLUGIN_VERSION;
-}
-
-void llp2pFBAPI::testEvent()
-{
-fire_test();
-}
-
-void llp2pFBAPI::mytestEvent()
-{
-
-
-// Retrieve a reference to the DOM Window
-FB::DOM::WindowPtr window = m_host->getDOMWindow();
-
-// Check if the DOM Window has an alert peroperty
-if (window && window->getJSObject()->HasProperty("window")) {
-// Create a reference to alert
-FB::JSObjectPtr obj = window->getProperty<FB::JSObjectPtr>("window");
-
-// Invoke alert with some text
-obj->Invoke("alert", FB::variant_list_of("This is a test alert invoked from an NPAPI Plugin !!!"));
-//obj->Invoke("testCallByPlugin", FB::variant_list_of(ss.str()));
-}
-
-}
-*/

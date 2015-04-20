@@ -67,6 +67,9 @@ public:
 
 	map<string, string> map_table;
 
+	Json::Reader reader;
+	Json::Value value;
+
 private:
 	
 	bool tmp_only;

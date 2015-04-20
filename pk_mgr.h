@@ -41,7 +41,7 @@ public:
 	unsigned long totalbyte;
 	int syncLock;					// set 1 if send sync token to pk and not yet receive the response
 	unsigned char exit_code;		// Error code (for program exit)
-	int previous_ss_num;
+	unsigned int previous_ss_num;
 
 	UINT32 first_timestamp;		// 第一個收到的封包的timestampd
 	bool firstIn;
@@ -112,7 +112,7 @@ public:
 
 	// Variables of synchronization
 	struct timerStruct syn_round_start;
-	int syn_round_time;
+	int syn_round_time;							// RTT of SYN message 
 	struct syn_struct syn_table;
 
 	struct timerStruct child_queue_timer;

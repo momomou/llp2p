@@ -22,8 +22,8 @@ configuration::configuration() : filename(""), tmp_only(true)
 configuration::configuration(string file) : filename(file), tmp_only(false) 
 {
 	std::string input = readConfigFile("llp2p.conf");
-	Json::Reader reader;
-	Json::Value value;
+	//Json::Reader reader;
+	//Json::Value value;
 	if (reader.parse(input, value)) {
 		map_table["bucket_size"] = value["BUCKET_SIZE"].asString();
 		map_table["channel_id"] = value["CHANNEL_ID"].asString();
@@ -50,7 +50,7 @@ configuration::configuration(string file) : filename(file), tmp_only(false)
 	}
 	else {
 		map_table["bucket_size"] = "8192";
-		map_table["channel_id"] = "0";
+		map_table["channel_id"] = "1";
 		map_table["html_size"] = "8192";
 		map_table["lane_depth"] = "3";
 		map_table["max_lane"] = "8";
@@ -61,6 +61,7 @@ configuration::configuration(string file) : filename(file), tmp_only(false)
 		map_table["reg_port"] = "7756";
 		map_table["log_ip"] = "140.114.71.174";
 		map_table["log_port"] = "9956";
+		map_table["stun_ip"] = "140.114.71.174";
 		map_table["stream_local_port"] = "3000";
 		//map_table["sub_stream_num"] = "4";
 		map_table["svc_tcp_port"] = "5566";
