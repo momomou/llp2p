@@ -1,0 +1,98 @@
+[Apr 13 16:57:26] main(1133) Create bit_stream_server success. port = 3000 
+[Apr 13 16:57:26] main(1183) Create TCP listening socket, port = 5566 
+[Apr 13 16:57:26] main(1242) Create UDP listen-socket, internal port 7788 external port 7788 
+[Apr 13 16:57:26] network_udp::epoll_control(358) sock 885647763 op 1 events 1 
+[Apr 13 16:57:26] network_udp::set_fd_bcptr_map(93) [INSERT _map_fd_bc_tbl] 885647763 12181712 
+[Apr 13 16:57:26] pk_mgr::init(1059) PK_sock = 288 
+[Apr 13 16:57:26] pk_mgr::init(1087) Register PK complete 
+[Apr 13 16:57:26] main(1292) bit_stream_server 15480424 
+[Apr 13 16:57:26] main(1293) io_accept_udp 15489580 
+[Apr 13 16:57:26] main(1294) io_connect_udp 12099144 
+[Apr 13 16:57:26] main(1295) io_connect_udp_ctrl 12099240 
+[Apr 13 16:57:26] main(1296) io_nonblocking_udp 12098696 
+[Apr 13 16:57:26] main(1297) peer_communication 15540072 
+[Apr 13 16:57:26] main(1298) peer 12093160 
+[Apr 13 16:57:26] main(1299) logger_client 15509716 
+[Apr 13 16:57:26] main(1300) pk_mgr 15555344 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1727) CHNK_CMD_CHN_UPDATE_DATA 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1737) expected_len = 437 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1742) len_ptr = 429 streamID_ptr = 0 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1772) len_ptr = 429 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1783) stream_number = 1 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1363) CHNK_CMD_PEER_REG 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1397) my_pid 8 my_level 0 bit_rate 300 ss_num 2 my_public_ip 140.114.71.32 inside_lane_rescue_num 4 lane_member 0 is_seed 1 pkt_rate 92 peercomm_session 9 
+[Apr 13 16:57:26] pk_mgr::delay_table_init(175) source delay substreamID 0 initialization end 
+[Apr 13 16:57:26] pk_mgr::delay_table_init(175) source delay substreamID 1 initialization end 
+[Apr 13 16:57:26] pk_mgr::send_syn_token_to_pk(3097) Send synchronization packets to PK 4 
+[Apr 13 16:57:26] pk_mgr::send_syn_token_to_pk(3111) 20 20 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1434) lane_member  0 
+[Apr 13 16:57:26] pk_mgr::SetParentManifest(3003) parent 999999 manifest 0 -> 3 
+[Apr 13 16:57:26] logger_client::log_to_server(1342) 140.114.71.32:5566 
+[Apr 13 16:57:26] logger_client::log_to_server(491) 140.114.71.32:0  140.114.71.32:5566 
+[Apr 13 16:57:26] pk_mgr::SendCapacityToPK(979) Send capacity to PK 0 0 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1549) Set manifest 0 blocked by connecting peer 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1560) CHNK_CMD_PEER_REG DONE 
+[Apr 13 16:57:26] network::nonblock_send(662) Send 43(43) bytes to 292 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1718) CHNK_CMD_PEER_SEED 
+[Apr 13 16:57:26] pk_mgr::HandleCMDSeed(2431) ss_id 0 manifest 3 
+[Apr 13 16:57:26] pk_mgr::SetParentManifest(3003) parent 999999 manifest 3 -> 3 
+[Apr 13 16:57:26] pk_mgr::SetSubstreamParent(2991) ss_id 0 current parent 999999 previous parent 4294967295 
+[Apr 13 16:57:26] pk_mgr::SetSubstreamState(2965) Substream 0 state changed from 0 -> 1 
+[Apr 13 16:57:26] pk_mgr::ResetDetection(4072) 
+[Apr 13 16:57:26] network::nonblock_send(662) Send 37(37) bytes to 292 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1718) CHNK_CMD_PEER_SEED 
+[Apr 13 16:57:26] pk_mgr::HandleCMDSeed(2431) ss_id 1 manifest 3 
+[Apr 13 16:57:26] pk_mgr::SetParentManifest(3003) parent 999999 manifest 3 -> 3 
+[Apr 13 16:57:26] pk_mgr::SetSubstreamParent(2991) ss_id 1 current parent 999999 previous parent 4294967295 
+[Apr 13 16:57:26] pk_mgr::SetSubstreamState(2965) Substream 1 state changed from 0 -> 1 
+[Apr 13 16:57:26] pk_mgr::ResetDetection(4072) 
+[Apr 13 16:57:26] network::nonblock_send(662) Send 49(49) bytes to 292 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1710) CHNK_CMD_PEER_DATA 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2076) Drop the packet(the first sync not done yet) 
+[Apr 13 16:57:26] network::nonblock_send(662) Send 61(61) bytes to 292 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1710) CHNK_CMD_PEER_DATA 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2076) Drop the packet(the first sync not done yet) 
+[Apr 13 16:57:26] network::nonblock_send(662) Send 37(37) bytes to 292 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1710) CHNK_CMD_PEER_DATA 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2076) Drop the packet(the first sync not done yet) 
+[Apr 13 16:57:26] network::nonblock_send(662) Send 37(37) bytes to 292 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1565) CHNK_CMD_PEER_SYN 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1572) CHNK_CMD_PEER_SYN REPLY 
+[Apr 13 16:57:26] pk_mgr::syn_recv_handler(3238) client_abs_start_time = 2986307202 pk_RecvTime = 2986307222 syn_round_time = 40 syn_table.start_seq = 58161 
+[Apr 13 16:57:26] network::nonblock_send(662) Send 69(69) bytes to 292 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1710) CHNK_CMD_PEER_DATA 
+[Apr 13 16:57:26] pk_mgr::SetSubstreamState(2965) Substream 0 state changed from 1 -> 1 
+[Apr 13 16:57:26] pk_mgr::SetSubstreamParent(2991) ss_id 0 current parent 999999 previous parent 999999 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2169) parent 999999(288) manifest 3 s_id 0 ss_id 0 state 1 seq 58160 timestamp 2986307214 src_delay 28 bytes 6970 _least_sequence_number 58160 _current_send_sequence_number 58160 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2245) ss_table 0 1 58160 58160 0 1 0 0 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2262) new sequence number in the buffer. seq 58160 
+[Apr 13 16:57:26] pk_mgr::GetPSClass(4168) avg 0.000000 
+[Apr 13 16:57:26] network::nonblock_send(662) Send 69(69) bytes to 292 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1710) CHNK_CMD_PEER_DATA 
+[Apr 13 16:57:26] pk_mgr::SetSubstreamState(2965) Substream 1 state changed from 1 -> 1 
+[Apr 13 16:57:26] pk_mgr::SetSubstreamParent(2991) ss_id 1 current parent 999999 previous parent 999999 
+[Apr 13 16:57:26] logger_client::count_start_delay(209) start_delay = 122.000000 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2157) Send start-delay to PK 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2169) parent 999999(288) manifest 3 s_id 0 ss_id 1 state 1 seq 58161 timestamp 2986307234 src_delay 8 bytes 494 _least_sequence_number 58161 _current_send_sequence_number 58160 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2245) ss_table 1 1 58161 58161 0 1 0 0 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2262) new sequence number in the buffer. seq 58161 
+[Apr 13 16:57:26] pk_mgr::GetPSClass(4168) avg 0.000000 
+[Apr 13 16:57:26] network::nonblock_send(662) Send 45(45) bytes to 292 
+[Apr 13 16:57:26] network::nonblock_send(662) Send 45(45) bytes to 292 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1710) CHNK_CMD_PEER_DATA 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2169) parent 999999(288) manifest 3 s_id 0 ss_id 0 state 1 seq 58162 timestamp 2986307235 src_delay 17 bytes 6127 _least_sequence_number 58162 _current_send_sequence_number 58161 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2245) ss_table 0 1 58160 58160 0 1 0 0 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2262) new sequence number in the buffer. seq 58162 
+[Apr 13 16:57:26] pk_mgr::GetPSClass(4168) avg 0.000000 
+[Apr 13 16:57:26] pk_mgr::RescueDetecion(3364) ss_table[ 0 ].total_byte = 6127 (6127) 
+[Apr 13 16:57:26] network::nonblock_send(662) Send 49(49) bytes to 292 
+[Apr 13 16:57:26] pk_mgr::handle_pkt_in(1710) CHNK_CMD_PEER_DATA 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2169) parent 999999(288) manifest 3 s_id 0 ss_id 1 state 1 seq 58163 timestamp 2986307256 src_delay -4 bytes 428 _least_sequence_number 58163 _current_send_sequence_number 58162 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2245) ss_table 1 1 58161 58161 0 1 0 0 
+[Apr 13 16:57:26] pk_mgr::HandleStream(2262) new sequence number in the buffer. seq 58163 
+[Apr 13 16:57:26] pk_mgr::GetPSClass(4168) avg 0.000000 
+[Apr 13 16:57:26] pk_mgr::RescueDetecion(3364) ss_table[ 1 ].total_byte = 428 (428) 
+[Apr 13 16:57:26] pk_mgr::SourceDelayDetection(673) client_abs_start_time changed from 2986307202 to 2986307206 
+[Apr 13 16:57:26] pk_mgr::SourceDelayDetection(674) totalMod changed from 0 to 4 
+[Apr 13 16:57:26] network::nonblock_send(662) Send 100(100) bytes to 292 
+[Apr 13 16:57:26] pk_mgr::time_handle(4192) ****** 

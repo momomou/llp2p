@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009"
+					   xmlns:s="library://ns.adobe.com/flex/spark"
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   xmlns:updater="http://updater.riaspace.com/"
+					   width="982" height="608"
+					   creationComplete="windowedapplication1_creationCompleteHandler(event)">
+	
+	<fx:Script source="Config.as" />
+	<fx:Script>
+		<![CDATA[
+			import air.update.events.UpdateEvent;
+			
+			import appsroid.RegistryModify;
+			
+			import com.adobe.serialization.json.JSON;
+			import com.diadraw.extension.WindowsExtensionWrapper;
+			
+			import flash.desktop.NativeApplication;
+			import flash.display.Sprite;
+			import flash.events.InvokeEvent;
+			import flash.media.Video;
+			import flash.net.NetConnection;
+			import flash.net.NetStream;
+			import flash.text.TextField;
+			
+			import mx.core.UIComponent;
+			import mx.core.mx_internal;
+			import mx.events.FlexEvent;
+			
+			import wrase.*;
+			import wrase.events.WindowsRegistryEvent;
+			
+			private var m_ext : WindowsExtensionWrapper = null;
+			public var regEdit:WindowsRegistryEditor;      
+			public var process:NativeProcess;
+			public var logFile:File = File.documentsDirectory;
+			public var regFile:File = File.documentsDirectory;
+			public var logFile2:File;
+			public var fileStream:FileStream;
+			public var settingArray:Array;
+			public var settingString:String;
+			
+			protected function fffff(event:FlexEvent):void
+			{
+				fileStream.close();
+			}
+			
+			protected function windowedapplication1_creationCompleteHandler(event:FlexEvent):void
+			{
+				// Instantiate the extension class:
+				m_ext = new WindowsExtensionWrapper();
+				
+				//Setllp2pSetting();
+				//trace(Getllp2pSetting());
+				
+				loader.load(new URLRequest("http://airdownload.adobe.com/air/browserapi/air.swf"));
+				loader.contentLoaderInfo.addEventListener(Event.INIT, onInit);
+				loader.contentLoaderInfo.addEventListener(Event.COMPLETE, onComplete);
+				NativeApplication.nativeApplication.addEventListener(InvokeEvent.INVOKE, onInvoke); 
+				NativeApplication.nativeApplication.addEventListener(Event.EXITING, applicationExitHandler);
+				
+				// Initializie updater
+				updater.initialize();
+				
+				// Initializie log_file
+				logFile = logFile.resolvePath("log.txt");
+				fileStream = new FileStream();
+				fileStream.open(logFile, FileMode.WRITE); 
+				writeLogger("Start");
+				
+				logFile2 = new File("app:/");
+				writeLogger(logFile2.url);
+				writeLogger(logFile2.nativePath);
+				
+				writeRegFile("llp2pApp", logFile2.nativePath);
+				
+				launchExeFile("AccessRegistry.exe");
+				
+				
+				settingArray = new Array({	
+				"BUCKET_SIZE" : 8192,
+				"CHANNEL_ID" : 1,
+				"HTML_SIZE" : 1024,
+				"LANE_DEPTH" : 3,
+				"MAX_LANE" : 8,
+				"MIN_LANE": 1,
+				"PK_SERVER" : {
+				"IP" : "140.114.71.166",
+				"PORT" : "8855"
+				},
+				"REG_SERVER" : {
+				"IP" : "140.114.71.174",
+				"PORT" : "7756"
+				},
+				"LOG_SERVER" : {
+				"IP" : "140.114.71.166",
+				"PORT" : "9955"
+				},
+				"STUN_SERVER" : {
+				"IP" : "140.114.71.174"
+				},
+				"STREAM" : {
+				"PORT" : "3000"
+				},
+				"P2P_TCP_PORT" : "5566",
+				"P2P_UDP_PORT" : "7788"
+				});
+				
+				var sss:String = "123 456%20789";
+				var re:RegExp = /( |%20)/g;
+				
+				var aaa:Array = sss.split(re);
+				trace("-----");
+				trace(aaa.length);
+				trace(aaa);
+				trace(aaa.toString());
+				trace("-----");
+				var bbb:Array = aaa.toString().split("%20");
+				trace("-----");
+				trace(bbb.length);
+				trace(bbb);
+				trace(bbb.toString());
+			}
+			
+			public function applicationExitHandler(event:Event):void
+			{
+				fileStream.close();
+			}
+			
+			public function writeLogger(message:String):void
+			{
+				fileStream.writeUTFBytes(message);
+				fileStream.writeUTFBytes("\r\n");
+			}
+			
+			public function launchExeFile(fileName:String):void
+			{     
+				var installPath:String = new File("app:/").nativePath;
+				
+				var nativeProcessStartupInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
+				//var file:File = File.applicationDirectory.resolvePath(fileName);
+				var file:File = new File(installPath + "\\" + fileName);
+				nativeProcessStartupInfo.executable = file;
+				
+				
+				var processArgs:Vector.<String> = new Vector.<String>(); 
+				processArgs.push(regFile.nativePath);
+				nativeProcessStartupInfo.arguments = processArgs;
+				
+				process = new NativeProcess();
+				process.start(nativeProcessStartupInfo);
+				process.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onOutputData);
+				process.addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onErrorData);
+				process.addEventListener(NativeProcessExitEvent.EXIT, onExit);
+				process.addEventListener(IOErrorEvent.STANDARD_OUTPUT_IO_ERROR, onIOError);
+				process.addEventListener(IOErrorEvent.STANDARD_ERROR_IO_ERROR, onIOError);
+			}
+			
+			public function writeRegFile(appName:String, path:String):void
+			{
+				var fileName:File = new File();
+				fileName.nativePath = path + "\\myApp.reg";
+				
+				writeLogger("file existe? " + fileName.exists + "  " + appName);
+				//if (fileName.exists == false) {
+					var myPattern:RegExp = /\\/g;  
+					var hkeyPath:String = path.replace(myPattern, "\\\\");
+					
+					regFile = regFile.resolvePath("myApp.reg");
+					var fileStream:FileStream = new FileStream();
+					fileStream.open(regFile, FileMode.WRITE); 
+					fileStream.writeUTFBytes("REGEDIT4\r\n");
+					fileStream.writeUTFBytes('\r\n');
+					fileStream.writeUTFBytes('[HKEY_CLASSES_ROOT\\' + appName + ']\r\n');
+					fileStream.writeUTFBytes('@="URL:' + appName + ' Protocol"\r\n');
+					fileStream.writeUTFBytes('"URL Protocol"=""\r\n');
+					fileStream.writeUTFBytes('\r\n');
+					fileStream.writeUTFBytes('[HKEY_CLASSES_ROOT\\' + appName + '\\DefaultIcon]\r\n');
+					fileStream.writeUTFBytes('@="\\"' + hkeyPath + '\\\\' + appName + '.exe\\""\r\n');
+					fileStream.writeUTFBytes('\r\n');
+					fileStream.writeUTFBytes('[HKEY_CLASSES_ROOT\\' + appName + '\\shell]\r\n');
+					fileStream.writeUTFBytes('\r\n');
+					fileStream.writeUTFBytes('[HKEY_CLASSES_ROOT\\' + appName + '\\shell\\open]\r\n');
+					fileStream.writeUTFBytes('\r\n');
+					fileStream.writeUTFBytes('[HKEY_CLASSES_ROOT\\' + appName + '\\shell\\open\\command]\r\n');
+					fileStream.writeUTFBytes('@="\\"' + hkeyPath + '\\\\' + appName + '.exe\\" \\"%1\\""\r\n');
+					
+					fileStream.close();
+				//}
+			}
+			
+			public function onOutputData(event:ProgressEvent):void
+			{
+				writeLogger("Got: " + process.standardOutput.readUTFBytes(process.standardOutput.bytesAvailable));
+			}
+			
+			public function onErrorData(event:ProgressEvent):void
+			{
+				writeLogger("ERROR -" + process.standardError.readUTFBytes(process.standardError.bytesAvailable));
+			}
+			
+			public function onExit(event:NativeProcessExitEvent):void
+			{
+				writeLogger("Process exited with " + event.exitCode);
+			}
+			
+			public function onIOError(event:IOErrorEvent):void
+			{
+				writeLogger(event.toString());
+			}
+			
+			protected function btnTest_clickHandler(event:MouseEvent):void
+			{
+				//var inputString : String = {"key1":"value1", {"key2":"value2","key3":"value3"}};
+				//var outputString : String = m_ext.passString2( inputString );
+				/*
+				var inputString : String = "Thank you, Eric, for the inspiration for this tutorial!!!";
+				log.text += "inputString: " + inputString + "\n";
+				
+				// Then call the passString method on it and check what it returns:
+				var outputString : String = m_ext.passString( inputString );
+				log.text += "ouputString: " + outputString + "\n";
+				*/
+				trace(updater.updateVersion);
+				trace(updater.currentState);
+			}
+			
+			
+			protected function btnTest_clickHandler2(event:MouseEvent):void
+			{
+				//var inputString : String = {"key1":"value1", {"key2":"value2","key3":"value3"}};
+				//var outputString : String = m_ext.passString2( inputString );
+				
+				var objarr : Array = new Array({"BUCKET_SIZE":"1234", "CHANNEL_ID":"5678"});
+				var inputString:String = com.adobe.serialization.json.JSON.encode(objarr);
+				writeLogger("inputString: " + inputString);
+				
+				// Then call the passString method on it and check what it returns:
+				var outputString : String = m_ext.passString2( inputString.substr(1,inputString.length-2) );
+				writeLogger("ouputString: " + outputString);
+				
+				trace(inputString);
+				trace(inputString.substr(1,inputString.length-2));
+				trace(objarr);
+				
+			}
+			
+			import flash.display.MovieClip;
+			import flash.display.Loader;
+			import flash.net.URLRequest;
+			
+			public var loader:Loader = new Loader();
+			
+			public function onComplete(event:Event):void
+			{
+				// applicationID - <id>sk.yoz.whatever</id> defined in app.xml
+				// publisherID - WindowedApplication().nativeApplication.publisherID
+				var appXml:XML = NativeApplication.nativeApplication.applicationDescriptor; 
+				//var applicationID:String = "TestApp";
+				var applicationID:String = "FlexPlayerTest";
+				var publisherID:String = "";
+				Object(loader.content).getApplicationVersion(applicationID, publisherID, appVersionCallback);
+				trace(applicationID);
+				trace(publisherID);
+				
+				writeLogger("DONE");
+					
+			}
+			
+			private var _air:Object;
+					
+			private function onInit(e:Event):void {
+				_air = e.target.content;
+				switch (_air.getStatus()) {
+					case "installed" :
+						trace("AIR is installed and has been detected.");
+						//launchButton.addEventListener(MouseEvent.CLICK,onButtonClicked);
+						break;
+					case "available" :
+						// AIR is Available
+						trace("AIR is not installed - application cannot be launched.");
+						break;
+					case "unavailable" :
+						// AIR Not Available
+						trace("AIR is not installed - application cannot be launched.");
+						break;
+				}
+			}		
+			
+			private function onButtonClicked(e:Event):void {
+				
+				var _applicationID:String = "FlexPlayerTest";
+				var publisherID:String = "";
+				trace("Attempting to Launch AIR Application");
+				trace(_applicationID);
+				var arguments:Array = ["launchFromBrowser"]; // Optional
+				_air.launchApplication(_applicationID, publisherID, arguments);
+			}
+			
+			
+			public function appVersionCallback(version:String):void
+			{
+				if (version == null) {
+					// application is not installed
+					trace("DONE11");
+				}
+				else {
+					// installed, compare variable version with some desired
+					trace("DONE22");
+					var applicationID:String = "FlexPlayerTest";
+					var publisherID:String = "";
+					var arguments:Array = ["launchFromBrowser"]; // Optional
+					Object(loader.content).launchApplication(applicationID, publisherID, arguments);
+					trace(version);
+				}
+				
+			}
+			
+			protected function updater_initializedHandler(event:UpdateEvent):void
+			{
+				trace(updater.currentVersion);
+				updater.checkNow();
+			}
+			
+			public function onInvoke(invokeEvent:InvokeEvent):void 
+			{ 
+				var outputString:String;
+				
+				if (invokeEvent.currentDirectory != null) 
+				{ 
+					writeLogger("Current directory=" + invokeEvent.currentDirectory.nativePath);
+				}  
+				else  
+				{ 
+					writeLogger("--no directory information available-- ");
+				}
+				
+				if (invokeEvent.arguments.length > 0) 
+				{ 
+					
+					writeLogger("settingString: " + settingString);
+					
+					var arg:Array;
+					
+					for (var i:int = 0; i < invokeEvent.arguments.length; i++) {
+						writeLogger("Arguments: " + invokeEvent.arguments[i].toString());
+						arg = invokeEvent.arguments[i].toString().split(",");
+						for (var j:int = 0; j < arg.length; j++) {
+							writeLogger("Sub-arguments: " + arg[j].toString());
+						}
+					}
+					
+					settingArray = new Array({	
+						"BUCKET_SIZE" : 8192,
+						"CHANNEL_ID" : arg[1],
+						"HTML_SIZE" : 1024,
+						"LANE_DEPTH" : 3,
+						"MAX_LANE" : 8,
+						"MIN_LANE": 1,
+						"PK_SERVER" : {
+							"IP" : arg[2],
+							"PORT" : arg[3]
+						},
+						"REG_SERVER" : {
+							"IP" : "140.114.71.174",
+							"PORT" : 7756
+						},
+						"LOG_SERVER" : {
+							"IP" : arg[4],
+							"PORT" : arg[5]
+						},
+						"STUN_SERVER" : {
+							"IP" : "140.114.71.174"
+						},
+						"STREAM" : {
+							"PORT" : 3000
+						},
+						"P2P_TCP_PORT" : 5566,
+						"P2P_UDP_PORT" : 7788
+					});
+				}  
+				else  
+				{ 
+					writeLogger("--no arguments-- ");
+				}
+				
+				settingString = com.adobe.serialization.json.JSON.encode(settingArray);
+				writeLogger("settingString: " + settingString);
+				
+				// Start llp2p-client if no arguments, use default setting
+				outputString = m_ext.runp2pclient(settingString.substr(1,settingString.length-2) );
+			} 
+		]]>
+	</fx:Script>    
+	
+	<fx:Declarations>
+		<!-- Updater -->
+		<updater:NativeApplicationUpdater id="updater" updateURL="http://140.114.71.166:8080/Portal/badge/update.xml" initialized="updater_initializedHandler(event)"/>
+	</fx:Declarations>
+	<!--
+	<s:Label text="You are updated to version: {updater.currentVersion}"  horizontalCenter="0" verticalCenter="0" />
+	
+	<s:Button id="btnTest" x="435" y="116" width="100%" label="Test ANE" click="btnTest_clickHandler(event)"/>
+	<s:Button id="btnTest2" x="435" y="145" width="100%" label="Test2" click="btnTest_clickHandler2(event)"/>
+	<s:Button id="launchButton" x="435" y="174" width="100%" label="Test3"/>
+	-->
+	<s:VideoPlayer id="videoplayer" x="0" y="0" width="100%" height="100%" autoPlay="true"
+				   creationComplete="videoplayer.videoDisplay.mx_internal::videoPlayer.bufferTime = 1;" source="http://127.0.0.1:3000/0.flv"
+				   />
+	<!--
+	<mx:VideoDisplay id="videodisplay" x="695" y="326" width="445" height="264" autoPlay="false"
+	bufferTime="5" live="true" source="http://127.0.0.1:3000/0.flv"/>
+	-->
+	
+</s:WindowedApplication>

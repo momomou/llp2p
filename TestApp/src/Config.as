@@ -1,0 +1,46 @@
+// ActionScript file
+
+
+import com.adobe.serialization.json.JSON;
+
+private var llp2p_setting : String = null;
+
+	protected function Setllp2pSetting():void
+	{
+		var objarr : Array = new Array({	
+			"BUCKET_SIZE" : 8192,
+			"CHANNEL_ID" : 1,
+			"HTML_SIZE" : 1024,
+			"LANE_DEPTH" : 3,
+			"MAX_LANE" : 8,
+			"MIN_LANE": 1,
+			"PK_SERVER" : {
+				"IP" : "140.114.71.174",
+				"PORT" : 8856
+			},
+			"REG_SERVER" : {
+				"IP" : "140.114.71.174",
+				"PORT" : 7756
+			},
+			"LOG_SERVER" : {
+				"IP" : "140.114.71.174",
+				"PORT" : 9956
+			},
+			"STUN_SERVER" : {
+				"IP" : "140.114.71.174"
+			},
+			"STREAM" : {
+				"PORT" : 3000
+			},
+			"P2P_TCP_PORT" : 5566,
+			"P2P_UDP_PORT" : 7788
+		});
+		
+		llp2p_setting = com.adobe.serialization.json.JSON.encode(objarr);
+	}
+	
+	protected function Getllp2pSetting():String
+	{
+		return llp2p_setting;
+	}
+
