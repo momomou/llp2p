@@ -3,7 +3,7 @@ CC = gcc
 CPP = g++
 
 #CPPFLAGS += -Wno-write-strings -g -W -I/usr/include -I/usr/local/include/stlport -I.
-CPPFLAGS += -std=c++11 -g -W -I /usr/include -I /usr/local/include/stlport -I ./udt_lib -I. -pthread
+CPPFLAGS += -std=c++11 -static -g -W -I /usr/include -I /usr/local/include/stlport -I ./udt_lib -I. -pthread
 
 #OBJS = configuration.o network.o peer.o basic_class.o pk_mgr.o peer_mgr.o logger.o librtsp/rtsp_server.o librtsp/rtsp_viewer.o librtmp/rtmp_server.o librtmp/rtmp_viewer.o librtsp/ss_rtsp.o stream.o stream_handler.o stream_handler_udp.o stream_server.o stream_udp.o
 udt_lib_obj = udt_lib/api.o udt_lib/buffer.o udt_lib/cache.o udt_lib/ccc.o udt_lib/channel.o udt_lib/common.o udt_lib/core.o udt_lib/epoll.o udt_lib/list.o udt_lib/md5.o udt_lib/packet.o udt_lib/queue.o udt_lib/window.o

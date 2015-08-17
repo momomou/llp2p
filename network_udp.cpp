@@ -783,7 +783,7 @@ int network_udp::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 		int len2 = sizeof(udp_sndbuf);
 		UDT::getsockopt(sock, 0, UDT_SNDBUF, &udt_sndbuf, &len1);
 		UDT::getsockopt(sock, 0, UDP_SNDBUF, &udp_sndbuf, &len2);
-		_log_ptr->write_log_format("s(u) s d(u) s u s u s u s s d d \n", __FUNCTION__, __LINE__, "Send", send_rt_val, send_info->expect_len, "bytes to", sock, "state", UDT::getsockstate(sock), "ErrCode", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage(), udt_sndbuf, udp_sndbuf);
+		//_log_ptr->write_log_format("s(u) s d(u) s u s u s u s s d d \n", __FUNCTION__, __LINE__, "Send", send_rt_val, send_info->expect_len, "bytes to", sock, "state", UDT::getsockstate(sock), "ErrCode", UDT::getlasterror().getErrorCode(), "ErrMsg", UDT::getlasterror().getErrorMessage(), udt_sndbuf, udp_sndbuf);
 		
 		UDT::TRACEINFO trace;
 		//memset(&trace, 0, sizeof(UDT::TRACEINFO));

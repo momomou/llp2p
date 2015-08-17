@@ -339,12 +339,6 @@
     <ClCompile Include="..\..\librtsp\ss_rtsp.cpp">
       <Filter>原始程式檔\librtsp</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\stund\stun.cxx">
-      <Filter>原始程式檔\stund</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\stund\udp.cxx">
-      <Filter>原始程式檔\stund</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\udt_lib\api.cpp">
       <Filter>原始程式檔\udt_lib</Filter>
     </ClCompile>
@@ -470,6 +464,12 @@
     </ClCompile>
     <ClCompile Include="..\..\stunt_mgr.cpp">
       <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\stund\stun.cpp">
+      <Filter>原始程式檔\stund</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\stund\udp.cpp">
+      <Filter>原始程式檔\stund</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

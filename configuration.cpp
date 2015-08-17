@@ -157,7 +157,7 @@ std::string configuration::readConfigFile(const char *path) {
 
 void configuration::add_key(const char *key,std::string val)
 {
-    map_table[key] = val; 
+    map_table[key] = val;
 }
 
 void configuration::add_key(const char *key, unsigned short val)
@@ -166,6 +166,7 @@ void configuration::add_key(const char *key, unsigned short val)
 	stringstream ss(s);
 	ss << (int)val;
 	map_table[key] = ss.str();
+	debug_printf("size %d \n", map_table.size());
 }
 
 void configuration::read_key(const char *key, bool & retval) const

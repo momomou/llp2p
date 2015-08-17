@@ -394,7 +394,7 @@ int network::accept(int sock, struct sockaddr *addr, socklen_t *addrlen)
 
 int network::send(int s, const char *buf, size_t len, int flags) 
 {
-	int ret;
+	int ret = 0;
 	if((ret = ::send(s, buf, len, flags)) > 0) {
 		send_byte += (unsigned long long int) ret;
 	}
@@ -495,6 +495,7 @@ int network::nonblock_recv(int sock, Nonblocking_Ctl* send_info)
 
 	recv_rt_val = recv(sock, send_info->recv_ctl_info.buffer + send_info->recv_ctl_info.offset, send_info->recv_ctl_info.expect_len, 0);
 	//debug_printf("Recv %d(expected:%d) bytes to sock %d \n", recv_rt_val, send_info->recv_ctl_info.expect_len, sock);
+	_log_ptr->write_log_format("s(u) s d s d s d \n", __FUNCTION__, __LINE__, "Recv", recv_rt_val, "bytes from sock", sock, "expected len", send_info->recv_ctl_info.expect_len);
 
 	if (recv_rt_val < 0) {
 		
@@ -659,7 +660,7 @@ int network::nonblock_send(int sock, Network_nonblocking_ctl* send_info)
 	int send_rt_val;
 	if (send_info->ctl_state == READY) {
 		send_rt_val = send(sock, send_info->buffer + send_info->offset, send_info->expect_len, 0);
-		_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__, "Send", send_rt_val, send_info->expect_len, "bytes to", sock);
+		//_log_ptr->write_log_format("s(u) s u(u) s u \n", __FUNCTION__, __LINE__, "Send", send_rt_val, send_info->expect_len, "bytes to", sock);
 
 		if (send_rt_val < 0) {
 #ifdef _WIN32 

@@ -645,7 +645,6 @@ int LLP2P::createObj(int thread_key)
 		//memset(temp->irc_arg.nick, 0, sizeof(temp->irc_arg.nick));
 		//memcpy(temp->irc_arg.nick, "USER1", 5);
 		//
-
 		map_channelID_globalVar[thread_key] = temp;
 
 		return 0;
@@ -858,9 +857,6 @@ int FlashAirmainFunction(int thread_key){
 int main(int argc, char **argv){
 #endif
 
-	//cout << UDT::stunRandomPort() << endl;
-
-
 	cout << "tst_speed_svr " << version << " (Compiled Time: "<< __DATE__ << " "<< __TIME__")" << endl << endl;
 
 	FILE *record_file_fp2 = NULL;
@@ -913,8 +909,7 @@ int main(int argc, char **argv){
 		// Create constructors
 		//prep = new configuration(config_file);
 
-
-
+		
 #if defined(_FIRE_BREATH_MOD_)
 		prep = new configuration(config_file);
 		for (map<string, string>::iterator iter = map_channelID_globalVar[thread_key]->map_config->begin(); iter != map_channelID_globalVar[thread_key]->map_config->end(); iter++) {
@@ -927,7 +922,9 @@ int main(int argc, char **argv){
 		prep = new configuration(config_file);
 		for (map<string, string>::iterator iter = map_channelID_globalVar[thread_key]->map_config->begin(); iter != map_channelID_globalVar[thread_key]->map_config->end(); iter++) {
 			//prep->map_table.insert(pair<string, string>(iter->first, iter->second));
-			prep->map_table[iter->first] = iter->second;
+			//cout << iter->first << endl;
+			//prep->map_table[iter->first] = iter->second;
+			prep->add_key(iter->first.c_str(), iter->second);
 		}
 		net_ptr = new network(&(map_channelID_globalVar[thread_key]->errorRestartFlag), map_channelID_globalVar[thread_key]->fd_list);
 		net_udp_ptr = new network_udp(&(map_channelID_globalVar[thread_key]->errorRestartFlag), map_channelID_globalVar[thread_key]->fd_list);
@@ -959,12 +956,13 @@ int main(int argc, char **argv){
 		}
 
 
-
+		
 		log_ptr = new logger();
 		if (log_ptr == NULL) {
 			printf("[ERROR] log_ptr new error \n");
 			PAUSE
 		}
+		
 		//log_ptr->logger_set(net_ptr);
 		logger_client_ptr = new logger_client(log_ptr);
 		if (logger_client_ptr == NULL) {
@@ -1015,9 +1013,8 @@ int main(int argc, char **argv){
 			debug_printf("PK  ip:%s port:%s \n", register_mgr_ptr->pk_ip.c_str(), register_mgr_ptr->pk_ip.c_str());
 		}
 
-
 		log_ptr->start_log_record(SYS_FREQ);
-
+		
 		prep->read_key("html_size", html_size);
 		prep->read_key("svc_tcp_port", svc_tcp_port);
 		prep->read_key("svc_udp_port", svc_udp_port);
@@ -1384,8 +1381,8 @@ int main(int argc, char **argv){
 	#endif
 #else
 		while (!srv_shutdown && !errorRestartFlag) {
-			for (int i = 0; i < 5; i++) {
-				for (int j = 0; j < 5; j++) {
+			for (int i = 0; i < 2; i++) {
+				for (int j = 0; j < 2; j++) {
 					net_ptr->epoll_waiter(1000);
 					net_ptr->epoll_dispatcher();
 				}

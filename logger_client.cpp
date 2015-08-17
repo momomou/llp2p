@@ -411,8 +411,28 @@ void logger_client::send_bw()
 	//																																		quality_struct_ptr->accumulated_quality,
 	//																																		quality_struct_ptr->average_quality,
 	//																																		quality_struct_ptr->lost_pkt);
-	log_to_server(LOG_WRITE_STRING, 0, "s u s u d d d d d d \n", "my_pid", _pk_mgr_ptr->my_pid, "[DATA]", quality_struct_ptr->lost_pkt, quality_struct_ptr->redundatnt_pkt, quality_struct_ptr->expired_pkt, quality_struct_ptr->total_chunk, _pk_mgr_ptr->pkt_count, _pk_mgr_ptr->pkt_rate, _pk_mgr_ptr->Xcount);
-	log_to_server(LOG_WRITE_STRING, 0, "s u s d d d d d d d d d d d d d \n", "my_pid", _pk_mgr_ptr->my_pid, "[DATA_BW]", message_bw_analysis.in_control_bw.header, message_bw_analysis.in_control_bw.payload, message_bw_analysis.in_data_bw.header, message_bw_analysis.in_data_bw.payload, message_bw_analysis.in_redundant_data_bw.header, message_bw_analysis.in_redundant_data_bw.payload, message_bw_analysis.out_control_bw.header, message_bw_analysis.out_control_bw.payload, message_bw_analysis.out_data_bw.header, message_bw_analysis.out_data_bw.payload, message_bw_analysis.out_logger_bw.header, message_bw_analysis.out_logger_bw.payload, period_msec);
+	log_to_server(LOG_WRITE_STRING, 0, "s u s u d d d d d d \n", "my_pid", _pk_mgr_ptr->my_pid, "[DATA]", 
+		quality_struct_ptr->lost_pkt, 
+		quality_struct_ptr->redundatnt_pkt, 
+		quality_struct_ptr->expired_pkt, 
+		quality_struct_ptr->total_chunk, 
+		_pk_mgr_ptr->pkt_count, 
+		_pk_mgr_ptr->pkt_rate, 
+		_pk_mgr_ptr->Xcount);
+	log_to_server(LOG_WRITE_STRING, 0, "s u s d d d d d d d d d d d d d \n", "my_pid", _pk_mgr_ptr->my_pid, "[DATA_BW]", 
+		message_bw_analysis.in_control_bw.header, 
+		message_bw_analysis.in_control_bw.payload, 
+		message_bw_analysis.in_data_bw.header, 
+		message_bw_analysis.in_data_bw.payload, 
+		message_bw_analysis.in_redundant_data_bw.header, 
+		message_bw_analysis.in_redundant_data_bw.payload, 
+		message_bw_analysis.out_control_bw.header, 
+		message_bw_analysis.out_control_bw.payload,
+		message_bw_analysis.out_data_bw.header, 
+		message_bw_analysis.out_data_bw.payload,
+		message_bw_analysis.out_logger_bw.header, 
+		message_bw_analysis.out_logger_bw.payload, 
+		period_msec);
 
 	quality_struct_ptr->lost_pkt = 0;
 	quality_struct_ptr->redundatnt_pkt = 0;

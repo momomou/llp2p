@@ -484,6 +484,12 @@ void peer_mgr::HandleBlockRescue(struct chunk_block_rescue_t *chunk_ptr)
 	unsigned long ss_id = chunk_ptr->ss_id;
 	unsigned long type = chunk_ptr->type;
 	unsigned long value = chunk_ptr->value;
+	
+	if (value > 5) {
+		// Limit the transmission times to avoid loop
+		return ;
+	}
+
 	_pk_mgr_ptr->SetSubstreamBlockRescue(ss_id, type);
 
 	for (map<unsigned long, struct peer_info_t *>::iterator iter = _pk_mgr_ptr->map_pid_child.begin(); iter != _pk_mgr_ptr->map_pid_child.end(); iter++) {

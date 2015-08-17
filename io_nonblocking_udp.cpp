@@ -148,6 +148,11 @@ int io_nonblocking_udp::handle_pkt_in_udp(int sock)
 					peer_info_ptr->estimated_delay = role_protocol_ptr->parent_src_delay + role_protocol_ptr->queueing_time + role_protocol_ptr->transmission_time;
 					peer_info_ptr->PS_class = role_protocol_ptr->PS_class;
 					_log_ptr->write_log_format("s(u) s d(d) u u u \n", __FUNCTION__, __LINE__, "peer", peer_info_ptr->pid, sock, role_protocol_ptr->parent_src_delay, role_protocol_ptr->queueing_time, role_protocol_ptr->transmission_time);
+					
+					UDT::TRACEINFO trace;
+					memset(&trace, 0, sizeof(UDT::TRACEINFO));
+					int nnn = UDT::perfmon(sock, &trace);
+					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s d d d d d \n", "my_pid", _peer_communication_ptr->_pk_mgr_ptr->my_pid, "peer", peer_info_ptr->pid, "estimated_delay", peer_info_ptr->estimated_delay, role_protocol_ptr->parent_src_delay, role_protocol_ptr->queueing_time, role_protocol_ptr->transmission_time, (UINT32)(trace.msRTT));
 				}
 			}
 		}
@@ -289,6 +294,10 @@ void io_nonblocking_udp::HandleCMDRole(int sock, struct role_struct *role_protoc
 			role_protocol_ptr->parent_src_delay = _peer_communication_ptr->_pk_mgr_ptr->ss_table[_peer_communication_ptr->_pk_mgr_ptr->manifestToSubstreamID(map_mysession_candidates_iter->second->manifest)]->data.avg_src_delay;
 			role_protocol_ptr->queueing_time = _peer_communication_ptr->_pk_mgr_ptr->GetQueueTime();
 			//role_protocol_ptr->transmission_time = transmisstion_time + 100;
+			UDT::TRACEINFO trace;
+			memset(&trace, 0, sizeof(UDT::TRACEINFO));
+			int nnn = UDT::perfmon(sock, &trace);
+			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s u s u u \n", "my_pid", _peer_communication_ptr->_pk_mgr_ptr->my_pid, "Reply", role_protocol_ptr->send_pid, "->", role_protocol_ptr->recv_pid, "[PS] RTT", transmisstion_time, (UINT32)(trace.msRTT));
 		}
 		role_protocol_ptr->flag = map_mysession_candidates_iter->second->myrole == CHILD_PEER ? PARENT_PEER : CHILD_PEER;
 

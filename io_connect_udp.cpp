@@ -150,6 +150,11 @@ int io_connect_udp::handle_pkt_out_udp(int sock)
 			role_protocol_ptr->parent_src_delay = _pk_mgr_ptr->ss_table[_pk_mgr_ptr->manifestToSubstreamID(map_mysession_candidates_iter->second->manifest)]->data.avg_src_delay;
 			role_protocol_ptr->queueing_time = _pk_mgr_ptr->GetQueueTime();
 			role_protocol_ptr->transmission_time = transmisstion_time;
+
+			UDT::TRACEINFO trace;
+			memset(&trace, 0, sizeof(UDT::TRACEINFO));
+			int nnn = UDT::perfmon(sock, &trace);
+			_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s u s u u \n", "my_pid", _pk_mgr_ptr->my_pid, "Request", role_protocol_ptr->send_pid, "->", role_protocol_ptr->recv_pid, "[PS] RTT", transmisstion_time, (UINT32)(trace.msRTT));
 		}
 
 		Nonblocking_Send_Ctrl_ptr ->recv_ctl_info.offset = 0;

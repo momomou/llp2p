@@ -20,11 +20,11 @@
 #define DEBUG2
 #endif
 */
-
+/*
 #ifndef WRITE_LOG
 #define WRITE_LOG		// write log.txt
 #endif
-
+*/
 #ifndef SEND_LOG_DEBUG
 #define SEND_LOG_DEBUG	// Allow to send CHNK_CMD_LOG_DEBUG to log-server
 #endif
@@ -44,9 +44,13 @@
 #define STUNT_FUNC	// Allow to record received message
 #endif
 */
-/*
+
 #ifndef BLOCK_RESCUE
 #define BLOCK_RESCUE	// Allow to record received message
+#endif
+/*
+#ifndef PS_PARENT
+#define PS_PARENT		// Allow Parent Selection in parent-part
 #endif
 */
 // Role of function caller
@@ -81,8 +85,8 @@
 
 ////resuce PARAMETER////
 #define PARAMETER_X		4				// chunk packets per (1000/PARAMETER_X) ms
-#define MAX_DELAY 		5000			// source delay PARAMETER ms
-#define SOURCE_DELAY_CONTINUOUS 1		// The maximal permissive times that souce-delay is bigger than MAX_DELAY. SOURCE_DELAY_CONTINUOUS * x(packets/s) / substream
+#define MAX_DELAY 		3000			// source delay PARAMETER ms
+#define SOURCE_DELAY_CONTINUOUS 0.5		// (MAX_DELAY+3) The maximal permissive times that souce-delay is bigger than MAX_DELAY. SOURCE_DELAY_CONTINUOUS * x(packets/s) / substream
 // M 次測量發生N次 or 連續P次發生 則判斷需要Rescue(頻寬檢查)
 #define PARAMETER_M		16		// 8
 #define PARAMETER_N		10		// 5
@@ -98,19 +102,24 @@
 //ms
 #define CONNECT_TIME_OUT		2000		// Session timer
 #define NETWORK_TIMEOUT			5000		// Period of check peer's unnormal disconnection
-#define DATA_TIMEOUT			2000		// Timeout for rescue type 3
-#define BASE_RESYN_TIME			20000
-#define MIN_RESYN_TIME			10000
-#define MAX_RESYN_TIME			40000
+#define DATA_TIMEOUT			3000		// Timeout for rescue type 3
+#define BASE_RESYN_TIME			60000//20000
+#define MIN_RESYN_TIME			60000//10000
+#define MAX_RESYN_TIME			60000//40000
 #define NAT_WAITING_TIME		200			// waiting time before build connection (等待一段時間給 PK 送的 CMD 能到達雙方)
 #define DELAY_BUILD_CONN_TIME	500			// 給一個時間緩衝，確保 child 和 parent 都收有到 list
 #define BLOCK_RESCUE_TIME		5000		// waiting time for block_rescue
 #define BLOCK_RESCUE_INTERVAL	2000		// Time interval between sending block_rescue
-#define RTT_CMD_TIMEOUT			3000
+#define RTT_CMD_TIMEOUT			5000
 
 #define NEEDSOURCE_THRESHOLD	0.96		// substream在stable或有duplicate source狀態的數目 / 全部substream數目, 超過這個threshold可以不必向pk要source
 
 #define MAX_RTT_TEST_PEER_LIST	5
+
+#define SOURCE_BITRATE			125	// (kB/s)
+#define SELF_DIAGNOSIS_A		0.8
+#define MIN_SEND_BW				8		// kbps
+#define MAX_SEND_BW				10000		// kbps (~2.5*bitrate)
 
 //  必須小於bucket_size  (從接收 - > 送到player中間的buff ) 
 // BUFF_SIZE sec
@@ -143,7 +152,7 @@
 #define LOG_TIMES 2
 #define TIME_PERIOD 2500		//500
 #define MAX_STORED_NUM	20					// If log_buffer.size() more than this value, send log messages to log server
-#define LOG_DELAY_SEND_PERIOD 5000
+#define LOG_DELAY_SEND_PERIOD 3000
 #define LOG_BW_SEND_PERIOD 10000
 
 /* LOG part: peer state (for debug CHNK_CMD_LOG_DEBUG) */
@@ -281,7 +290,11 @@ using std::bitset;
 #pragma pack(1)
 
 // Defined Macro
-#define PAUSE for (;;) { cout << "PAUSE , Press any key to continue..." << __FUNCTION__ << ":" << __LINE__ << endl; fgetc(stdin); }
+#ifdef _WIN32
+	#define PAUSE for (;;) { cout << "PAUSE , Press any key to continue..." << __FUNCTION__ << ":" << __LINE__ << endl; fgetc(stdin); }
+#else
+	#define PAUSE for (;;) { cout << "PAUSE , Press any key to continue..." << __FUNCTION__ << ":" << __LINE__ << endl; exit(1); }
+#endif
 #ifdef DEBUG
 #define debug_printf(...) do { printf("(%d)\t", __LINE__); printf(__VA_ARGS__); } while (0)
 #else
@@ -292,6 +305,7 @@ using std::bitset;
 #else
 #define debug_printf2(str, ...)
 #endif 
+
 
 /****************************************************/
 /*		Type Definition								*/
@@ -490,6 +504,18 @@ struct timerStruct{
 #define STATE_LIST			2
 #define STATE_TESTING		3
 
+// Peer self-diagnose
+#define SELF_DIAGNOSE_NONE	0		// 不做任何動作
+#define SELF_DIAGNOSE_TIME	1		// 從連線持續時間最短的開始捨棄
+#define SELF_DIAGNOSE_RTT	2		// 從 RTT 最長的開始捨棄
+#define SELF_DIAGNOSE_FLOW	3		// 從 Queue 變化最不穩定的開始捨棄
+#define SELF_DIAGNOSE_QUEUE	4		// 從 Queue 積最多的開始捨棄
+
+// Parent Selection Policy
+#define PS_RTT				1		// 挑選 rtt 最小的
+#define PS_SD				2		// 挑選 estimated source delay 最小的
+#define PS_RD				3		// random
+
 #define DBG_MODE
 
 #ifdef DBG_MODE
@@ -558,6 +584,9 @@ struct peer_info_t {
 	struct timerStruct time_end;		// 這條 socket 成功建立連線的時間. Transmission time = time_end - time_start
 	INT32 rtt;							// 只用在 CHNK_CMD_RTT_TEST_REQUEST. 如果只用一個封包來測 RTT, 就用 time_end - time_start 來 assign, 如果可以送很多封包來找出 RTT, 就用 UDT 計算的 RTT (因為 UDT 有 Congestion Control, RTT 只用一個封包測會不精準)
 	UINT32 estimated_delay;				// 用來估算這個 parent 的 delay
+	INT32 queue_len;					// child 上次被記錄到的 queue length (bytes)
+	INT32 is_frozen;					// child 是否正在被凍結狀態，使用在 Peer Overloaded Detection
+	INT32 frozen_seq;					// 模擬 stack 效果
 };
 
 
@@ -966,6 +995,7 @@ struct update_test_info{
 struct chunk_rtt_request {
 	struct chunk_header_t header;
 	UINT32 pid;
+	INT32 rttResponser;			// 0: responser , 1: test partner
 	struct level_info_t test_peer_info[MAX_RTT_TEST_PEER_LIST];
 };
 
@@ -1091,13 +1121,18 @@ struct queue_history {
 	INT32 current_index;		// 目前 index, 未被記錄
 };
 
+struct peer_diagnose {
+	INT32 seq;					// Initialize with 1
+	struct timerStruct timer;
+};
+
 /************************************************************/
 /*		Structures of Sock Priority Queue	(2014/12/26)	*/
 /************************************************************/
 struct queue_info {
-	INT32 length;			// Current length of queue
-	INT32 lambda;		// Input rate
-	INT32 mu;			// Output rate
+	INT32 length;		// Current length of queue  (bytes)
+	INT32 lambda;		// Input rate  (bytes)
+	INT32 mu;			// Output rate (bytes)
 };
 
 /****************************************************/

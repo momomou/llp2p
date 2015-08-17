@@ -99,11 +99,11 @@ CUDT::CUDT()
    initSynch();
 
    // Default UDT configurations
-   m_iMSS = 1430;
+   m_iMSS = 544;//1430
    m_bSynSending = true;
    m_bSynRecving = true;
    m_iFlightFlagSize = 25600;
-   m_iSndBufSize = 1024; // 8192
+   m_iSndBufSize = 4096; // 8192
    m_iRcvBufSize = 8192; //Rcv buffer MUST NOT be bigger than Flight Flag size
    m_Linger.l_onoff = 1;
    m_Linger.l_linger = 180;
@@ -1609,7 +1609,7 @@ void CUDT::sample(CPerfMon* perf, bool clear)
    perf->usSndDurationTotal = m_llSndDurationTotal;
 
    double interval = double(currtime - m_LastSampleTime);
-
+   
    perf->mbpsSendRate = double(m_llTraceSent) * m_iPayloadSize * 8.0 / interval;
    perf->mbpsRecvRate = double(m_llTraceRecv) * m_iPayloadSize * 8.0 / interval;
 

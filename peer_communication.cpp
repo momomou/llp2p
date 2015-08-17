@@ -1548,9 +1548,10 @@ void peer_communication::stop_attempt_connect(unsigned long stop_session_id)
 // 4. 從 dangerous_list 挑選
 void peer_communication::SelectStrategy(UINT32 my_session)
 {
+	int PS_policy = PS_SD;
 	bool selection_done = false;	// 讓被選中的 parent 只有一個
 	UINT32 selected_pid = -1;
-	UINT32 selected_est_delay = 100000;
+	UINT32 selected_value = 100000;
 	list<UINT32> stable_list;
 	list<UINT32> warning_list;
 	list<UINT32> dangerous_list;
@@ -1576,7 +1577,8 @@ void peer_communication::SelectStrategy(UINT32 my_session)
 			"peercomm_session", map_mysession_candidates_iter->second->p_candidates_info[i].peercomm_session,
 			"sock1", peer_fd1, map_mysession_candidates_iter->second->p_candidates_info[i].connection_state, map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, map_mysession_candidates_iter->second->p_candidates_info[i].PS_class,
 			"sock2", peer_fd2, map_mysession_candidates_iter->second->n_candidates_info[i].connection_state, map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay, map_mysession_candidates_iter->second->n_candidates_info[i].PS_class);
-		
+		_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u u u u u \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "peer", peer_pid, map_mysession_candidates_iter->second->p_candidates_info[i].connection_state, map_mysession_candidates_iter->second->p_candidates_info[i].PS_class, map_mysession_candidates_iter->second->n_candidates_info[i].connection_state, map_mysession_candidates_iter->second->n_candidates_info[i].PS_class);
+
 
 		if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED || map_mysession_candidates_iter->second->n_candidates_info[i].connection_state == PEER_CONNECTED) {
 			struct peer_connect_down_t *parent_info = _pk_mgr_ptr->GetParentFromPid(peer_pid);
@@ -1602,6 +1604,7 @@ void peer_communication::SelectStrategy(UINT32 my_session)
 					_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s u u \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "push parent", peer_pid, "into overloading_list", map_mysession_candidates_iter->second->p_candidates_info[i].PS_class, map_mysession_candidates_iter->second->n_candidates_info[i].PS_class);
 					overloading_list.push_back(peer_pid);
 				}
+				// 可能發生 PS_class = 0 的情況，如果兩個 peer 之間 RTT 過長會導致無法在時限內做完訊息交換
 			}
 		}
 	}
@@ -1613,21 +1616,83 @@ void peer_communication::SelectStrategy(UINT32 my_session)
 			INT32 peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
 			INT32 peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
 			UINT32 peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
-			_log_ptr->write_log_format("s(u) s d s u s u s u s u \n", __FUNCTION__, __LINE__, "peer_pid", peer_pid, "*iter", *iter, "selected_est_delay", selected_est_delay, "estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, "connection_state", map_mysession_candidates_iter->second->p_candidates_info[i].connection_state);
+			_log_ptr->write_log_format("s(u) s d s u s u s u s u \n", __FUNCTION__, __LINE__, "peer_pid", peer_pid, "*iter", *iter, "selected_value", selected_value, "estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, "connection_state", map_mysession_candidates_iter->second->p_candidates_info[i].connection_state);
 			
 			if (peer_pid == *iter) {
 				if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED) {
-					if (selected_est_delay > map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay) {
-						selected_pid = peer_pid;
-						selection_done = true;
-						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in stable_list");
+					if (PS_policy == PS_SD) {
+						if (selected_value > map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay) {
+							selected_pid = peer_pid;
+							selection_done = true;
+							selected_value = map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay;
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in stable_list  estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, selected_value);
+						}
+						else {
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in stable_list  estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, selected_value);
+						}
+					}
+					else if (PS_policy == PS_RTT) {
+						UDT::TRACEINFO trace;
+						memset(&trace, 0, sizeof(UDT::TRACEINFO));
+						int nnn = UDT::perfmon(peer_fd1, &trace);
+						if (selected_value > (UINT32)(trace.msRTT) + 1) {
+							selected_pid = peer_pid;
+							selection_done = true;
+							selected_value = (UINT32)(trace.msRTT) + 1;
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in stable_list  rtt", (UINT32)(trace.msRTT) + 1, selected_value);
+						}
+						else {
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in stable_list  rtt", (UINT32)(trace.msRTT) + 1, selected_value);
+						}
+					}
+					else if (PS_policy == PS_RD) {
+						if (selected_value > 1) {
+							selected_pid = peer_pid;
+							selection_done = true;
+							selected_value = 1;
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in stable_list  random", selected_value);
+						}
+						else {
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in stable_list  random", selected_value);
+						}
 					}
 				}
 				else if (map_mysession_candidates_iter->second->n_candidates_info[i].connection_state == PEER_CONNECTED) {
-					if (selected_est_delay > map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay) {
-						selected_pid = peer_pid;
-						selection_done = true;
-						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in stable_list");
+					if (PS_policy == PS_SD) {
+						if (selected_value > map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay) {
+							selected_pid = peer_pid;
+							selection_done = true;
+							selected_value = map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay;
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in stable_list  estimated_delay", map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay, selected_value);
+						}
+						else {
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in stable_list  estimated_delay", map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay, selected_value);
+						}
+					}
+					else if (PS_policy == PS_RTT) {
+						UDT::TRACEINFO trace;
+						memset(&trace, 0, sizeof(UDT::TRACEINFO));
+						int nnn = UDT::perfmon(peer_fd2, &trace);
+						if (selected_value > (UINT32)(trace.msRTT) + 1) {
+							selected_pid = peer_pid;
+							selection_done = true;
+							selected_value = (UINT32)(trace.msRTT) + 1;
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in stable_list  rtt", (UINT32)(trace.msRTT) + 1, selected_value);
+						}
+						else {
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in stable_list  rtt", (UINT32)(trace.msRTT) + 1, selected_value);
+						}
+					}
+					else if (PS_policy == PS_RD) {
+						if (selected_value > 1) {
+							selected_pid = peer_pid;
+							selection_done = true;
+							selected_value = 1;
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in stable_list  random", selected_value);
+						}
+						else {
+							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in stable_list  random", selected_value);
+						}
 					}
 				}
 			}
@@ -1661,23 +1726,83 @@ void peer_communication::SelectStrategy(UINT32 my_session)
 				INT32 peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
 				INT32 peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
 				UINT32 peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
-				_log_ptr->write_log_format("s(u) s d s u s u s u s u \n", __FUNCTION__, __LINE__, "peer_pid", peer_pid, "*iter", *iter, "selected_est_delay", selected_est_delay, "estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, "connection_state", map_mysession_candidates_iter->second->p_candidates_info[i].connection_state);
+				_log_ptr->write_log_format("s(u) s d s u s u s u s u \n", __FUNCTION__, __LINE__, "peer_pid", peer_pid, "*iter", *iter, "selected_est_delay", selected_value, "estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, "connection_state", map_mysession_candidates_iter->second->p_candidates_info[i].connection_state);
 
 				if (peer_pid == *iter) {
 					if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED) {
-						if (selected_est_delay > map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay) {
-							selected_pid = peer_pid;
-							selection_done = true;
-							selected_est_delay = map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay;
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in warning_list");
+						if (PS_policy == PS_SD) {
+							if (selected_value > map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay) {
+								selected_pid = peer_pid;
+								selection_done = true;
+								selected_value = map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay;
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in warning_list  estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, selected_value);
+							}
+							else {
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in warning_list  estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, selected_value);
+							}
+						}
+						else if (PS_policy == PS_RTT) {
+							UDT::TRACEINFO trace;
+							memset(&trace, 0, sizeof(UDT::TRACEINFO));
+							int nnn = UDT::perfmon(peer_fd1, &trace);
+							if (selected_value > (UINT32)(trace.msRTT) + 1) {
+								selected_pid = peer_pid;
+								selection_done = true;
+								selected_value = (UINT32)(trace.msRTT) + 1;
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in warning_list  rtt", (UINT32)(trace.msRTT) + 1, selected_value);
+							}
+							else {
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in warning_list  rtt", (UINT32)(trace.msRTT) + 1, selected_value);
+							}
+						}
+						else if (PS_policy == PS_RD) {
+							if (selected_value > 1) {
+								selected_pid = peer_pid;
+								selection_done = true;
+								selected_value = 1;
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in warning_list  random", selected_value);
+							}
+							else {
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in warning_list  random", selected_value);
+							}
 						}
 					}
 					else if (map_mysession_candidates_iter->second->n_candidates_info[i].connection_state == PEER_CONNECTED) {
-						if (selected_est_delay > map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay) {
-							selected_pid = peer_pid;
-							selection_done = true;
-							selected_est_delay = map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay;
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in warning_list");
+						if (PS_policy == PS_SD) {
+							if (selected_value > map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay) {
+								selected_pid = peer_pid;
+								selection_done = true;
+								selected_value = map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay;
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in warning_list  estimated_delay", map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay, selected_value);
+							}
+							else {
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in warning_list  estimated_delay", map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay, selected_value);
+							}
+						}
+						else if (PS_policy == PS_RTT) {
+							UDT::TRACEINFO trace;
+							memset(&trace, 0, sizeof(UDT::TRACEINFO));
+							int nnn = UDT::perfmon(peer_fd2, &trace);
+							if (selected_value > (UINT32)(trace.msRTT) + 1) {
+								selected_pid = peer_pid;
+								selection_done = true;
+								selected_value = (UINT32)(trace.msRTT) + 1;
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in warning_list  rtt", (UINT32)(trace.msRTT) + 1, selected_value);
+							}
+							else {
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in warning_list  rtt", (UINT32)(trace.msRTT) + 1, selected_value);
+							}
+						}
+						else if (PS_policy == PS_RD) {
+							if (selected_value > 1) {
+								selected_pid = peer_pid;
+								selection_done = true;
+								selected_value = 1;
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in warning_list  random", selected_value);
+							}
+							else {
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in warning_list  random", selected_value);
+							}
 						}
 					}
 				}
@@ -1694,23 +1819,83 @@ void peer_communication::SelectStrategy(UINT32 my_session)
 				INT32 peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
 				INT32 peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
 				UINT32 peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
-				_log_ptr->write_log_format("s(u) s d s u s u s u s u \n", __FUNCTION__, __LINE__, "peer_pid", peer_pid, "*iter", *iter, "selected_est_delay", selected_est_delay, "estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, "connection_state", map_mysession_candidates_iter->second->p_candidates_info[i].connection_state);
+				_log_ptr->write_log_format("s(u) s d s u s u s u s u \n", __FUNCTION__, __LINE__, "peer_pid", peer_pid, "*iter", *iter, "selected_est_delay", selected_value, "estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, "connection_state", map_mysession_candidates_iter->second->p_candidates_info[i].connection_state);
 
 				if (peer_pid == *iter) {
 					if (map_mysession_candidates_iter->second->p_candidates_info[i].connection_state == PEER_CONNECTED) {
-						if (selected_est_delay > map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay) {
-							selected_pid = peer_pid;
-							selection_done = true;
-							selected_est_delay = map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay;
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in dangerous_list");
+						if (PS_policy == PS_SD) {
+							if (selected_value > map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay) {
+								selected_pid = peer_pid;
+								selection_done = true;
+								selected_value = map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay;
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in dangerous_list  estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, selected_value);
+							}
+							else {
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in dangerous_list  estimated_delay", map_mysession_candidates_iter->second->p_candidates_info[i].estimated_delay, selected_value);
+							}
+						}
+						else if (PS_policy == PS_RTT) {
+							UDT::TRACEINFO trace;
+							memset(&trace, 0, sizeof(UDT::TRACEINFO));
+							int nnn = UDT::perfmon(peer_fd1, &trace);
+							if (selected_value > (UINT32)(trace.msRTT) + 1) {
+								selected_pid = peer_pid;
+								selection_done = true;
+								selected_value = (UINT32)(trace.msRTT) + 1;
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in dangerous_list  rtt", (UINT32)(trace.msRTT) + 1, selected_value);
+							}
+							else {
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in dangerous_list  rtt", (UINT32)(trace.msRTT) + 1, selected_value);
+							}
+						}
+						else if (PS_policy == PS_RD) {
+							if (selected_value > 1) {
+								selected_pid = peer_pid;
+								selection_done = true;
+								selected_value = 1;
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in dangerous_list  random", selected_value);
+							}
+							else {
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in dangerous_list  random", selected_value);
+							}
 						}
 					}
 					else if (map_mysession_candidates_iter->second->n_candidates_info[i].connection_state == PEER_CONNECTED) {
-						if (selected_est_delay > map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay) {
-							selected_pid = peer_pid;
-							selection_done = true;
-							selected_est_delay = map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay;
-							_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in dangerous_list");
+						if (PS_policy == PS_SD) {
+							if (selected_value > map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay) {
+								selected_pid = peer_pid;
+								selection_done = true;
+								selected_value = map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay;
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in dangerous_list  estimated_delay", map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay, selected_value);
+							}
+							else {
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in dangerous_list  estimated_delay", map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay, selected_value);
+							}
+						}
+						else if (PS_policy == PS_RTT) {
+							UDT::TRACEINFO trace;
+							memset(&trace, 0, sizeof(UDT::TRACEINFO));
+							int nnn = UDT::perfmon(peer_fd2, &trace);
+							if (selected_value > (UINT32)(trace.msRTT) + 1) {
+								selected_pid = peer_pid;
+								selection_done = true;
+								selected_value = (UINT32)(trace.msRTT) + 1;
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in dangerous_list  rtt", (UINT32)(trace.msRTT) + 1, selected_value);
+							}
+							else {
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in dangerous_list  rtt", (UINT32)(trace.msRTT) + 1, selected_value);
+							}
+						}
+						else if (PS_policy == PS_RD) {
+							if (selected_value > 1) {
+								selected_pid = peer_pid;
+								selection_done = true;
+								selected_value = 1;
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select parent", peer_pid, "in dangerous_list  random", selected_value);
+							}
+							else {
+								_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u s d \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "not select parent", peer_pid, "in dangerous_list  random", selected_value);
+							}
 						}
 					}
 				}
@@ -2667,7 +2852,12 @@ int peer_communication::handle_pkt_in_udp(int sock)
 						peer_info_ptr = &(iter->second->p_candidates_info[i]);
 						peer_info_ptr->estimated_delay = role_protocol_ptr->parent_src_delay + role_protocol_ptr->queueing_time + role_protocol_ptr->transmission_time;
 						peer_info_ptr->PS_class = role_protocol_ptr->PS_class;
-						_log_ptr->write_log_format("s(u) s d(d) u u u \n", __FUNCTION__, __LINE__, "peer", peer_info_ptr->pid, sock, role_protocol_ptr->parent_src_delay, role_protocol_ptr->queueing_time, role_protocol_ptr->transmission_time);
+						_log_ptr->write_log_format("s(u) s d(d) d d d \n", __FUNCTION__, __LINE__, "peer", peer_info_ptr->pid, sock, role_protocol_ptr->parent_src_delay, role_protocol_ptr->queueing_time, role_protocol_ptr->transmission_time);
+						
+						UDT::TRACEINFO trace;
+						memset(&trace, 0, sizeof(UDT::TRACEINFO));
+						int nnn = UDT::perfmon(sock, &trace);
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u s u s d d d d d \n", "my_pid", _pk_mgr_ptr->my_pid, "peer", peer_info_ptr->pid, "estimated_delay", peer_info_ptr->estimated_delay, role_protocol_ptr->parent_src_delay, role_protocol_ptr->queueing_time, role_protocol_ptr->transmission_time, (UINT32)(trace.msRTT));
 					}
 				}
 			}
@@ -2800,7 +2990,7 @@ int peer_communication::handle_pkt_in_udp(int sock)
 					int peer_fd1 = map_mysession_candidates_iter->second->p_candidates_info[i].sock;
 					int peer_fd2 = map_mysession_candidates_iter->second->n_candidates_info[i].sock;
 					int peer_manifest = map_mysession_candidates_iter->second->n_candidates_info[i].manifest;
-
+					
 					_log_ptr->write_log_format("s(u) s u s u s u s u(u)(u)(u) s u(u)(u)(u) \n", __FUNCTION__, __LINE__,
 						"parent", peer_pid,
 						"my_session", iter->first,
@@ -2809,6 +2999,7 @@ int peer_communication::handle_pkt_in_udp(int sock)
 						"sock2", peer_fd2, map_mysession_candidates_iter->second->n_candidates_info[i].connection_state, map_mysession_candidates_iter->second->n_candidates_info[i].estimated_delay, map_mysession_candidates_iter->second->n_candidates_info[i].PS_class);
 
 					if (iter->second->p_candidates_info[i].sock == sock) {
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select child", peer_pid);
 						iter->second->p_candidates_info[i].connection_state = PEER_SELECTED;
 						peer_info_ptr = &(iter->second->p_candidates_info[i]);
 						my_role = iter->second->myrole;
@@ -2817,6 +3008,7 @@ int peer_communication::handle_pkt_in_udp(int sock)
 						}
 					}
 					else if (iter->second->n_candidates_info[i].sock == sock) {
+						_logger_client_ptr->log_to_server(LOG_WRITE_STRING, 0, "s u(u) s u \n", "my_pid", _pk_mgr_ptr->my_pid, peer_manifest, "select child", peer_pid);
 						iter->second->n_candidates_info[i].connection_state = PEER_SELECTED;
 						peer_info_ptr = &(iter->second->n_candidates_info[i]);
 						my_role = iter->second->myrole;

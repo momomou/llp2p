@@ -6,6 +6,7 @@
 #include "stream_udp.h"
 #include <iostream>
 #include <map>
+#include <algorithm>
 
 class network;
 class network_udp;
@@ -37,6 +38,7 @@ public:
 	unsigned long reSynTime;
 	struct timerStruct lastSynStartclock;
 	struct queue_history my_queue_history;
+	struct peer_diagnose my_peer_diagnose;
 	unsigned long pkt_count ;			// 一次 XCOUNT_INTERVAL 時間內收到的chunk數量(有過濾過)
 	unsigned long totalbyte;
 	int syncLock;					// set 1 if send sync token to pk and not yet receive the response
@@ -50,6 +52,7 @@ public:
 	struct timerStruct reSynTimer;
 	struct timerStruct XcountTimer;
 	struct timerStruct programStartTimer;
+	
 
 //	LARGE_INTEGER teststart,testend;
 //	LARGE_INTEGER syn_round_start;
@@ -117,7 +120,8 @@ public:
 
 	struct timerStruct child_queue_timer;
 	struct timerStruct base_timer;
-	struct timerStruct base2_timer;
+	struct timerStruct update_children_timer;
+	struct timerStruct system_start_timer;
 
 	void syn_table_init(int pk_sock);
 	void send_syn_token_to_pk(int pk_sock);
@@ -195,8 +199,13 @@ public:
 	void handle_kickout(struct chunk_t *chunk_ptr, int sockfd);
 	void handle_error(int exit_code, const char *msg, const char *func, unsigned int line);
 	void HandleRelayStream(struct chunk_t *chunk_ptr);
+	void HandleRelayStream2(struct chunk_t *chunk_ptr);
 	void HandleCMDSeed(struct seed_notify *chunk_seed_notify);
 	void HandleCMDRTT(struct chunk_rtt_request *chunk_rtt_req_ptr, int peer_num);
+	void OverloadedDetection();
+	void FreezeChild(INT32 type);
+	void ReleaseChild();
+	void UpdateChildrenInfo();
 
 	// Queue Handler
 	int GetQueueInfo(int *sock, int *bits);		// Get the lowest queue

@@ -131,3 +131,26 @@ UDT::m_iMSS 1500->1430
 llp2pDll.dll 編譯好後也要放在以下目錄:
 1. C:\Program Files (x86)\Adobe\Adobe Flash Builder 4.6\sdks\4.6.0 _withair17\bin
 2. D:\Adobe Flash Builder 4.6\TestApp\src
+
+/* 2015.04.24 */
+自動輸入 ssh key 的方法:
+ssh-agent bash --login -i
+ssh-add
+
+/* 2015.04.27 */
+砍掉process:
+ps -A
+pkill -9 ray-32
+
+PlanetLab:
+export MQ_NODES=/home/myubuntu/Desktop/PlanetLab/codeploy/nodes270.txt
+export MQ_SLICE=nthu_hsnl
+export MQ_MAXLOAD=20
+export MQ_TIMEOUT=10
+wget -q 140.114.71.174/ray_32_20150515_d2 -O ray_32_20150515_d2
+ 
+/* 2015.05.04 */
+Block Rescue 似乎有 loop 發生(因為其 value 竟然到上千甚至上萬)，設定最大傳送次數只能3次
+
+/* 2015.05.26 */
+UDT::m_iMSS 1430->544 (配合 video 封包的大小及提高頻寬計算準確度)

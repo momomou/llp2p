@@ -141,8 +141,8 @@
     <ClCompile Include="..\..\stream_handler.cpp" />
     <ClCompile Include="..\..\stream_handler_udp.cpp" />
     <ClCompile Include="..\..\stream_udp.cpp" />
-    <ClCompile Include="..\..\stund\stun.cxx" />
-    <ClCompile Include="..\..\stund\udp.cxx" />
+    <ClCompile Include="..\..\stund\stun.cpp" />
+    <ClCompile Include="..\..\stund\udp.cpp" />
     <ClCompile Include="..\..\stunt\tcp_punch.cpp" />
     <ClCompile Include="..\..\stunt_mgr.cpp" />
     <ClCompile Include="..\..\udt_lib\api.cpp" />

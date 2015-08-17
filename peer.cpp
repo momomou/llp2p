@@ -2235,7 +2235,7 @@ int peer::handle_pkt_out_udp(int sock)
 		}
 		// DATA
 		else if (queue_out_data_ptr->size() != 0) {
-			
+			/*
 			bool can_send = true;
 			int total_pendingpkt = 0;
 			//_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "sock", sock, "state", UDT::getsockstate(sock));
@@ -2262,17 +2262,6 @@ int peer::handle_pkt_out_udp(int sock)
 				return RET_OK;
 			}
 			
-			/*
-			// 控制 pending packets in udt queue 的數量 (MTU = 1500 bytes)，最多就 1500*50 bytes
-			int32_t pendingpkt_size = 0;
-			int len = sizeof(pendingpkt_size);
-			UDT::getsockopt(sock, 0, UDT_SNDDATA, &pendingpkt_size, &len);
-			if (pendingpkt_size > 50) {
-				//_log_ptr->write_log_format("s(u) s d s u \n", __FUNCTION__, __LINE__, "sock", sock, "pendingpkt_size", pendingpkt_size);
-				return RET_OK;
-			}
-			*/
-
 			// 檢查 priority 比自己高一級的那個 child 的 queue 是否 empty, 不是 empty 的話就不發送
 			for (list<unsigned long>::reverse_iterator iter = priority_children.rbegin(); iter != priority_children.rend(); iter++) {
 				//_log_ptr->write_log_format("s(u) s u s d \n", __FUNCTION__, __LINE__, "*iter", *iter, "size", priority_children.size());
@@ -2315,6 +2304,16 @@ int peer::handle_pkt_out_udp(int sock)
 			if (can_send == false) {
 				return RET_OK;
 			}
+			*/
+
+			int32_t pendingpkt_size = 0;
+			int len = sizeof(pendingpkt_size);
+			UDT::getsockopt(sock, 0, UDT_SNDDATA, &pendingpkt_size, &len);
+			
+			
+			if (pendingpkt_size > 20 || child_info->is_frozen == TRUE) {
+				return RET_OK;
+			}
 			
 
 			if (Nonblocking_Send_Data_ptr->recv_ctl_info.ctl_state == READY) {
@@ -2329,12 +2328,13 @@ int peer::handle_pkt_out_udp(int sock)
 				Nonblocking_Send_Data_ptr->recv_ctl_info.serial_num = chunk_ptr->header.sequence_number;
 
 				_send_byte = _net_udp_ptr->nonblock_send(sock, &(Nonblocking_Send_Data_ptr->recv_ctl_info));
-				map_udpfd_queue[sock]->length -= chunk_ptr->header.length * 8;
-				map_udpfd_queue[sock]->mu += chunk_ptr->header.length * 8;
+				map_udpfd_queue[sock]->length -= chunk_ptr->header.length;
+				map_udpfd_queue[sock]->mu += chunk_ptr->header.length;
 
-				_log_ptr->write_log_format("s(u) s d s d(d) s d s d s u \n", __FUNCTION__, __LINE__,
+				_log_ptr->write_log_format("s(u) s d s d(d) s d s d s d s u \n", __FUNCTION__, __LINE__,
 					"sent data", _send_byte, "bytes to child", pid, sock,
 					"queue_out_data_ptr->size()", queue_out_data_ptr->size(),
+					"pending_size", pendingpkt_size,
 					"cmd", chunk_ptr->header.cmd,
 					"seq", chunk_ptr->header.sequence_number);
 
@@ -2403,14 +2403,14 @@ int peer::handle_pkt_out_udp(int sock)
 
 		}
 	}
-	
+	/*
 	if (queue_out_data_ptr->size() == 0 && queue_out_ctrl_ptr->size() == 0) {
 		if (parent_info != NULL) {
 			_net_udp_ptr->epoll_control(sock, EPOLL_CTL_DEL, UDT_EPOLL_OUT);		// 這個 socket 指向 parent, 關閉 writable 增加效能. 
 			_net_udp_ptr->epoll_control(sock, EPOLL_CTL_ADD, UDT_EPOLL_IN);		// UDT epoll_remove_usock 會關閉所有 event, 所以要將 readable 補回來 
 		}
 	}
-	
+	*/
 	return RET_OK;
 }
 
